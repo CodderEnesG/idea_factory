@@ -1,4 +1,13 @@
-# Plan: Idea Factory — MVP + İş Modeli
+# Plan: Idea Factory — MVP + Mimari
+
+> **Doküman haritası / otorite sırası.** Bu plan MVP + mimarinin kaynağıdır. Strateji kararları
+> ayrı, daha güncel dokümanlarda:
+> - **İş modeli** → `BUSINESS_MODEL.md` (v2; aşağıdaki §İş Modeli'nin yerini alır — burada özet).
+> - **Analist personası** → `AI_ANALYST.md` (karar fonksiyonu, 3 katman, debate modu).
+> - **Pazar bilgisi / "eğitme"** → `MARKET_KNOWLEDGE.md` (fine-tune değil grounding; 5 katman).
+> - **Somut ilk tez + arbitraj merceği** → `THESIS_AND_LENS.md` (Türkiye/MENA değerleri + soru çerçevesi).
+>
+> Konumlanma kararı: **global, tez-bağımsız platform**; Türkiye/arbitraj = ilk tez/mercek, marka değil.
 
 ## Bağlam
 Bir girişimci networkü (kurucu + arkadaşlar) için, startup/pazar sinyallerini sürekli toplayan, bunları **çok-mercekli (multi-lens), tez-odaklı yapay zeka analistlerinden** geçiren, **sıralı fırsat kuyruğu** üreten **ve aynı zamanda büyüyen, sorgulanabilir bir ekosistem bilgi tabanı** kuran bir sistem. Arbitraj (ABD/yurt dışı ürün → Türkiye'ye uyarlama) **ilk ve en keskin mercek** — ama tek mercek değil; yapı zamanla bambaşka çıktılara (trend raporu, sektör haritası, araştırma ürünü) evrilebilecek şekilde açık tasarlanır.
@@ -22,6 +31,10 @@ Kullanıcıyla netleşen kararlar:
 ---
 
 ## İş Modeli
+
+> **Bu bölüm özetdir; otorite `BUSINESS_MODEL.md` (v2).** Orada: dürüst CEO-review, ICP
+> önceliklendirme, North Star metriği, değere-çapalı fiyatlandırma, sağ-boyutlanmış moat,
+> rekabet haritası ve ticari doğrulama planı.
 
 ### Değer Önerisi
 "Sinyal içeri → çok-mercekli analiz + sıralı fırsatlar **+ büyüyen bilgi tabanı** dışarı." Network için üç şey üretir: (1) **hız** — literatürü tek tek takip etme yükünü kaldırır, (2) **kanaat** — her fırsatı tez'e göre puanlar, neyin emeğe değdiğini söyler, (3) **bilgi birikimi** — zamanla compound eden, sorgulanabilir bir ekosistem hafızası (kim, ne, hangi pazar, hangi trend).
@@ -90,7 +103,7 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 3. **Depolama + dedup** — **Postgres (Supabase)**; `url`/içerik-hash üzerinde unique index. Supabase seçildi çünkü: hosted, B2B için auth hazır, ileride `pgvector` ile semantik dedup/arama. (Alternatif: lokal başlamak istersen SQLite, sonra göç.)
 4. **Tez/persona konfig** — `thesis.config.ts`: `{capital_range, target_markets, sectors, capabilities, risk_appetite, anti_patterns}`, versiyonlu. Analistin system prompt'unun ortak zemini.
 5. **Mercek kayıt defteri** — `lenses.config.ts`: her mercek `{id, name, prompt_template, output_schema, weight}`. v1: `arbitrage`. Yeni mercek = tek giriş (trend, white-space, tech-novelty, timing…). Bu, "zamanla bambaşka çıktı" hedefinin teknik karşılığı.
-6. **AI analist** — `@anthropic-ai/sdk`, **yapısal JSON çıktı** (zod doğrulamalı). Kademeli maliyet: tüm sinyallerde **`claude-sonnet-4-6`** (bulk), kısa listede **`claude-opus-4-8`** (derin). Sinyal × aktif mercek başına: `{lens, fit 0-10, rationale, adaptation_notes, risks[], recommended_action: pursue|watch|kill, tags[]}`.
+6. **AI analist** — `@anthropic-ai/sdk`, **yapısal JSON çıktı** (zod doğrulamalı). Kademeli maliyet: tüm sinyallerde **`claude-sonnet-4-6`** (bulk), kısa listede **`claude-opus-4-8`** (derin). Sinyal × aktif mercek başına: `{lens, fit 0-10, rationale, adaptation_notes, risks[], confidence, recommended_action: pursue|watch|kill, tags[]}`. **Analist fine-tune edilmez — grounding ile çalışır** (tez config + RAG/gbrain + web arama + few-shot örnekler + memory). Persona = karar fonksiyonu; detay: `AI_ANALYST.md`, `MARKET_KNOWLEDGE.md`, `THESIS_AND_LENS.md`.
 7. **Ranker** — kompozit skor = (mercek uyumları, ağırlıklı) + tazelik + momentum → sıralı kuyruk.
 8. **Bilgi Katmanı (Knowledge Layer)** — analiz edilen her sinyal + analiz çıktısı + insan kararı, kalıcı bir bilgi tabanına yazılır. **gstack `gbrain`** (kalıcı, agent-dostu bilgi tabanı; Supabase + `pgvector`) bunun omurgası: embedding'li semantik arama + zamanla varlık ilişkileri (şirket/kurucu/sektör/pazar/trend). Network buradan ekosistemi sorgular. `/setup-gbrain` ile kurulur, `/sync-gbrain` ile güncel tutulur.
 9. **Sunum**:
@@ -149,3 +162,4 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 - **API maliyeti**: kademeli sonnet/opus + batch + analiz öncesi dedup.
 - **X/LinkedIn**: yalnız faz 2; ücretli X API veya manuel — MVP'yi bunlara bağlama.
 - **Açık karar**: Supabase mi (öneri) yoksa lokal SQLite başlangıç mı? Figma linki ne zaman gelir (UI fazı onu bekler)?
+- **Açık karar (strateji, ilgili dokümanlarda izleniyor)**: beachhead segment kesinleştirme (`BUSINESS_MODEL.md §9`); varsayılan analist arketipi + debate tetik eşiği (`AI_ANALYST.md §9`); somut tez değerlerinin doldurulması (`THESIS_AND_LENS.md §1`).
