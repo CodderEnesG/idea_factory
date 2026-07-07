@@ -37,7 +37,10 @@ değil — yani değiştirmek yeni model değil, yeni ayar gerektirir.
 risk iştahı, anti-pattern'ler. Bu, analistin *neyi iyi sayacağının* sabit zemini. Bir fonun
 yatırım mandası gibi. (Bkz. `THESIS_AND_LENS.md` — somut Türkiye/MENA değerleri.)
 
-### Katman 2 — Küratörlü bilgi tabanı (RAG — asıl "pazar hafızası")
+### Katman 2 — Küratörlü bilgi tabanı (RAG — asıl "pazar hafızası") · **FAZ 2**
+> **v1'de kapalı:** gbrain/RAG faz 2'ye ertelendi; Bilgi Katmanı v1'de boş stub. v1 analist yalnız
+> Katman 1 (tez) + Katman 3 (canlı web) + Katman 4 (few-shot) ile çalışır — geçmiş-hafıza bağlamı yok.
+
 Analistin uzun-vadeli hafızası. **gstack `gbrain` (Supabase + `pgvector`)** omurga: geçmiş
 sinyaller, şirketler, kurucular, fonlama olayları, pazar/regülasyon notları embedding'lenip
 kalıcı tabana yazılır. Analiz anında, sinyalle **semantik olarak en alakalı** geçmiş bağlam
@@ -62,7 +65,9 @@ gerekçeli vaka analizleri. Bu, modelin **tonunu** değil **yargısını** hizal
 fırsat sayıp neyi saymadığını örnekten öğrenir. (İlk set elle küratörlenir; zamanla insan
 kararları yeni örneklere dönüşür — bkz. Katman 5.)
 
-### Katman 5 — Memory (oturumlar-arası öğrenme)
+### Katman 5 — Memory (oturumlar-arası öğrenme) · **FAZ 2**
+> **v1'de kapalı** (Katman 2 ile birlikte ertelendi).
+
 Anthropic **memory tool** + karar geri-besleme döngüsü: analist kullanıldıkça öğrendiğini
 (düzeltmeler, doğrulanmış yaklaşımlar, networkün tercihleri) kalıcı bir hafıza dosyasına yazar ve
 sonraki oturumlarda okur. "Bu sektörde geçen ay şu yanlış pozitifi gördük" gibi dersler birikir.
@@ -96,8 +101,9 @@ Türkiye uzmanısın" demekle olmaz (o sadece tondur). Gerçek tanıma, bilgi ta
 - **Prompt caching** — büyük, stabil bilgi-prefix'i (tez + sabit pazar bilgisi) bir kez yazılıp
   cache'lenir; tekrar eden analizlerde ~0.1× maliyetle okunur. Stabil içeriği önde, değişken
   sinyali sonda tut.
-- **Kademeli model** — tüm sinyaller ucuz toplu modelle (**`claude-sonnet-4-6`**) ön-elenir;
-  yalnız kısa liste pahalı modele (**`claude-opus-4-8`**) gider. Persona aynı, efor kademeli.
+- **Model** — **v1: tek model** (`analysis_model`, varsayılan **`claude-opus-4-8`**); hacim
+  düşükken max yargı kalitesi. Kademeli ucuz toplu (**`claude-sonnet-4-6`**) ön-eleme + kısa listede
+  Opus **faz 2** (hacim zorlayınca). Persona aynı, efor kademeli.
 - **RAG = seçici enjeksiyon** — tüm bilgi tabanını değil, sinyalle alakalı parçayı çekeriz
   (bağlam şişmez, maliyet düşer).
 - **Context-editing / compaction** — uzun oturumlarda eski tool sonuçlarını/bağlamı temizler.

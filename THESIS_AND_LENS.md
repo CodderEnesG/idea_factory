@@ -2,27 +2,34 @@
 
 > **Bu dokümanın yeri:** `AI_ANALYST.md` (persona) ve `MARKET_KNOWLEDGE.md` (grounding) felsefesini
 > **somuta** indirir: ilk tez konfigürasyonunun gerçek değerleri + arbitraj merceğinin tam soru
-> çerçevesi. Şablon değerler **başlangıç taslağıdır** — sermaye/sektör gibi alanları kullanıcı
-> (network) kendi gerçeğiyle doldurur.
+> çerçevesi. Aşağıdaki değerler **v1 için kesinleşmiştir** (network ile alan-alan dolduruldu);
+> yeni yanlış pozitifler çıktıkça yalnız `anti_patterns` genişler.
 
 ---
 
-## 1. İlk tez: Türkiye/MENA arbitraj mandası
+## 1. İlk tez: Türkiye arbitraj mandası (v1 — kesinleşti)
 
-Tez = analistin "neyi iyi sayacağının" sabit zemini (mandate). Aşağıdaki değerler **temsili
-taslaktır**; her satır network'ün gerçeğiyle güncellenmeli.
+Tez = analistin "neyi iyi sayacağının" sabit zemini (mandate).
 
-| Alan | Temsili başlangıç değeri (DOLDUR) | Neden önemli (analist bunu nasıl kullanır) |
+| Alan | v1 değeri | Neden önemli (analist bunu nasıl kullanır) |
 |---|---|---|
-| `capital_range` | ~$25K–$250K tohum/bootstrap | Kovalanabilir fırsatı sermaye gerçeğine göre eler; "100M$ gerektiren" fikri baştan düşürür |
-| `target_markets` | Türkiye (birincil), MENA (genişleme) | Arbitraj hedefi; uyarlama analizinin yapılacağı pazar |
-| `sectors` | B2B SaaS, fintech, e-ticaret altyapısı, vertical SaaS | Odak; dışı düşük öncelik (ama "tez-dışı ama ilginç" kovası açık kalır) |
-| `capabilities` | Yazılım/ürün, hızlı GTM, yerel pazar erişimi | "Bizim yapabileceğimiz" işi öne çıkarır; yetkinlik dışını işaretler |
-| `risk_appetite` | Orta — kanıtlı model + yerel uyarlama; derin Ar-Ge düşük | Erken/riskli vs kanıtlı fırsat dengesini ayarlar |
-| `anti_patterns` | Ağır regülasyon (lisanslı bankacılık/sağlık), tek-şehir hikâyesi, ödeme isteği belirsiz, network-effect'siz pazaryeri | Bilinen yanlış pozitifleri **baştan bastırır** — en güçlü kalibrasyon |
+| `capital_range` | **Minimal / sermaye-hafif** (bootstrap-önce, ~$0–100K) | Kovalanabilir fırsatı sermaye gerçeğine göre eler; büyük ön yatırım gerektiren fikri baştan düşürür (sermaye-ağır = anti-pattern) |
+| `target_markets` | **Türkiye (birincil, ispat pazarı); genişleme global** | Arbitraj hedefi; uyarlama analizinin yapılacağı ilk pazar Türkiye, ölçek sonra global |
+| `sectors` | **B2B SaaS, fintech, e-ticaret altyapısı, vertical SaaS** | Odak; dışı düşük öncelik (ama "tez-dışı ama ilginç" kovası açık kalır) |
+| `capabilities` | **Yazılım/ürün, hızlı GTM, yerel pazar erişimi** | "Bizim yapabileceğimiz" işi öne çıkarır; yetkinlik dışını işaretler |
+| `risk_appetite` | **Orta** — kanıtlı model + yerel uyarlama; derin Ar-Ge düşük | Erken/riskli vs kanıtlı fırsat dengesini ayarlar |
+| `anti_patterns` | **Ağır regülasyon (lisanslı bankacılık/sağlık); ödeme isteği (WTP) belirsiz; sermaye-ağır (büyük ön yatırım gerektiren)** | Bilinen yanlış pozitifleri **baştan bastırır** — en güçlü kalibrasyon |
 
-> **Not:** `anti_patterns` listesi zamanla en değerli varlık olur — her yanlış pozitif buraya
-> eklenir, analist bir daha aynı tuzağa düşmez (bkz. `MARKET_KNOWLEDGE.md` Katman 5).
+> **Not (anti_patterns kapsamı):** "tek-şehir hikâyesi" ve "network-effect'siz pazaryeri" v1
+> başlangıç setinden **çıkarıldı** — analist bunları otomatik bastırmaz. Gerçek yanlış pozitif
+> olarak karşımıza çıkarlarsa sonradan eklenir. `anti_patterns` listesi zamanla en değerli varlık
+> olur — her yanlış pozitif buraya eklenir, analist bir daha aynı tuzağa düşmez.
+
+> **Not (kanıt asimetrisi — v1'de dürüstçe kabul edilir):** Arbitraj kanıtının iki ayağı var:
+> (a) *orada işe yarıyor mu* — ücretsiz feed'ler (YC/PH/fonlama) bunu güçlü verir; (b) *burada acı
+> var mı* (yerel wedge/talep) — ücretsiz feed'de yok, `web_search` + yerel bilgi + zamanla network
+> ile dolar. Yani v1'de yerel-talep kanıtı **yapısal olarak zayıf/spekülatif** olacak. Bu yüzden
+> analistin ilgili ayak için `confidence: low, doğrulanmalı` demesi **doğru davranıştır, hata değil.**
 
 ---
 
@@ -61,9 +68,20 @@ sorar (çıktı yapılandırılır, her sayının yanında gerekçe + güven):
 
 ---
 
-## 3. Kalibrasyon — altın-standart örnekler (taslak)
+## 3. Kalibrasyon — altın-standart örnekler + eval
 
-Analistin yargısını hizalayan örnekler. İlk set elle küratörlenir; gerçek vakalarla değiştirilmeli.
+Analistin yargısını hizalayan örnekler. **v1 hedefi: 5-6 örnek.** Üretim süreci: **network gerçek
+sinyal + tek-satır kovala/izle/ele kararı verir → asistan bunu tam yapılandırılmış analize (arbitraj
+şeması) açar → network gerekçeyi düzeltir.** Böylece ground-truth etiketler network'ün, prose emeği
+asistanın.
+
+Bu 5-6 örnek aynı zamanda **eval setinin çekirdeği**: minimal harness = analisti N sinyalde koştur →
+`recommended_action`'ı insan etiketiyle kıyasla → örtüşme %'sine bak. **Leave-one-out** kullan (test
+edilen örneği few-shot'tan çıkar, sırayla döndür). Dürüst uyarı harness çıktısına yazılır: küçük ve
+few-shot'la örtüşen bir setle örtüşme %'si "analist örnekleri izliyor mu"yu ölçer, *genelleme*yi değil.
+v1'de kabul; set gerçek sinyallerle büyüdükçe anlam kazanır (8-10 vaka hedefe iyi bir başlangıç).
+
+Aşağıdaki A/B iki taslaktır; ilk gerçek vakalarla değiştirilecek/genişletilecek.
 
 ### Örnek A — "KOVALA" (yüksek uyum)
 > **Sinyal:** ABD'de B2B fatura/ön-muhasebe otomasyonu SaaS, KOBİ'lerde hızlı büyüme, kanıtlı tur.

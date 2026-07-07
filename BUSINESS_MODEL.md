@@ -139,10 +139,10 @@ böylece doğru bahsi daha erken ve daha az emekle koyarsın."*
 
 - **Usage katmanı:** Yüksek hacimli derin analiz (Opus) maliyetini fiyata bağlamak için üst
   kademede kota + aşım passthrough. Bu, LLM maliyetinin marjı yemesini engeller.
-- **Birim ekonomisi mantığı (yüksek brüt marj):** tüm sinyaller ucuz toplu modelle
-  (`claude-sonnet-4-6`) skorlanır; yalnız kısa liste pahalı modele (`claude-opus-4-8`) gider.
-  Dedup + tez filtresi analiz öncesi hacmi düşürür. Hedef: bir hesabın aylık LLM maliyeti,
-  aboneliğin küçük bir yüzdesi.
+- **Birim ekonomisi mantığı (yüksek brüt marj):** *faz 2 kademesi* — tüm sinyaller ucuz toplu
+  modelle (`claude-sonnet-4-6`) skorlanır; yalnız kısa liste pahalı modele (`claude-opus-4-8`)
+  gider. (**v1 = tek model** Opus; hacim düşük, kademeye gerek yok.) Dedup + tez filtresi analiz
+  öncesi hacmi düşürür. Hedef: bir hesabın aylık LLM maliyeti, aboneliğin küçük bir yüzdesi.
 - **Go-to-paid motion:** Faz 1 başarı hikâyeleri → design-partner indirimi (erken erişim karşılığı
   geri bildirim + referans) → LOI → ücretli pilot.
 
@@ -198,6 +198,12 @@ Faz 2'yi inşa etmeden, Faz 1 boyunca *ticari* sinyali test ederiz — kod deği
 **"3 iş modeli yürütme" tuzağından kaçın:** Knowledge-layer'ı *ayrı araştırma ürünü* olarak satmak
 cazip bir **hipotez** ama Faz 2'ye kadar buna bağlanma. Çekirdek (sıralı fırsat + tez istihbaratı)
 kanıtlanmadan ikinci/üçüncü iş modeli odak dağıtır.
+
+> **Kanıt asimetrisi (v1'de dürüstçe kabul).** v1 ücretsiz kaynakları (YC/PH/fonlama feed'leri)
+> *arz*ı kanıtlar — "bu iş başka pazarda çalışıyor". Ama *yerel talep/acı*yı kanıtlamaz; onun tek
+> ücretsiz yolu `web_search` + yerel bilgi ve asıl olarak **bu bölümdeki sorun mülakatlarıdır**.
+> Yani yerel-talep kanıtını feed değil, doğrulama planı üretir; analistin yerel ayak için
+> `confidence: low, doğrulanmalı` demesi normaldir (bkz. `THESIS_AND_LENS.md §1` kanıt asimetrisi).
 
 ---
 

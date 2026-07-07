@@ -95,7 +95,10 @@ Bu bölüm personanın **çekirdek karakteridir** — analizi gürültüden ayı
 
 7. **Bağlam farkındalığı (hafızaya bağlanma).** Analist izole çalışmaz; ilgili geçmiş sinyalleri ve
    ekosistem hafızasını (gbrain) bağlam olarak okur — "bunu daha önce gördük mü, kim denedi, ne
-   oldu?". Bu, hem tekrarı önler hem kanaati derinleştirir.
+   oldu?". Bu, hem tekrarı önler hem kanaati derinleştirir. **→ Faz 2:** bu ilke gbrain/RAG'e
+   bağlıdır; **v1'de gbrain ertelendiği için analist bağlamsız çalışır** (Bilgi Katmanı boş stub).
+   v1'de "daha önce gördük mü" sorusu yalnız `web_search` ile kısmen cevaplanır; tam hafıza-bağlamı
+   faz 2. Bunu v1 yeteneği olarak iddia etme.
 
 ---
 
@@ -137,9 +140,12 @@ olmalı.** Gerekçesiz skor yayınlamayız.
 
 ## 6. Maliyet × derinlik (persona aynı, efor kademeli)
 
-Aynı analist karakteri iki kademede çalışır:
-- **Toplu tarama** (ucuz model): tüm sinyallere hızlı, yüzeysel ön-eleme. Amaç: gürültüyü atmak.
-- **Derin analiz** (pahalı model): yalnız kısa listeye tam muhakeme, çürütme, uyarlama derinliği.
+**v1 = tek model** (`analysis_model`, varsayılan Opus): hacim düşükken max yargı kalitesi öncelikli
+— temiz eval etiketi + güven. Kademelendirme, olmayan bir ölçeği optimize etmek olurdu.
+
+**Faz 2 (hacim zorlayınca)** aynı karakter iki kademede çalışır:
+- **Toplu tarama** (ucuz model, örn. Sonnet): tüm sinyallere hızlı, yüzeysel ön-eleme. Amaç: gürültü.
+- **Derin analiz** (pahalı model, Opus): yalnız kısa listeye tam muhakeme, çürütme, uyarlama derinliği.
 
 Persona değişmez; değişen **eforun ne kadar derine indiği.** Bu, birim ekonomisini korur (bkz.
 `BUSINESS_MODEL.md` §6).
@@ -192,8 +198,10 @@ Kısaca: persona kanaat üretir, **sistem onu hesap verebilir kılar.**
   öneriliyor; alternatif (örn. "büyüme-odaklı fırsatçı") test edilmeli mi?
 - **Açık karar — debate tetik eşiği:** debate modunu hangi skor/bahis seviyesinde açalım (maliyet ↔
   robustluk dengesi)?
-- **Açık karar — örnek seti kaynağı:** ilk altın-standart örnekler nereden? (network geçmiş
-  kararları / elle küratörlenmiş bir başlangıç seti?)
+- **Karar (kapandı) — örnek seti kaynağı:** v1 = **5-6 elle küratörlenmiş örnek**; süreç network
+  gerçek sinyal + tek-satır karar verir → asistan tam analize açar → network gerekçeyi düzeltir.
+  Aynı set **eval çekirdeği** (leave-one-out). Zamanla insan kararları yeni örneklere dönüşür.
+  Detay: `THESIS_AND_LENS.md §3`.
 
 ---
 

@@ -83,10 +83,10 @@ Tek-kiracılı pipeline: **Topla → Normalize/Dedup → Çok-mercekli Analiz �
 Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ──────────────┐
                                                       │              │
                   Tez + Mercek Kayıt Defteri ─▶ AI Analist           │
-                  (Sonnet bulk / Opus deep, çok-mercek)              │
+                  (v1: tek model=Opus, arbitraj merceği)             │
                                                       │              ▼
-                                              Ranker (kompozit)   Bilgi Katmanı
-                                                      │           (embedding + arama/soru)
+                                        Ranker (v1: fit+tazelik) Bilgi Katmanı
+                                                      │        (v1: boş stub · gbrain faz 2)
                               ┌───────────────────────┤              ▲
                         React Kuyruk UI         Digest üretici       │
                        (kovala/izle/ele)      (markdown/HTML/PDF)     │
@@ -100,12 +100,12 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 ### Bileşenler (her biri ayrı modül)
 1. **Kaynak kayıt defteri** — `sources.config.ts`: `{name, kind: rss|api|scrape, url, parser, cadence}`. Yeni kaynak = tek satır.
 2. **Ingestion worker'ları** — kind'a göre çekim. Feed/API olmayan siteler için gstack **`/scrape`** + **`/browse`** (headless Playwright); başarılı her scrape **`skillify`** ile kalıcı browser-skill'e dönüşür (kaynak-kütüphanesi moat'ı).
-3. **Depolama + dedup** — **Postgres (Supabase)**; `url`/içerik-hash üzerinde unique index. Supabase seçildi çünkü: hosted, B2B için auth hazır, ileride `pgvector` ile semantik dedup/arama. (Alternatif: lokal başlamak istersen SQLite, sonra göç.)
+3. **Depolama + dedup** — **Postgres (Supabase)**; `url`/içerik-hash üzerinde unique index. **v1 dedup naiftir**: aynı şirket farklı kaynaktan mükerrer görünebilir — bu kabul edilir (entity-resolution faz 2 problemi). Supabase seçildi çünkü: hosted, B2B için auth hazır, ileride `pgvector` ile semantik dedup/arama. (Alternatif: lokal başlamak istersen SQLite, sonra göç.)
 4. **Tez/persona konfig** — `thesis.config.ts`: `{capital_range, target_markets, sectors, capabilities, risk_appetite, anti_patterns}`, versiyonlu. Analistin system prompt'unun ortak zemini.
 5. **Mercek kayıt defteri** — `lenses.config.ts`: her mercek `{id, name, prompt_template, output_schema, weight}`. v1: `arbitrage`. Yeni mercek = tek giriş (trend, white-space, tech-novelty, timing…). Bu, "zamanla bambaşka çıktı" hedefinin teknik karşılığı.
-6. **AI analist** — `@anthropic-ai/sdk`, **yapısal JSON çıktı** (zod doğrulamalı). Kademeli maliyet: tüm sinyallerde **`claude-sonnet-4-6`** (bulk), kısa listede **`claude-opus-4-8`** (derin). Sinyal × aktif mercek başına: `{lens, fit 0-10, rationale, adaptation_notes, risks[], confidence, recommended_action: pursue|watch|kill, tags[]}`. **Analist fine-tune edilmez — grounding ile çalışır** (tez config + RAG/gbrain + web arama + few-shot örnekler + memory). Persona = karar fonksiyonu; detay: `AI_ANALYST.md`, `MARKET_KNOWLEDGE.md`, `THESIS_AND_LENS.md`.
-7. **Ranker** — kompozit skor = (mercek uyumları, ağırlıklı) + tazelik + momentum → sıralı kuyruk.
-8. **Bilgi Katmanı (Knowledge Layer)** — analiz edilen her sinyal + analiz çıktısı + insan kararı, kalıcı bir bilgi tabanına yazılır. **gstack `gbrain`** (kalıcı, agent-dostu bilgi tabanı; Supabase + `pgvector`) bunun omurgası: embedding'li semantik arama + zamanla varlık ilişkileri (şirket/kurucu/sektör/pazar/trend). Network buradan ekosistemi sorgular. `/setup-gbrain` ile kurulur, `/sync-gbrain` ile güncel tutulur.
+6. **AI analist** — `@anthropic-ai/sdk`, **yapısal JSON çıktı** (zod doğrulamalı). **v1 = tek model**: `analysis_model` config alanı (hardcode değil), varsayılan **`claude-opus-4-8`** (hacim düşükken max yargı kalitesi → temiz eval etiketi + güven). Kademeli sonnet→opus maliyet ayrımı **faz 2** (hacim onu zorlayınca). Sinyal × aktif mercek başına: `{lens, fit 0-10, rationale, adaptation_notes, risks[], confidence, recommended_action: pursue|watch|kill, tags[]}`. **Analist fine-tune edilmez — grounding ile çalışır** (v1: tez config + web arama + few-shot örnekler; RAG/gbrain + memory faz 2). Persona = karar fonksiyonu; detay: `AI_ANALYST.md`, `MARKET_KNOWLEDGE.md`, `THESIS_AND_LENS.md`.
+7. **Ranker** — **v1: tek mercek → kompoze edilecek bir şey yok.** Sırala = `arbitrage_fit`, tazelik tiebreak. Ağırlık/momentum/feedback-tuning yok. **Kompozit skor (mercek uyumları ağırlıklı + momentum) faz 2** — ikinci mercek gelince anlam kazanır.
+8. **Bilgi Katmanı (Knowledge Layer)** — **v1'de interface arkasında boş stub** (bağlam döndürmez); analist v1'de **bağlamsız** çalışır ("daha önce gördük mü / kim denedi" sorusunu v1 cevaplayamaz — bunu v1 yeteneği olarak iddia etme). **gstack `gbrain`** (Supabase + `pgvector`) omurgası **faz 2**: embedding'li semantik arama + varlık ilişkileri (şirket/kurucu/sektör/pazar/trend), `/setup-gbrain` + `/sync-gbrain`. v1 dedup için gbrain gerekmez (bkz. bileşen 3).
 9. **Sunum**:
    - **Kuyruk UI** — **Next.js (React) + Tailwind**; tasarım Figma'dan. kovala/izle/ele butonları `decisions`'a yazar.
    - **Bilgi sorgu arayüzü** — bilgi tabanına basit arama/soru (faz 2'de zenginleşir).
@@ -120,7 +120,7 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 - **Veritabanı**: **Supabase (Postgres)** — ücretsiz kademe, auth + `pgvector` hazır.
 - **Ingestion worker**: ayrı Node süreci (Next.js dışında) + zamanlama. Seçenekler: `node-cron`, Supabase scheduled functions, ya da GitHub Actions cron. **Öneri**: ayrı worker + cron (UI'ı ingestion yükünden ayırır).
 - **Scraping**: Playwright (gstack `/browse` zaten Playwright tabanlı) → kod tekrar kullanımı.
-- **AI**: Anthropic SDK; `claude-sonnet-4-6` (bulk) + `claude-opus-4-8` (deep). `ANTHROPIC_API_KEY` gerekli.
+- **AI**: Anthropic SDK; **v1 tek model** `analysis_model`=`claude-opus-4-8` (config'lenebilir). Kademeli `claude-sonnet-4-6` (bulk) + Opus (deep) faz 2. `ANTHROPIC_API_KEY` gerekli.
 - **Bilgi tabanı**: gstack **`gbrain`** (Supabase + `pgvector`) — embedding, semantik arama, kalıcı hafıza. `/setup-gbrain` + `/sync-gbrain`.
 - **Tasarım**: **Figma paylaşılınca** `mcp__figma__get_figma_data` + `mcp__figma__download_figma_images` ile token/komponent/asset çekilir; gstack `/design-html` ile üretim kalitesinde React komponentlerine dönüştürülür.
 - **Repo**: `git init` (şu an git repo değil) → gstack `/review`, `/cso`, `/ship` çalışsın.
@@ -137,20 +137,22 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 ## Geliştirme Fazları (milestone'lar)
 1. **İskelet**: `git init`; monorepo; `Signal` şeması + Supabase tabloları + dedup; `sources.config.ts` + `thesis.config.ts` + `lenses.config.ts` taslakları.
 2. **Tek kaynak uçtan uca** (YC ya da ProductHunt; RSS/scrape) → DB'de satırlar.
-3. **Analist (çok-mercek)**: Anthropic SDK + tez/mercek prompt + yapısal puanlama (zod). v1'de arbitraj merceği.
-4. **Sırala + digest**: kompozit skorlayıcı → en iyi N markdown digest.
-5. **Bilgi Katmanı**: `/setup-gbrain`; her analiz edilen sinyali gbrain'e yaz; basit semantik arama/soru arayüzü.
+3. **Analist (tek mercek)**: Anthropic SDK + tez/mercek prompt + yapısal puanlama (zod). v1'de arbitraj merceği, tek model (`analysis_model`=Opus).
+3b. **Eval harness (thin slice)**: 5-6 altın-standart örnek (network kararı → asistan açar). Script: analisti N etiketli sinyalde koştur → `recommended_action` vs insan etiketi örtüşme %. **Leave-one-out** + dürüst uyarı çıktıya yazılır (bkz. `THESIS_AND_LENS.md §3`). Prompt tuning'in tek körlemesiz yolu.
+4. **Sırala + digest**: v1 sıralayıcı = `arbitrage_fit` + tazelik → en iyi N markdown digest. (Kompozit ranker faz 2.)
+5. **Bilgi Katmanı interface**: v1'de boş stub (bağlam döndürmez). **`/setup-gbrain` + gbrain yazımı faz 2.**
 6. **Kuyruk UI**: Figma'dan Next.js komponentleri + kovala/izle/ele kalıcılığı.
-7. **Kalan kaynaklar** (her scrape `skillify`); ingest+analiz cron'a bağlanır; `/sync-gbrain`.
+7. **Kalan kaynaklar** (her scrape `skillify`); ingest+analiz cron'a bağlanır.
 8. **Sertleştir**: `/review` + `/cso`, testler, `/ship`.
-9. **Genişleme (faz sonrası)**: yeni mercekler ekle (trend/white-space), çıktı katmanını çeşitlendir (trend raporu, sektör haritası) — mimari buna açık.
+9. **Genişleme (faz 2)**: kademeli sonnet→opus model; gbrain/RAG + memory; kompozit ranker; yeni mercekler (trend/white-space); çıktı katmanını çeşitlendir (trend raporu, sektör haritası) — mimari buna açık.
 
 ---
 
 ## Doğrulama
 - Faz 2 sonrası: ingest çalıştır → `SELECT count(*) FROM signals > 0`, dup URL yok.
 - Faz 3 sonrası: bilinen bir yurt dışı launch makul `arbitrage_fit` + Türkiye için `adaptation_notes` alır; bozuk model çıktısı yakalanır (zod guard).
-- Faz 4 sonrası: digest en iyi N'i kompozit skora göre gerekçeyle sıralar.
+- Faz 3b sonrası: **eval harness çalışır** — altın-standart set üzerinde leave-one-out örtüşme % ölçülür; bu, analist prompt'unu tune etmenin ana sinyalidir.
+- Faz 4 sonrası: digest en iyi N'i `arbitrage_fit`+tazelik sırasına göre gerekçeyle sıralar.
 - Faz 5 sonrası: kuyruk UI'da kovala/ele → `decisions`'a satır düşer, sonraki çalıştırmada sıralama bunu yansıtır.
 - Uçtan uca: bir cron tick'i yeni sinyalleri toplar, puanlar, kuyruğu manuel adım olmadan günceller. Network güvenmeden önce `/review` + `/cso` temiz geçsin.
 
@@ -159,7 +161,7 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 ## Riskler & Açık Kararlar
 - **Kaynak kırılganlığı**: site değişince scraper bozulur → `skillify` + kaynak-başı health check; RSS/API kaynakları öncelikli.
 - **AI gürültüsü / uydurma uyum**: yapısal çıktı + güven eşiği; derin analiz yalnız kısa listeye; tez `anti_patterns` ile bilinen yanlış pozitifleri bastır.
-- **API maliyeti**: kademeli sonnet/opus + batch + analiz öncesi dedup.
+- **API maliyeti**: v1'de hacim düşük → tek model (Opus) + analiz öncesi dedup yeter; kademeli sonnet/opus + batch faz 2 (hacim zorlayınca).
 - **X/LinkedIn**: yalnız faz 2; ücretli X API veya manuel — MVP'yi bunlara bağlama.
 - **Açık karar**: Supabase mi (öneri) yoksa lokal SQLite başlangıç mı? Figma linki ne zaman gelir (UI fazı onu bekler)?
-- **Açık karar (strateji, ilgili dokümanlarda izleniyor)**: beachhead segment kesinleştirme (`BUSINESS_MODEL.md §9`); varsayılan analist arketipi + debate tetik eşiği (`AI_ANALYST.md §9`); somut tez değerlerinin doldurulması (`THESIS_AND_LENS.md §1`).
+- **Açık karar (strateji, ilgili dokümanlarda izleniyor)**: beachhead segment kesinleştirme (`BUSINESS_MODEL.md §9`); varsayılan analist arketipi + debate tetik eşiği (`AI_ANALYST.md §9`). (Somut tez değerleri `THESIS_AND_LENS.md §1`'de v1 için **dolduruldu**.)
