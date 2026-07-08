@@ -52,34 +52,91 @@ sorar (çıktı yapılandırılır, her sayının yanında gerekçe + güven):
 5. **Kim deniyor?** — Türkiye/MENA'da zaten bu fikri kovalayan var mı? (gbrain + web ile.)
 6. **Önerilen aksiyon** — kovala / izle / ele — ve **neden**, bu teze göre.
 
+   **İzle kuralı (operasyonel):** izle = teze uyum sinyali var, AMA `validation_needed`'daki
+   1-2 kritik veri karar değiştirebilir; kanıt gelince kovala ya da ele'ye düşmek zorundadır.
+   İzle bir bekleme odasıdır, kararsızlık çöp kutusu değil: **her "izle" çıktısı
+   `validation_needed`'da neyi beklediğini yazmak zorundadır — yazamıyorsa izle değil, ele'dir.**
+   Bu kural örneklerle kalibre edilir ve `anti_patterns` gibi evrilir: etiketlemede insan-arası
+   tutarsızlık çıktıkça kurala cümle eklenir.
+
 ### Çıktı şeması (kavramsal — `AI_ANALYST.md §5` ile uyumlu)
 ```
 {
   lens: "arbitrage",
-  fit: 0-10,                  // teze uyum
+  fit: 0-100,                 // teze uyum — katı bant kuralı (aşağıda)
   rationale: "...",           // gerekçe (kanıta bağlı)
-  evidence: ["kaynak..."],    // olgu, atfıyla
+  evidence: [{fact: "...", source: "..."}],  // her olgu KAYNAK ATFIYLA — atıfsız olgu reddedilir
   adaptation_notes: "...",    // neyi uyarla, ne kırılır
   risks: ["..."],             // en güçlü kill gerekçesi dahil
   confidence: low|med|high,   // analistin kendi belirsizliği
+  validation_needed: [        // ZORUNLU Validation Block — en fazla 3, en kritik
+    {data: "...",             //   hangi spesifik veri eksik (örn. "X pazarı CAC maliyeti")
+     why: "...",              //   neden karar değiştirir
+     how_to_verify: "..."}    //   nasıl doğrulanır (web / insan / mülakat)
+  ],                          // yalnız confidence: high iken boş olabilir
   recommended_action: pursue|watch|kill
 }
 ```
 
+**Fit bant kuralı (0-100, katı):**
+
+| Bant | Anlam | Kural |
+|---|---|---|
+| **80-100** | Teze birebir uyum (kovala-adayı) | Katı: yalnız mandate'e tam oturanlara **ve yalnız `confidence: high` ile** (güven kapısı) |
+| **50-79** | Uyum var, kritik belirsizlik var (izle bandı) | `confidence: low/med` çıktının fit tavanı 79 |
+| **0-49** | Uyumsuz / anti-pattern (ele bandı) | — |
+
+- **Tutarlılık kuralı:** `recommended_action` bantla çelişemez (örn. fit 85 + kill yasak);
+  çelişki zod-sonrası mantık kontrolünde reddedilir, analiz yeniden denenir.
+- **Tazelik (freshness) skora karışmaz** — yalnız aynı bant içindeki fırsatları kendi içinde
+  sıralayan tiebreaker'dır. Böylece eski-yüksek-skor, yeni-düşük-skoru ezemez (ve tersi).
+- **Validation Block'un amacı:** "kanıt zayıf" deyip kaçmak yasak. Analist belirsizliği
+  çözmez, *adreslenebilir kılar* — nereye bakılacağını adlandırır; nihai karar insanın.
+  `validation_needed` dolu kayıtlar kuyrukta "doğrulama bekliyor" işaretiyle görünür.
+- **Not (faz 2 adayı — sert kural):** gerekirse `confidence: low` için "kovala" tamamen
+  yasaklanıp zorunlu izle'ye düşürülebilir; v1'de uygulanmaz, ileriye dönük not.
+
 ---
 
-## 3. Kalibrasyon — altın-standart örnekler + eval
+## 3. Kalibrasyon — iki ayrı set: golden few-shot + eval
 
-Analistin yargısını hizalayan örnekler. **v1 hedefi: 5-6 örnek.** Üretim süreci: **network gerçek
-sinyal + tek-satır kovala/izle/ele kararı verir → asistan bunu tam yapılandırılmış analize (arbitraj
-şeması) açar → network gerekçeyi düzeltir.** Böylece ground-truth etiketler network'ün, prose emeği
-asistanın.
+**İki set birbirinden ayrıktır** — aynı vaka iki yerde olursa eval kendi kendini ölçer
+(kontaminasyon). Toplam kurulum maliyeti: bir öğleden sonra. Otomatize framework yok; basit script.
 
-Bu 5-6 örnek aynı zamanda **eval setinin çekirdeği**: minimal harness = analisti N sinyalde koştur →
-`recommended_action`'ı insan etiketiyle kıyasla → örtüşme %'sine bak. **Leave-one-out** kullan (test
-edilen örneği few-shot'tan çıkar, sırayla döndür). Dürüst uyarı harness çıktısına yazılır: küçük ve
-few-shot'la örtüşen bir setle örtüşme %'si "analist örnekleri izliyor mu"yu ölçer, *genelleme*yi değil.
-v1'de kabul; set gerçek sinyallerle büyüdükçe anlam kazanır (8-10 vaka hedefe iyi bir başlangıç).
+### 3a. Golden few-shot seti (5-6 gerçek vaka — prompt'a girer)
+
+Analistin yargısını hizalayan örnekler. Üretim = **co-creation**: network gerçek sinyalin ham
+olgularını + tek-satır kovala/izle/ele kararını verir → asistan bunu tam yapılandırılmış analize
+(arbitraj şeması) açar → network gerekçeyi düzeltir. Ground-truth etiketler network'ün, prose
+emeği asistanın. Set en az 1 kovala, 1 ele, **1 izle** örneği içerir (izle kuralının nasıl
+uygulandığını gösterir).
+
+### 3b. Eval seti (tam 20 vaka: 7 kovala / 6 izle / 7 ele — few-shot'tan ayrık)
+
+Prompt'u körlemesine ayarlamamanın tek yolu. ~14-15 vakayı asistan hazırlar — ama **sıfırdan
+uydurmaz**: feed'lerden/webden *gerçek* geçmiş sinyaller seçer, taslak analiz + etiket önerir;
+**insan her etiketi tek satırla onaylar/düzeltir** (döngüsellik mitigasyonu — AI hem vakayı hem
+etiketi uydurursa eval kendi kendini ölçer). Çeşitlilik kotası:
+
+- ≥2 anti-pattern tetikleyici (ele bandını test eder)
+- ≥2 sınırda-izle (izle kuralını test eder)
+- 1 tez-dışı-ama-ilginç
+- 1-2 **mükerrer çift** (aynı şirket, iki farklı kaynak/metin) — naif dedup'un bilinçli stres
+  testi: aynı sinyal → aynı aksiyon beklenir; tutarsızlık = model metin yüzeyine göre karar veriyor
+- 1-2 **halüsinasyon probu** (kritik bilgisi bilerek eksik sinyal) — doğru davranış: bilinmeyeni
+  işaretle + `validation_needed`; **uydurulmuş olgu tespit edilirse o vaka otomatik 0 puan**
+
+### 3c. Metrik — ağırlıklı skor + confusion matrix
+
+Basit örtüşme %'si her hatayı eşit sayar; oysa hatalar asimetrik (kovala↔ele karışması felaket,
+izle'ye kayma tolere edilebilir):
+
+- Tam eşleşme = **1.0** · komşu sınıfa kayma (kovala↔izle, izle↔ele) = **0.5** · zıt uç
+  (kovala↔ele) = **0.0** → toplam/20 → 0-100 kalite skoru.
+- **3×3 confusion matrix** yazdırılır — tek skor "ne kadar iyi"yi, matrix "**neyi düzelteceğini**"
+  söyler: ele→kovala hücresi doluysa `anti_patterns` bastırmıyor; her şey izle'ye kaçıyorsa izle
+  kuralı/Validation Block zorunluluğu sıkılaştırılır.
+- Mükerrer çift tutarlılık kontrolü ayrı satırda raporlanır.
 
 Aşağıdaki A/B iki taslaktır; ilk gerçek vakalarla değiştirilecek/genişletilecek.
 
@@ -88,13 +145,13 @@ Aşağıdaki A/B iki taslaktır; ilk gerçek vakalarla değiştirilecek/genişle
 > **Analiz:** *Kanıt* güçlü (büyüme + fonlama). *Yerel wedge:* TR KOBİ'lerinde e-fatura zorunluluğu
 > + manuel ön-muhasebe acısı. *Uyarlama:* e-fatura/GİB entegrasyonu gerekir (kırılma noktası ama
 > aşılabilir, regülasyon *engel değil tetikleyici*). *Zamanlama:* e-dönüşüm mevzuatı olgun. *Aksiyon:*
-> **pursue**, fit 8/10, confidence high. *Risk:* yerel muhasebe yazılımı oyuncuları (işaretlendi).
+> **pursue**, fit 85/100, confidence high. *Risk:* yerel muhasebe yazılımı oyuncuları (işaretlendi).
 
 ### Örnek B — "ELE" (anti-pattern tetikledi)
 > **Sinyal:** ABD'de lisanslı neobank, devasa tur.
 > **Analiz:** *Kanıt* var ama `anti_patterns`: ağır bankacılık regülasyonu + büyük sermaye gereği.
 > `capital_range` ve `risk_appetite` ile çelişir. *Uyarlama:* BDDK lisansı = yıllar + milyonlar.
-> *Aksiyon:* **kill**, fit 2/10, confidence high. *Gerekçe:* mandate dışı; klasik yanlış pozitif.
+> *Aksiyon:* **kill**, fit 15/100, confidence high. *Gerekçe:* mandate dışı; klasik yanlış pozitif.
 
 ---
 

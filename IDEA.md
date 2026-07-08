@@ -43,8 +43,11 @@ whole product.
    The analyst is **grounded, not fine-tuned**: market knowledge comes from thesis
    config + a curated knowledge base (RAG) + live web search + gold-standard
    exemplars + memory. (See `AI_ANALYST.md`, `MARKET_KNOWLEDGE.md`.)
-4. **Rank**: composite score → ordered opportunity queue with rationale, adaptation
-   notes, risks, confidence, and a recommended action (pursue/watch/kill).
+4. **Rank**: ordered opportunity queue with rationale, adaptation notes, risks,
+   confidence, a mandatory validation block (what's missing, why, how to verify),
+   and a recommended action (pursue/watch/kill). v1 ranker = thesis-fit score
+   (0-100, strict bands) + freshness as within-band tiebreaker; composite
+   multi-lens scoring is phase 2.
 5. **Accumulate**: every signal + analysis + human decision is written to a
    persistent, queryable knowledge layer that compounds over time.
 

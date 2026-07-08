@@ -92,6 +92,8 @@ Bu bölüm personanın **çekirdek karakteridir** — analizi gürültüden ayı
 
 6. **"E sonra ne?" (so-what / now-what).** Her analiz, *bu network için, bu teze göre* somut bir
    aksiyonla biter: kovala / izle / ele — ve nedeniyle. Aksiyona bağlanmayan analiz gürültüdür.
+   **İzle bir kaçış değildir:** izle ⇔ dolu `validation_needed` (analist neyi beklediğini
+   yazmak zorunda; yazamıyorsa ele) — operasyonel kural: `THESIS_AND_LENS.md §2`.
 
 7. **Bağlam farkındalığı (hafızaya bağlanma).** Analist izole çalışmaz; ilgili geçmiş sinyalleri ve
    ekosistem hafızasını (gbrain) bağlam olarak okur — "bunu daha önce gördük mü, kim denedi, ne
@@ -135,6 +137,13 @@ Analist serbest paragraf değil, **karşılaştırılabilir bir yargı** üretme
 
 Şema detayı `PLAN.md`'de; buradaki ilke: **her sayının yanında bir gerekçe ve bir güven düzeyi
 olmalı.** Gerekçesiz skor yayınlamayız.
+
+**Validation Block (zorunlu alan) — "bilinmeyeni işaretle" ilkesinin (§3.3) somutlaşması:**
+"kanıt zayıf" tek başına kabul edilebilir çıktı değildir. Analist eksik kanıtı **adlandırır**:
+hangi spesifik veri eksik, neden karar değiştirir, nasıl doğrulanır (`validation_needed` —
+şema: `THESIS_AND_LENS.md §2`). İlke: **analist belirsizliği çözmez, *adreslenebilir kılar*;
+nihai karar insanın.** Teknik karşılığı: güven kapısı (80+ fit yalnız `confidence: high`) +
+kuyrukta "doğrulama bekliyor" şeridi + digest'te doğrulama görev listesi.
 
 ---
 
@@ -198,10 +207,11 @@ Kısaca: persona kanaat üretir, **sistem onu hesap verebilir kılar.**
   öneriliyor; alternatif (örn. "büyüme-odaklı fırsatçı") test edilmeli mi?
 - **Açık karar — debate tetik eşiği:** debate modunu hangi skor/bahis seviyesinde açalım (maliyet ↔
   robustluk dengesi)?
-- **Karar (kapandı) — örnek seti kaynağı:** v1 = **5-6 elle küratörlenmiş örnek**; süreç network
-  gerçek sinyal + tek-satır karar verir → asistan tam analize açar → network gerekçeyi düzeltir.
-  Aynı set **eval çekirdeği** (leave-one-out). Zamanla insan kararları yeni örneklere dönüşür.
-  Detay: `THESIS_AND_LENS.md §3`.
+- **Karar (kapandı) — örnek seti kaynağı:** v1 = **iki ayrık set**: (a) golden few-shot 5-6
+  gerçek vaka (co-creation: network ham olgu + tek-satır karar → asistan tam analize açar →
+  network gerekçeyi düzeltir; prompt'a girer), (b) eval seti 20 vaka (7/6/7; asistan gerçek
+  sinyallerden taslak + etiket hazırlar, insan onaylar; few-shot'la kesişmez → kontaminasyon
+  yok). Zamanla insan kararları yeni örneklere dönüşür. Detay: `THESIS_AND_LENS.md §3`.
 
 ---
 

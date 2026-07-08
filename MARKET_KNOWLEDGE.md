@@ -60,10 +60,12 @@ kesim tarihi" sorununu ortadan kaldırır — model ne zaman eğitilmiş olursa 
 gerçek-zamanlı.
 
 ### Katman 4 — Altın-standart örnekler (few-shot — yargı hizalama)
-Analiste *neyin iyi bir analiz olduğunu* gösteren örnekler: hem "kovala" hem "ele" için
+Analiste *neyin iyi bir analiz olduğunu* gösteren örnekler: "kovala", "ele" ve "izle" için
 gerekçeli vaka analizleri. Bu, modelin **tonunu** değil **yargısını** hizalar — networkün neyi
-fırsat sayıp neyi saymadığını örnekten öğrenir. (İlk set elle küratörlenir; zamanla insan
-kararları yeni örneklere dönüşür — bkz. Katman 5.)
+fırsat sayıp neyi saymadığını örnekten öğrenir. İlk set (5-6 gerçek vaka) **co-creation** ile
+üretilir: network ham olgu + tek-satır karar verir, asistan tam analize açar, network gerekçeyi
+düzeltir. **Few-shot seti ≠ eval seti** — eval ayrık 20 vakadır (`THESIS_AND_LENS.md §3`).
+Zamanla insan kararları yeni örneklere dönüşür — bkz. Katman 5.
 
 ### Katman 5 — Memory (oturumlar-arası öğrenme) · **FAZ 2**
 > **v1'de kapalı** (Katman 2 ile birlikte ertelendi).

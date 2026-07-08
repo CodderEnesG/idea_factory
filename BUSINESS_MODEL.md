@@ -204,6 +204,11 @@ kanıtlanmadan ikinci/üçüncü iş modeli odak dağıtır.
 > ücretsiz yolu `web_search` + yerel bilgi ve asıl olarak **bu bölümdeki sorun mülakatlarıdır**.
 > Yani yerel-talep kanıtını feed değil, doğrulama planı üretir; analistin yerel ayak için
 > `confidence: low, doğrulanmalı` demesi normaldir (bkz. `THESIS_AND_LENS.md §1` kanıt asimetrisi).
+>
+> **Köprü — Validation Block → sorun mülakatları:** analistin `validation_needed` çıktıları
+> ("X pazarı CAC maliyeti", "Y segmentinin ödeme isteği"…) bu bölümdeki sorun mülakatlarının
+> (§9.1) soru listesine **ham madde** olur. Analiz katmanı doğrulama planını besler: sistem
+> yalnız "kanıt zayıf" demez, mülakatta neyin sorulacağını üretir.
 
 ---
 
