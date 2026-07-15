@@ -38,10 +38,13 @@ cp .env.example .env      # key'leri doldur
 ```
 
 `.env`:
-- `ANTHROPIC_API_KEY` — analist
+- `ANALYSIS_PROVIDER` — `gemini` (MVP, varsayılan) | `anthropic` (sonra)
+- `GEMINI_API_KEY`, `GEMINI_MODEL` (varsayılan `gemini-3-flash`, yoksa `gemini-2.5-flash`) — MVP analist
+- `ANTHROPIC_API_KEY`, `ANALYSIS_MODEL` — Claude sonrası için
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — worker
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — web
-- `ANALYSIS_MODEL` (varsayılan `claude-opus-4-8`)
+
+> Analist sağlayıcı-bağımsız: MVP Gemini (ucuz, grounding kapalı), Claude tek env ile devreye girer.
 
 Supabase: proje aç → SQL Editor'de `supabase/migrations/0001_init.sql` çalıştır.
 

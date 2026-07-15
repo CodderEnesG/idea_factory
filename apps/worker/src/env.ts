@@ -15,6 +15,10 @@ function required(name: string): string {
 export const env = {
   supabaseUrl: () => required("SUPABASE_URL"),
   supabaseServiceKey: () => required("SUPABASE_SERVICE_ROLE_KEY"),
-  anthropicKey: () => required("ANTHROPIC_API_KEY"),
-  analysisModel: () => process.env["ANALYSIS_MODEL"] ?? "claude-opus-4-8",
+  // MVP analist = gemini (ucuz); anthropic sonra. analyst.ts env'i doğrudan okur.
+  provider: () => process.env["ANALYSIS_PROVIDER"] ?? "gemini",
+  analysisModel: () =>
+    env.provider() === "anthropic"
+      ? (process.env["ANALYSIS_MODEL"] ?? "claude-opus-4-8")
+      : (process.env["GEMINI_MODEL"] ?? "gemini-3-flash"),
 };

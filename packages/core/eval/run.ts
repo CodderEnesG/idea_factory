@@ -40,7 +40,7 @@ async function main(): Promise<void> {
   for (const c of evalCases) {
     let got: RecommendedAction;
     try {
-      const a = await analyzeSignal(c.signal, { fewShot: golden, enableWebSearch: false });
+      const a = await analyzeSignal(c.signal, { fewShot: golden });
       got = a.recommended_action;
     } catch (e) {
       console.error(`  ✗ ${c.signal.title.slice(0, 50)}:`, e instanceof Error ? e.message : e);

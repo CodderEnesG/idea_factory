@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   ArbitrageAnalysisSchema,
@@ -10,6 +9,9 @@ import { thesis as defaultThesis, type ThesisConfig } from "./thesis.config.js";
 import { checkArbitrageGuards } from "./guards.js";
 import { emptyKnowledgeLayer, type KnowledgeLayer } from "./knowledge.js";
 import type { Signal } from "./signal.js";
+import type { AnalystProvider } from "./providers/types.js";
+import { GeminiProvider } from "./providers/gemini.js";
+import { AnthropicProvider } from "./providers/anthropic.js";
 
 /** Golden few-shot çapası: bir sinyal + onun onaylı analizi. */
 export interface FewShotExample {
@@ -17,38 +19,25 @@ export interface FewShotExample {
   analysis: ArbitrageAnalysis;
 }
 
+export type ProviderName = "gemini" | "anthropic";
+
 export interface AnalyzeOptions {
-  client?: Anthropic; // test/inject için
-  model?: string; // analysis_model (varsayılan claude-opus-4-8)
+  provider?: AnalystProvider; // doğrudan inject (test)
+  providerName?: ProviderName; // varsayılan env ANALYSIS_PROVIDER ?? "gemini"
+  model?: string;
   apiKey?: string;
   thesis?: ThesisConfig;
   fewShot?: FewShotExample[];
   knowledge?: KnowledgeLayer;
-  enableWebSearch?: boolean; // v1: kanıt için canlı web (varsayılan açık)
-  maxSteps?: number; // tool-nudge + şema/guard retry bütçesi
+  maxRetries?: number; // şema/guard ihlalinde yeniden deneme
 }
 
-const SUBMIT_TOOL = "submit_analysis";
-
-function submitTool(): Anthropic.Tool {
-  const schema = zodToJsonSchema(ArbitrageAnalysisSchema, { target: "jsonSchema7" }) as Record<
-    string,
-    unknown
-  >;
-  delete schema["$schema"];
-  return {
-    name: SUBMIT_TOOL,
-    description: "Arbitraj analizini bu şemaya uygun yapılandırılmış JSON olarak gönder.",
-    input_schema: schema as Anthropic.Tool.InputSchema,
-  };
+function pickProvider(opts: AnalyzeOptions): AnalystProvider {
+  if (opts.provider) return opts.provider;
+  const name = opts.providerName ?? (process.env["ANALYSIS_PROVIDER"] as ProviderName) ?? "gemini";
+  const cfg = { apiKey: opts.apiKey, model: opts.model };
+  return name === "anthropic" ? new AnthropicProvider(cfg) : new GeminiProvider(cfg);
 }
-
-// web_search server tool (Anthropic tarafında yürütülür). SDK tipi kesin olmayabilir → cast.
-const webSearchTool = {
-  type: "web_search_20250305",
-  name: "web_search",
-  max_uses: 5,
-} as unknown as Anthropic.Tool;
 
 function renderFewShot(examples: FewShotExample[]): string {
   if (examples.length === 0) return "";
@@ -64,95 +53,50 @@ ${JSON.stringify(ex.analysis)}`;
 }
 
 /**
- * Bir sinyali arbitraj merceğiyle analiz et. Yapısal çıktı (submit_analysis tool) +
- * zod + mantık guard'ları; ihlalde model'e geri bildirim verip yeniden dener.
+ * Bir sinyali arbitraj merceğiyle analiz et. Sağlayıcı-bağımsız (MVP: Gemini, sonra Claude).
+ * Yapısal JSON → zod + mantık guard'ları; ihlalde prompt'a geri bildirim ekleyip yeniden dener.
  */
 export async function analyzeSignal(
   signal: Signal,
   opts: AnalyzeOptions = {},
 ): Promise<ArbitrageAnalysis> {
-  const client = opts.client ?? new Anthropic({ apiKey: opts.apiKey ?? process.env["ANTHROPIC_API_KEY"] });
-  const model = opts.model ?? process.env["ANALYSIS_MODEL"] ?? "claude-opus-4-8";
+  const provider = pickProvider(opts);
   const thesis = opts.thesis ?? defaultThesis;
   const knowledge = opts.knowledge ?? emptyKnowledgeLayer;
-  const enableWebSearch = opts.enableWebSearch ?? true;
-  const maxSteps = opts.maxSteps ?? 6;
+  const maxRetries = opts.maxRetries ?? 3;
 
   const ctx = await knowledge.getContext(signal);
   const ctxText =
     ctx.notes.length > 0 ? `\n\nİlgili geçmiş bağlam:\n- ${ctx.notes.join("\n- ")}` : "";
 
   const system = buildArbitrageSystemPrompt(thesis) + renderFewShot(opts.fewShot ?? []);
-  const tools: Anthropic.Tool[] = [submitTool(), ...(enableWebSearch ? [webSearchTool] : [])];
+  const jsonSchema = zodToJsonSchema(ArbitrageAnalysisSchema, { target: "jsonSchema7" }) as Record<
+    string,
+    unknown
+  >;
+  delete jsonSchema["$schema"];
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: buildArbitrageUserPrompt(signal) + ctxText },
-  ];
+  const baseUser = buildArbitrageUserPrompt(signal) + ctxText;
+  let feedback = "";
 
-  for (let step = 0; step < maxSteps; step++) {
-    const resp = await client.messages.create({
-      model,
-      max_tokens: 2048,
-      system,
-      tools,
-      messages,
-    });
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const user = feedback ? `${baseUser}\n\n${feedback}` : baseUser;
+    const raw = await provider.generate({ system, user, jsonSchema });
 
-    // Server tool (web_search) çalışıyor → turn'ü sürdür. (SDK tipi geride; API destekler.)
-    if ((resp.stop_reason as string) === "pause_turn") {
-      messages.push({ role: "assistant", content: resp.content });
-      continue;
-    }
-
-    const submit = resp.content.find(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === SUBMIT_TOOL,
-    );
-
-    if (!submit) {
-      messages.push({ role: "assistant", content: resp.content });
-      messages.push({
-        role: "user",
-        content: "Analizi tamamladıysan submit_analysis aracını çağır.",
-      });
-      continue;
-    }
-
-    const parsed = ArbitrageAnalysisSchema.safeParse(submit.input);
+    const parsed = ArbitrageAnalysisSchema.safeParse(raw);
     if (!parsed.success) {
-      messages.push({ role: "assistant", content: resp.content });
-      messages.push({
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: submit.id,
-            is_error: true,
-            content: `Şema hatası: ${parsed.error.message}. Düzelt ve tekrar submit_analysis çağır.`,
-          },
-        ],
-      });
+      feedback = `Önceki çıktı şema hatası verdi: ${parsed.error.message}. Şemaya uygun düzelt.`;
       continue;
     }
 
     const violations = checkArbitrageGuards(parsed.data);
     if (violations.length > 0) {
-      messages.push({ role: "assistant", content: resp.content });
-      messages.push({
-        role: "user",
-        content: [
-          {
-            type: "tool_result",
-            tool_use_id: submit.id,
-            is_error: true,
-            content: `Mantık ihlali: ${violations.join("; ")}. Düzelt ve tekrar submit_analysis çağır.`,
-          },
-        ],
-      });
+      feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;
       continue;
     }
 
     return parsed.data;
   }
 
-  throw new Error(`analist ${maxSteps} adımda geçerli analiz üretemedi (${signal.url})`);
+  throw new Error(`analist (${provider.name}) ${maxRetries + 1} denemede geçerli analiz üretemedi (${signal.url})`);
 }

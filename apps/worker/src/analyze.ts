@@ -23,14 +23,15 @@ async function fetchUnanalyzed(limit: number): Promise<Signal[]> {
 }
 
 async function main(): Promise<void> {
-  const model = env.analysisModel();
   const todo = await fetchUnanalyzed(BATCH_LIMIT);
-  console.log(`${todo.length} sinyal analiz edilecek (model=${model})`);
+  console.log(
+    `${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()})`,
+  );
 
   let ok = 0;
   for (const signal of todo) {
     try {
-      const a = await analyzeSignal(signal, { model, apiKey: env.anthropicKey() });
+      const a = await analyzeSignal(signal); // sağlayıcı/model env'den (ANALYSIS_PROVIDER)
       const { error } = await db.from("analyses").upsert(
         {
           signal_id: signal.id,
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
           validation_needed: a.validation_needed,
           recommended_action: a.recommended_action,
           tags: a.tags,
-          model,
+          model: env.analysisModel(),
         },
         { onConflict: "signal_id,lens" },
       );
