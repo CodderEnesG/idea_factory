@@ -1,0 +1,21 @@
+{
+  "name": "@idea-factory/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "ingest": "tsx src/ingest.ts",
+    "analyze": "tsx src/analyze.ts",
+    "digest": "tsx src/digest.ts",
+    "tick": "tsx src/ingest.ts && tsx src/analyze.ts && tsx src/digest.ts"
+  },
+  "dependencies": {
+    "@idea-factory/core": "workspace:*",
+    "@supabase/supabase-js": "^2.46.1",
+    "dotenv": "^16.4.5",
+    "node-html-parser": "^6.1.13",
+    "rss-parser": "^3.13.0"
+  }
+}

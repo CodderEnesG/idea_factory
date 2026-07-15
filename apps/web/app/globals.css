@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+}
+
+::selection {
+  background: rgba(101, 220, 213, 0.25);
+}
+
+/* Landing mor radial glow + hafif yıldız-toz imzası */
+.glow-backdrop {
+  background:
+    radial-gradient(38% 30% at 50% 34%, rgba(124, 92, 200, 0.35) 0%, rgba(11, 10, 17, 0) 60%),
+    radial-gradient(55% 45% at 50% 38%, rgba(50, 30, 72, 0.95) 0%, rgba(11, 10, 17, 0) 72%),
+    radial-gradient(40% 40% at 62% 30%, rgba(101, 220, 213, 0.08) 0%, rgba(11, 10, 17, 0) 70%);
+}
+
+.starfield {
+  background-image: radial-gradient(1px 1px at 20% 30%, rgba(217, 255, 244, 0.35) 0, transparent 50%),
+    radial-gradient(1px 1px at 70% 60%, rgba(217, 255, 244, 0.25) 0, transparent 50%),
+    radial-gradient(1px 1px at 40% 80%, rgba(101, 220, 213, 0.25) 0, transparent 50%),
+    radial-gradient(1px 1px at 85% 20%, rgba(217, 255, 244, 0.2) 0, transparent 50%);
+}
+
+@layer components {
+  .chip {
+    @apply inline-flex items-center rounded-full border border-hair bg-elevated px-3 py-1 text-xs text-ink-secondary;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-btn bg-brand px-5 py-2.5 text-sm font-medium text-brand-fg transition hover:shadow-teal;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-btn border border-hair bg-surface px-5 py-2.5 text-sm text-ink transition hover:border-strong;
+  }
+}

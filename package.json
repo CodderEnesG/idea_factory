@@ -1,0 +1,23 @@
+{
+  "name": "idea-factory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Thesis-driven venture & market intelligence — v1 MVP",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "ingest": "pnpm --filter @idea-factory/worker ingest",
+    "analyze": "pnpm --filter @idea-factory/worker analyze",
+    "eval": "pnpm --filter @idea-factory/core eval",
+    "web": "pnpm --filter @idea-factory/web dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.2",
+    "@types/node": "^20.17.6"
+  }
+}
