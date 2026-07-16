@@ -34,12 +34,12 @@ Design system: **Idea Factory Dark** — near-black canvas, teal marka (`#65DCD5
 ```bash
 corepack enable pnpm      # Node 20+ bundled
 pnpm install
-cp .env.example .env      # key'leri doldur
+cp .env.example .env      # key'leri doldur (.env.local da okunur, öncelikli)
 ```
 
 `.env`:
 - `ANALYSIS_PROVIDER` — `gemini` (MVP, varsayılan) | `anthropic` (sonra)
-- `GEMINI_API_KEY`, `GEMINI_MODEL` (varsayılan `gemini-3-flash`, yoksa `gemini-2.5-flash`) — MVP analist
+- `GEMINI_API_KEY`, `GEMINI_MODEL` (varsayılan `gemini-3.5-flash`, erişim yoksa `gemini-2.5-flash`) — MVP analist
 - `ANTHROPIC_API_KEY`, `ANALYSIS_MODEL` — Claude sonrası için
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — worker
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — web

@@ -7,7 +7,8 @@ import { golden } from "./golden.js";
 import { evalCases } from "./cases.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(here, "../../../.env") });
+// .env.local öncelikli (dotenv array: ilk dosya kazanır), .env fallback.
+config({ path: [resolve(here, "../../../.env.local"), resolve(here, "../../../.env")] });
 
 const ACTIONS = ["pursue", "watch", "kill"] as const;
 
