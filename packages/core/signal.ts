@@ -16,5 +16,9 @@ export const SignalSchema = z.object({
   posted_at: z.string().datetime({ offset: true }).nullable().default(null),
   fetched_at: z.string().datetime({ offset: true }),
   content_hash: z.string(), // naif dedup: hash(title+summary)
+  // Zenginleştirme (0002) — default'suz optional: ingest insert'leri bu kolonları taşımaz.
+  // Şekil StoredEnrichmentSchema (enrichment.ts); tüketici safeParse ile daraltır.
+  enrichment: z.unknown().nullable().optional(),
+  enriched_at: z.string().nullable().optional(),
 });
 export type Signal = z.infer<typeof SignalSchema>;
