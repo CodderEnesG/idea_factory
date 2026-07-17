@@ -59,7 +59,9 @@ async function main(): Promise<void> {
   console.log(`bitti: ${ok}/${todo.length} analiz yazıldı`);
 }
 
-main().catch((e) => {
-  console.error("analyze başarısız:", e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0)) // Vertex/undici keep-alive'ı bekletmesin (cron temiz exit).
+  .catch((e) => {
+    console.error("analyze başarısız:", e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
