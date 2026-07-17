@@ -1,4 +1,4 @@
-import { fitBand, type RankedItem } from "@idea-factory/core";
+import { fitBand, StoredEnrichmentSchema, type RankedItem } from "@idea-factory/core";
 import { DecisionButtons } from "./DecisionButtons";
 
 const BAND = {
@@ -11,6 +11,20 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
   const { signal, analysis } = item;
   const band = BAND[fitBand(analysis.fit)];
   const pending = analysis.validation_needed.length > 0;
+
+  const enrParsed = StoredEnrichmentSchema.safeParse(
+    (signal as { enrichment?: unknown }).enrichment,
+  );
+  const enr = enrParsed.success ? enrParsed.data : null;
+  const facts: string[] = [];
+  if (enr) {
+    if (enr.hq_country) facts.push(`🌍 ${enr.hq_country}`);
+    if (enr.markets.length) facts.push(enr.markets.join(", "));
+    if (enr.funding.stage || enr.funding.amount)
+      facts.push(`💰 ${[enr.funding.stage, enr.funding.amount].filter(Boolean).join(" ")}`);
+    if (enr.target_users) facts.push(`👥 ${enr.target_users}`);
+    if (enr.traction) facts.push(`📈 ${enr.traction}`);
+  }
 
   return (
     <article
@@ -37,12 +51,24 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
           </a>
           <div className="mt-1 text-xs text-ink-muted">
             {signal.source} · {signal.market ?? "?"} · {signal.sector ?? "?"}
+            {enr && !enr.fetch_ok && (
+              <span className="ml-2 opacity-70">· sayfa çekilemedi</span>
+            )}
           </div>
+          {facts.length > 0 && (
+            <div className="mt-1.5 text-xs text-ink-secondary">{facts.join(" · ")}</div>
+          )}
         </div>
         {pending && (
           <span className="chip shrink-0 border-strong text-brand">🔎 doğrulama bekliyor</span>
         )}
       </div>
+
+      {enr && (
+        <p className="mt-4 text-sm leading-relaxed text-ink">
+          {enr.project_summary}
+        </p>
+      )}
 
       <p className="mt-4 text-sm leading-relaxed text-ink-secondary">{analysis.rationale}</p>
 

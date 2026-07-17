@@ -6,6 +6,7 @@ export * from "./providers/types.js";
 export * from "./providers/gemini.js";
 export * from "./providers/anthropic.js";
 export * from "./analyst.js";
+export * from "./enrichment.js";
 export * from "./ranker.js";
 export * from "./digest.js";
 export * from "./knowledge.js";

@@ -8,6 +8,7 @@ import {
 import { thesis as defaultThesis, type ThesisConfig } from "./thesis.config.js";
 import { checkArbitrageGuards } from "./guards.js";
 import { emptyKnowledgeLayer, type KnowledgeLayer } from "./knowledge.js";
+import { StoredEnrichmentSchema } from "./enrichment.js";
 import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
@@ -76,7 +77,10 @@ export async function analyzeSignal(
   >;
   delete jsonSchema["$schema"];
 
-  const baseUser = buildArbitrageUserPrompt(signal) + ctxText;
+  // Zenginleştirme varsa prompt'a olgu bloğu olarak gir (yoksa bugünkü davranış).
+  const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
+  const baseUser =
+    buildArbitrageUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText;
   let feedback = "";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

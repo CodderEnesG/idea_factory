@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ThesisConfig } from "./thesis.config.js";
 import type { Signal } from "./signal.js";
+import type { StoredEnrichment } from "./enrichment.js";
 
 /* ── Çıktı şeması (THESIS_AND_LENS.md §2) ───────────────────────────────── */
 
@@ -88,14 +89,37 @@ sorusuyla değerlendirmek. Varsayılan tutumun "bu neden çöker?" — bir fırs
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
 
-export function buildArbitrageUserPrompt(s: Signal): string {
-  return `Sinyal:
+export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
+  const head = `Sinyal:
 - Başlık: ${s.title}
 - Kaynak: ${s.source} (${s.type})
 - URL: ${s.url}
 - Pazar: ${s.market ?? "bilinmiyor"}
 - Sektör: ${s.sector ?? "bilinmiyor"}
-- Özet: ${s.summary_raw || "(özet yok)"}
+- Özet: ${s.summary_raw || "(özet yok)"}`;
+
+  let enr = "";
+  if (enrichment) {
+    const e = enrichment;
+    const f = e.funding;
+    const funding =
+      f.stage || f.amount || f.total_raised || f.investors.length
+        ? `${f.stage ?? "?"} ${f.amount ?? ""}`.trim() +
+          (f.total_raised ? ` (toplam: ${f.total_raised})` : "") +
+          (f.investors.length ? ` — yatırımcılar: ${f.investors.join(", ")}` : "")
+        : "bilinmiyor";
+    enr = `
+
+Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
+- Proje: ${e.project_summary}
+- Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
+- Fonlama: ${funding}
+- Hedef kullanıcı: ${e.target_users ?? "bilinmiyor"} · Traction: ${e.traction ?? "yok"}
+- Sermaye yoğunluğu: ${e.capital_intensity} · Regülasyon: ${e.regulation_flags.join(", ") || "yok"} · WTP: ${e.wtp_signals ?? "belirsiz"}${e.fetch_ok ? "" : "\n(sayfa çekilemedi — yalnız başlık/özet bazlı, güvenilirlik düşük)"}
+Bilinmeyen alanları validation_needed adayı olarak değerlendir.`;
+  }
+
+  return `${head}${enr}
 
 Bu sinyali arbitraj merceğiyle analiz et ve JSON döndür.`;
 }
@@ -105,7 +129,7 @@ export interface Lens {
   name: string;
   schema: typeof ArbitrageAnalysisSchema;
   buildSystemPrompt: (t: ThesisConfig) => string;
-  buildUserPrompt: (s: Signal) => string;
+  buildUserPrompt: (s: Signal, enrichment?: StoredEnrichment | null) => string;
   weight: number;
 }
 

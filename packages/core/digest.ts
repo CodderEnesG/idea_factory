@@ -1,5 +1,6 @@
 import { rank, type RankedItem } from "./ranker.js";
 import { fitBand } from "./lenses.config.js";
+import { StoredEnrichmentSchema } from "./enrichment.js";
 
 const BAND_LABEL = { pursue: "🟢 KOVALA", watch: "🟡 İZLE", kill: "🔴 ELE" } as const;
 
@@ -12,6 +13,21 @@ export interface DigestOptions {
  * Sıralı fırsat digest'i (markdown) + "doğrulama bekleyenler" bölümü.
  * ele bandı listeye alınmaz; doğrulama görevleri tüm izle/kovala'dan toplanır.
  */
+/** Zenginleştirmeden tek satır künye: null alanları atla; hiçbir şey yoksa null. */
+function buildKunye(enrichment: unknown): string | null {
+  const p = StoredEnrichmentSchema.safeParse(enrichment);
+  if (!p.success) return null;
+  const e = p.data;
+  const parts: string[] = [];
+  if (e.hq_country) parts.push(e.hq_country);
+  if (e.markets.length) parts.push(`pazarlar: ${e.markets.join(", ")}`);
+  const f = e.funding;
+  if (f.stage || f.amount) parts.push(`${f.stage ?? ""} ${f.amount ?? ""}`.trim());
+  if (e.target_users) parts.push(`hedef: ${e.target_users}`);
+  if (e.traction) parts.push(`traction: ${e.traction}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): string {
   const topN = opts.topN ?? 10;
   const title = opts.title ?? "Idea Factory — Fırsat Digest'i";
@@ -33,6 +49,8 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
       analysis.rationale,
       "",
     );
+    const kunye = buildKunye(signal.enrichment);
+    if (kunye) lines.push(`**Künye:** ${kunye}`, "");
     if (analysis.adaptation_notes) lines.push(`**Uyarlama:** ${analysis.adaptation_notes}`, "");
     if (analysis.risks.length) lines.push(`**Riskler:** ${analysis.risks.join("; ")}`, "");
     lines.push(`_Güven: ${analysis.confidence}_`, "");
