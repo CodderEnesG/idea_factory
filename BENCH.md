@@ -18,7 +18,7 @@ Durum: `onaylı` (çıtanın 6'sı da doğrulandı) · `aday` (listede görüld�
 
 ---
 
-## ✅ Onaylı (5/100)
+## ✅ Onaylı (8/100)
 
 | # | Girişim | Ne yapıyor | Kanıt | Kaynak |
 |---|---|---|---|---|
@@ -27,24 +27,25 @@ Durum: `onaylı` (çıtanın 6'sı da doğrulandı) · `aday` (listede görüld�
 | 3 | Madlen | Okullara AI öğretmen araçları (vertical SaaS) | 1 yılda $1M+ ARR, 16 okul grubu / 75+ kampüs | [Webrazzi](https://webrazzi.com/2026/05/12/egitim-teknolojileri-alaninda-ogretmen-ve-ogrenci-etkilesimini-dijitallestiren-platform-madlen/) |
 | 4 | Visby AI | Markaların LLM görünürlüğü (GEO) | 60+ ödeyen müşteri, $79/ay, aylık %55 büyüme | [Webrazzi](https://webrazzi.com/2026/02/16/yerli-yapay-zeka-gorunurluk-platformu-visby-ai/) |
 | 5 | Bimetrik | Pazaryeri satıcılarına karar/kârlılık platformu | 2 ayda ~40 müşteri organik; Amazon ekosisteminde kanıtlı model | [Webrazzi](https://webrazzi.com/2026/02/12/e-ticaret-odaginda-yapay-zeka-destekli-karar-destek-ve-analiz-platformu-bimetrik/) |
+| 6 | Opttab | AI arama görünürlüğü / GEO | 100+ ödeyen abone, aylık %160 gelir büyümesi, $20-999 kademeli fiyat | [Webrazzi](https://webrazzi.com/2025/12/15/yapay-zeka-aramalarina-odaklanan-gorunurluk-ve-geo-platformu-opttab/) |
+| 7 | InScope (arbitraj sinyali) | AI finansal raporlama otomasyonu — TR uyarlama fırsatı | ABD'de ARR 30×, müşteri 5×, $14,5M Series A; TR wedge: KGK/denetim + e-dönüşüm | [TechCrunch](https://techcrunch.com/2026/02/20/inscope-nabs-14-5m-to-solve-the-pain-of-financial-reporting/) |
+| 8 | Infoset | Omnichannel müşteri iletişimi SaaS | 6 ayda 6× büyüme; ödeyen kurumsallar: Casper, The North Face TR | [Webrazzi](https://webrazzi.com/2021/06/24/6-ay-icinde-hem-musteri-sayisi-hem-de-urun-kullanimi-olarak-6-kat-buyuyen-infoset-in-one-cikan-verileri/) |
 
 ## 🔍 Aday — doğrulama bekliyor (Webrazzi taraması 2026-07-18, detayına inilmedi)
 
 | Girişim | Neden aday | Doğrulanacak |
 |---|---|---|
-| Opttab | GEO platformu — Visby ile aynı kanıtlı dalga | Ödeyen müşteri/fiyat |
-| Lexnavi | Hukuki uyum/compliance tech — B2B vertical, küresel emsal (Harvey, Luminance) | Traksiyon, WTP, regülasyon yükü |
+| Lexnavi | Hukuki uyum/compliance tech — B2B vertical, küresel emsal (Harvey, Luminance); makalede traksiyon/fiyat yok | Traksiyon, WTP, regülasyon yükü |
 | TrustAI | Kurumsal AI şeffaflık/uyum — EU AI Act rüzgârı | İş modeli, TR'de alıcı var mı |
-| InScope | Fintech, $14,5M Series A almış | Hangi alt dikey, lisans gerekiyor mu |
 | Gobii | AI iş süreci otomasyonu — B2B SaaS | Farklılaşma (kategori kalabalık), traksiyon |
 | Evveko | Kentsel dönüşüm platformu — denetimli müteahhit eşleşmesi | Sektör uyumu sınırda; gelir modeli |
 | Agriprix | Çiftçi–kurumsal alıcı ticaret platformu | Sektör uyumu sınırda; komisyon/WTP |
 | LiveDemo (önceki kuyruktan) | Storylane/Navattic/Arcade'e açık kaynak alternatif — kanıtlı kategori | TR/global GTM açısı, monetizasyon |
 
 Uygun bulunmayıp elenen isimler (tekrar taramaya gerek yok): BoldVoice, RockAgent, ORDO,
-UpRock, Bubilet, Bundle Games, MyGarage, Okul.com.tr, Wise&Rise, AId Core, Midrise, Muzica,
-Rayİst, MeshGrid, Dronbul, microagi, Fora. — Rec Room ayrı not: kapanış haberi, "doğru türde
-batmışlık" incelemesi için eval-ele adayı olarak değerli.
+UpRock, Bubilet, Bundle Games, MyGarage, Okul.com.tr, Wise&Rise (eval-ele), AId Core (eval-ele),
+Midrise, Muzica, Rayİst, MeshGrid, Dronbul, microagi, Fora. — Rec Room ayrı not: kapanış haberi,
+"doğru türde batmışlık" incelemesi için eval-ele adayı olarak değerli.
 
 ---
 

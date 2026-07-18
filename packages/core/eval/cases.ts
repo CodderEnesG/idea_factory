@@ -3,14 +3,12 @@ import { makeSignal } from "./types.js";
 
 /**
  * Eval seti — HEDEF: 20 vaka (7 kovala / 6 izle / 7 ele). Golden'dan (golden.ts) AYRIK.
- * Mevcut: 15 gerçek vaka (Webrazzi taraması + web araştırması, 2026-07-18), dağılım 3/7/5.
- * (Bounce Watch ×2 güven kapısı kuralı gereği izle'ye çekildi — kanıt bandı erken.)
- * Kotalar: ✓ ≥2 anti-pattern (MeshGrid, Fora, Muzica) · ✓ ≥2 sınırda-izle (Join, DBTalk, Caretta)
- *          ✓ 1 tez-dışı-ama-ilginç (Dronbul) · ✓ mükerrer-çift (Bounce Watch ×2)
- *          ✓ 1 halüsinasyon probu (Caretta — traksiyon verisi gerçekten yok)
- * TODO(network): 20'ye tamamla (+4 kovala, +2 ele; izle 7→6 için mükerrer çift kovala
- * tarafına taşınacak — plan: yeni kovala vakalarından birinin ikinci kaynağıyla çift kur,
- * BW'nin Tech.eu kopyası düşür). Her yeni etiket tek satırla insan onayı ister.
+ * TAMAM: 20 gerçek vaka (Webrazzi taraması + web araştırması, 2026-07-18), dağılım 7/6/7.
+ * Tüm etiketler insan onaylı (2026-07-18). Bounce Watch güven kapısı kuralı gereği izle
+ * (kanıt bandı erken); mükerrer çift InScope ×2 (Webrazzi + TechCrunch — eşit bilgi seviyesi).
+ * Kotalar: ✓ ≥2 anti-pattern (MeshGrid, Fora, AId Core, Wise&Rise, Muzica)
+ *          ✓ ≥2 sınırda-izle (Join, DBTalk, Caretta) · ✓ 1 tez-dışı-ama-ilginç (Dronbul)
+ *          ✓ mükerrer-çift (InScope ×2) · ✓ 1 halüsinasyon probu (Caretta — traksiyon verisi yok)
  */
 export const evalCases: EvalCase[] = [
   // ── KOVALA (beklenen: pursue) ───────────────────────────────────────────
@@ -62,6 +60,72 @@ export const evalCases: EvalCase[] = [
     expected: "pursue",
     note: "Sektör birebir; Amazon ekosisteminde kanıtlı model (Helium 10, Perpetua) + organik ilk traksiyon",
   },
+  {
+    signal: makeSignal({
+      title: "Opttab — yapay zeka aramalarına odaklanan görünürlük ve GEO platformu",
+      summary_raw:
+        "Arda Ulusoy'un Opttab'ı (Ağustos 2025, 2 kişilik çekirdek ekip): markaların AI arama sonuçlarındaki " +
+        "görünürlüğünü ölçüp optimize ediyor. 1.000+ kayıtlı marka, 100+ ödeyen abone (bireysel/ajans/kurumsal), " +
+        "Eylül-Aralık arası aylık %160 gelir büyümesi; $20-999 kademeli SaaS fiyatlandırma. Hedef: TR/Kafkasya + Avrupa.",
+      source: "webrazzi",
+      type: "company",
+      url: "https://webrazzi.com/2025/12/15/yapay-zeka-aramalarina-odaklanan-gorunurluk-ve-geo-platformu-opttab/",
+      market: "TR",
+      sector: "B2B SaaS",
+    }),
+    expected: "pursue",
+    note: "GEO dalgası küresel kanıtlı (Profound, Peec AI); 100+ ödeyen + %160 büyüme = WTP kanıtlı; 2 kişi = sermaye-hafif",
+  },
+  {
+    signal: makeSignal({
+      title: "Fintech girişimi InScope, 14,5 milyon dolar yatırım aldı",
+      summary_raw:
+        "AI destekli finansal raporlama platformu InScope (2023, Mary Antony + Kelsey Gootnick), mutabakat/" +
+        "doğrulama/denetim izi gibi manuel işleri otomatikleştiriyor. Norwest liderliğinde $14,5M Series A; " +
+        "lansmandan beri müşteri tabanı 5×, ARR 30× büyüdü; Top 100 muhasebe firmaları onboard ediliyor.",
+      source: "webrazzi",
+      type: "funding",
+      url: "https://webrazzi.com/2026/02/23/fintech-girisimi-inscope-14-5-milyon-dolar-yatirim-aldi/",
+      market: "US",
+      sector: "fintech",
+    }),
+    expected: "pursue",
+    pairId: "inscope",
+    note: "Örnek A kalıbı: ABD'de kanıtlı raporlama otomasyonu; TR wedge: KGK/bağımsız denetim + e-dönüşüm raporlama yükü",
+  },
+  {
+    signal: makeSignal({
+      title: "InScope nabs $14.5M to solve the pain of financial reporting",
+      summary_raw:
+        "InScope, muhasebe firmaları ve şirketler için finansal tablo hazırlığını (gelir tablosu, bilanço, " +
+        "dipnotlar) otomatikleştiren AI platformu. Series A $14,5M (Norwest; Storm, BTV, Lightspeed katılımı), " +
+        "toplam fonlama $18,8M. 2024 lansmanından beri hızlı benimseme: müşteri 5 kat, ARR 30 kat arttı.",
+      source: "techcrunch",
+      type: "funding",
+      url: "https://techcrunch.com/2026/02/20/inscope-nabs-14-5m-to-solve-the-pain-of-financial-reporting/",
+      market: "US",
+      sector: "fintech",
+    }),
+    expected: "pursue",
+    pairId: "inscope",
+    note: "Mükerrer çift: aynı şirket/olgular, farklı kaynak ve metin — aynı aksiyon beklenir",
+  },
+  {
+    signal: makeSignal({
+      title: "6 ayda müşteri ve kullanımda 6 kat büyüyen Infoset'in öne çıkan verileri",
+      summary_raw:
+        "Infoset: bulut telefon + e-posta + chat/chatbot + WhatsApp/Messenger omnichannel müşteri iletişim " +
+        "platformu (CRM ve otomasyonla). 6 ayda müşteri sayısı ve kullanım 6×; ~2.000 kullanıcı; ödeyen kurumsallar: " +
+        "Casper, The North Face, Tommy Hilfiger, Vans TR. IT Task Force'tan $2,2M değerlemeyle yatırım; İtalya/Almanya'da satış.",
+      source: "webrazzi",
+      type: "company",
+      url: "https://webrazzi.com/2021/06/24/6-ay-icinde-hem-musteri-sayisi-hem-de-urun-kullanimi-olarak-6-kat-buyuyen-infoset-in-one-cikan-verileri/",
+      market: "TR",
+      sector: "B2B SaaS",
+    }),
+    expected: "pursue",
+    note: "Omnichannel destek SaaS'ı küresel kanıtlı (Zendesk, Freshworks); TR'de ödeyen kurumsal markalar = WTP kanıtlı; eski sinyal — tazelik banda karışmaz",
+  },
   // ── İZLE (beklenen: watch) ──────────────────────────────────────────────
   {
     signal: makeSignal({
@@ -77,25 +141,7 @@ export const evalCases: EvalCase[] = [
       sector: "B2B SaaS",
     }),
     expected: "watch",
-    pairId: "bounce-watch",
     note: "Güven kapısı kuralı: kanıt bandı erken (pre-seed, €2,5M) → confidence med → izle; yenileme/büyüme verisi gelirse kovala",
-  },
-  {
-    signal: makeSignal({
-      title: "Bounce Watch, pazar kararları için istihbarat katmanı inşa ediyor",
-      summary_raw:
-        "Bounce Watch gerçek zamanlı şirket sinyallerini (işe alım, fonlama, ortaklık) yatırımcı ve satış " +
-        "ekipleri için proaktif aksiyona çeviriyor. Abonelik + kullanım bazlı API modeli; 50'den fazla ödeyen " +
-        "kurumsal müşteri. Kurucular Cem Ötkün ve Sedat Yusuf Ergüneş.",
-      source: "tech.eu",
-      type: "company",
-      url: "https://tech.eu/2026/05/15/bounce-watch-building-the-intelligence-layer-for-faster-market-decisions/",
-      market: "TR",
-      sector: "B2B SaaS",
-    }),
-    expected: "watch",
-    pairId: "bounce-watch",
-    note: "Mükerrer çift: aynı şirket, farklı kaynak/metin — aynı aksiyon beklenir",
   },
   {
     signal: makeSignal({
@@ -257,5 +303,37 @@ export const evalCases: EvalCase[] = [
     }),
     expected: "kill",
     note: "Anti-pattern: sermaye-ağır network işi ($138,5M ile kurulan iki taraflı ağ) + sektör dışı",
+  },
+  {
+    signal: makeSignal({
+      title: "AId Core Solutions — yapay zeka destekli sağlık girişimi",
+      summary_raw:
+        "AId Core (2024, Ali Eren Karadağ + Umut Kutlu): RetinEye AId göz hastalığı tanı sistemi klinik " +
+        "doğrulama ve tıbbi cihaz regülasyon onayı sürecinde, henüz pazara çıkamıyor; Vitalify.ai ise B2C " +
+        "freemium wellness uygulaması (erken erişim). Öncelik bireysel kullanıcı + ABD pazarı.",
+      source: "webrazzi",
+      type: "company",
+      url: "https://webrazzi.com/2026/01/26/yapay-zeka-destekli-saglik-girisimi-aid-core-solutions/",
+      market: "TR",
+      sector: "healthtech",
+    }),
+    expected: "kill",
+    note: "Anti-pattern: ağır sağlık regülasyonu (tıbbi cihaz onayı bekleyen tanı ürünü) + B2C wellness WTP belirsiz",
+  },
+  {
+    signal: makeSignal({
+      title: "Wise&Rise — eğitimin Netflix'i olmayı hedefleyen dijital platform",
+      summary_raw:
+        "Wise&Rise: İlber Ortaylı, Vedat Milor gibi isimlerle 10 kategoride 800+ video ders sunan B2C abonelik " +
+        "platformu (+ Wise&Rise Business toplu lisans). 20 kişilik ekip, 14 ayda kendi altyapısıyla geliştirildi. " +
+        "Makalede fiyat ve abone sayısı yok. Azerbaycan/MENA'ya genişleme planı.",
+      source: "webrazzi",
+      type: "launch",
+      url: "https://webrazzi.com/2026/02/04/egitimin-netflix-i-olmayi-hedefleyen-dijital-platform-wise-rise/",
+      market: "TR",
+      sector: "consumer",
+    }),
+    expected: "kill",
+    note: "Sektör dışı B2C içerik; abone/fiyat verisi yok (WTP belirsiz) + ünlü eğitmenli içerik prodüksiyonu sermaye ister",
   },
 ];
