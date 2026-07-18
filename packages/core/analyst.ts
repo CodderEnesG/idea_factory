@@ -93,7 +93,9 @@ export async function analyzeSignal(
       continue;
     }
 
-    const violations = checkArbitrageGuards(parsed.data);
+    const violations = checkArbitrageGuards(parsed.data, {
+      ...(enrParsed.success ? { signalKind: enrParsed.data.signal_kind } : {}),
+    });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;
       continue;

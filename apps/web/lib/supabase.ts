@@ -5,5 +5,10 @@ export function serverDb(): SupabaseClient | null {
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
+  // Next, supabase-js'in fetch'ini de Data Cache'e alıyor; route `force-dynamic` olsa
+  // bile eski sonuç diskten (.next/cache/fetch-cache) servis ediliyordu. Her sorgu taze.
+  return createClient(url, key, {
+    auth: { persistSession: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+  });
 }

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { enrichSignal, type SignalEnrichment } from "./enrichment.js";
+import {
+  enrichSignal,
+  isActionableKind,
+  StoredEnrichmentSchema,
+  type SignalEnrichment,
+} from "./enrichment.js";
 import { buildArbitrageUserPrompt } from "./lenses.config.js";
 import type { AnalystProvider, GenerateArgs } from "./providers/types.js";
 import type { Signal } from "./signal.js";
@@ -19,6 +24,7 @@ const signal: Signal = {
 };
 
 const validExtraction: SignalEnrichment = {
+  signal_kind: "venture",
   project_summary: "Restoranlar için AI ile stok ve israf yönetimi yapan B2B SaaS.",
   hq_country: "US",
   markets: ["US"],
@@ -91,5 +97,52 @@ describe("buildArbitrageUserPrompt + enrichment", () => {
   it("enrichment yokken bugünkü prompt'la aynı kalır", () => {
     const p = buildArbitrageUserPrompt(signal);
     expect(p).not.toContain("Zenginleştirme");
+  });
+});
+
+describe("signal_kind ön kapısı", () => {
+  it("kovalanamaz tiplerde prompt'a uyarı düşer", () => {
+    for (const kind of ["essay", "research", "other"] as const) {
+      const p = buildArbitrageUserPrompt(signal, {
+        ...validExtraction,
+        signal_kind: kind,
+        fetch_ok: true,
+        model: "test",
+        page_chars: 100,
+      });
+      expect(p).toContain(`Sinyal tipi: ${kind}`);
+      expect(p).toContain("kovalanabilir teşebbüs YOK");
+    }
+  });
+
+  it("kovalanabilir tiplerde uyarı düşmez", () => {
+    const p = buildArbitrageUserPrompt(signal, {
+      ...validExtraction,
+      signal_kind: "venture",
+      fetch_ok: true,
+      model: "test",
+      page_chars: 100,
+    });
+    expect(p).toContain("Sinyal tipi: venture");
+    expect(p).not.toContain("kovalanabilir teşebbüs YOK");
+  });
+
+  it("eski satırlarda signal_kind yoksa 'other'a düşer, parse patlamaz", () => {
+    const { signal_kind: _omit, ...legacy } = validExtraction;
+    const parsed = StoredEnrichmentSchema.safeParse({
+      ...legacy,
+      fetch_ok: true,
+      model: "test",
+      page_chars: 10,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.signal_kind).toBe("other");
+  });
+});
+
+describe("isActionableKind", () => {
+  it("teşebbüs olanları ayırır", () => {
+    expect(["venture", "product", "funding"].every((k) => isActionableKind(k as never))).toBe(true);
+    expect(["essay", "research", "other"].some((k) => isActionableKind(k as never))).toBe(false);
   });
 });

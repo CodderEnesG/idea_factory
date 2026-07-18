@@ -11,6 +11,19 @@ import { AnthropicProvider } from "./providers/anthropic.js";
 export const CapitalIntensity = z.enum(["low", "medium", "high", "unknown"]);
 export type CapitalIntensity = z.infer<typeof CapitalIntensity>;
 
+/**
+ * Sinyalin ARKASINDA somut bir teşebbüs var mı? Newsletter'lar görüş yazısı da taşıyor;
+ * analist bunları "meta-öğrenme" diye rasyonalize edip yüksek fit veriyordu (bkz. guards (e)).
+ * venture/product/funding = kovalanabilir; essay/research/other = kovalanamaz.
+ */
+export const SignalKind = z.enum(["venture", "product", "funding", "essay", "research", "other"]);
+export type SignalKind = z.infer<typeof SignalKind>;
+
+/** Kovalanabilir mi — ortada şirket/ürün/tur var mı? */
+export function isActionableKind(k: SignalKind): boolean {
+  return k === "venture" || k === "product" || k === "funding";
+}
+
 export const EnrichmentFundingSchema = z.object({
   stage: z.string().nullable(), // "seed", "Series B"… null = sayfada yok
   amount: z.string().nullable(), // "$5M"
@@ -20,6 +33,7 @@ export const EnrichmentFundingSchema = z.object({
 
 /** LLM çıktısı — bilinmeyen alan null/unknown kalır, uydurma yasak (prompt). */
 export const SignalEnrichmentSchema = z.object({
+  signal_kind: SignalKind, // arkasında teşebbüs var mı — essay/research analiz kuyruğuna girmez
   project_summary: z.string().min(1), // 2-3 cümle: ne yapıyor, problem/çözüm, iş modeli
   hq_country: z.string().nullable(),
   markets: z.array(z.string()).default([]), // aktif/hedef pazarlar
@@ -34,8 +48,13 @@ export const SignalEnrichmentSchema = z.object({
 });
 export type SignalEnrichment = z.infer<typeof SignalEnrichmentSchema>;
 
-/** DB'de duran şekil: extraction + worker meta'sı. */
+/**
+ * DB'de duran şekil: extraction + worker meta'sı.
+ * signal_kind alandan önce yazılmış satırlarda yok — parse patlamasın diye "other"a düşer
+ * (FORCE_ENRICH=true ile yeniden zenginleştirince gerçek sınıf gelir).
+ */
 export const StoredEnrichmentSchema = SignalEnrichmentSchema.extend({
+  signal_kind: SignalKind.catch("other"),
   fetch_ok: z.boolean(),
   model: z.string(),
   page_chars: z.number().int().nullable(),
@@ -52,7 +71,17 @@ capital_intensity için "unknown" seç. null/unknown alanlar analist için "doğ
 demektir; boş bırakmak doğru davranıştır.
 
 Alan rehberi:
+- signal_kind: sinyalin ARKASINDA somut bir teşebbüs var mı? Bunu önce belirle:
+  · venture  — adı geçen, faaliyette bir şirket/girişim.
+  · product  — belirli bir ürün/araç (lansman, launch sayfası).
+  · funding  — bir şirketin aldığı somut yatırım turu.
+  · essay    — görüş/deneme/tavsiye yazısı, ilke anlatımı, "şu dersi çıkarın" içeriği.
+  · research — araştırma, veri/rapor, pazar analizi.
+  · other    — hiçbirine uymayan.
+  Uyarı: newsletter başlıkları çoğu zaman essay'dir. "Şirketinizi şöyle yönetin", "X neden
+  başarısız olur", "Y hakkında düşünceler" → essay. Bir şirket ADI geçmiyorsa venture DEĞİL.
 - project_summary: ne yapıyor, hangi problemi nasıl çözüyor, iş modeli (2-3 cümle, Türkçe).
+  signal_kind essay/research/other ise: yazının ne savunduğunu 1-2 cümlede özetle, ürün uydurma.
 - hq_country / markets: merkez ülke; aktif veya hedeflenen pazarlar.
 - funding: tur, miktar, yatırımcılar, toplam — yalnız metinde açıkça geçiyorsa.
 - target_users: segment (KOBİ / enterprise / consumer / developer). traction: somut sayılar.

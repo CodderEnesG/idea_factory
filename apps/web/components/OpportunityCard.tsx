@@ -1,5 +1,14 @@
-import { fitBand, StoredEnrichmentSchema, type RankedItem } from "@idea-factory/core";
+import { fitBand, isActionableKind, StoredEnrichmentSchema, type RankedItem } from "@idea-factory/core";
 import { DecisionButtons } from "./DecisionButtons";
+
+const KIND_LABEL = {
+  venture: "girişim",
+  product: "ürün",
+  funding: "yatırım turu",
+  essay: "görüş yazısı",
+  research: "araştırma",
+  other: "sınıflanmadı",
+} as const;
 
 const BAND = {
   pursue: { label: "KOVALA", text: "text-pursue", dot: "bg-pursue", ring: "border-l-pursue" },
@@ -16,6 +25,10 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
     (signal as { enrichment?: unknown }).enrichment,
   );
   const enr = enrParsed.success ? enrParsed.data : null;
+  // Karar verilemez kart: ya hiç zenginleştirme yok, ya da ortada kovalanacak teşebbüs yok.
+  // Sessizce "? · ?" gösterip kullanıcıyı karar vermeye zorlamak yerine sebebini söyle.
+  const notActionable = enr ? !isActionableKind(enr.signal_kind) : false;
+  const noData = !enr;
   const facts: string[] = [];
   if (enr) {
     if (enr.hq_country) facts.push(`🌍 ${enr.hq_country}`);
@@ -50,7 +63,10 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
             {signal.title}
           </a>
           <div className="mt-1 text-xs text-ink-muted">
-            {signal.source} · {signal.market ?? "?"} · {signal.sector ?? "?"}
+            {signal.source}
+            {enr && <> · {KIND_LABEL[enr.signal_kind]}</>}
+            {signal.market && <> · {signal.market}</>}
+            {signal.sector && <> · {signal.sector}</>}
             {enr && !enr.fetch_ok && (
               <span className="ml-2 opacity-70">· sayfa çekilemedi</span>
             )}
@@ -59,10 +75,28 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
             <div className="mt-1.5 text-xs text-ink-secondary">{facts.join(" · ")}</div>
           )}
         </div>
-        {pending && (
+        {pending && !notActionable && (
           <span className="chip shrink-0 border-strong text-brand">🔎 doğrulama bekliyor</span>
         )}
       </div>
+
+      {(notActionable || noData) && (
+        <div className="mt-4 rounded-btn border border-hair bg-elevated px-3 py-2 text-xs text-ink-secondary">
+          {notActionable ? (
+            <>
+              <span className="text-ink">Karar verilecek teşebbüs yok</span> — bu bir{" "}
+              {KIND_LABEL[enr!.signal_kind]}. Arkasında şirket/ürün/yatırım turu olmadığı için
+              kovalanamaz; fikir olarak değerliyse tez notlarına geçir.
+            </>
+          ) : (
+            <>
+              <span className="text-ink">Yetersiz veri</span> — sinyal henüz zenginleştirilmedi,
+              ne yaptığı ve hangi problemi çözdüğü bilinmiyor. Karar vermeden önce{" "}
+              <code>pnpm enrich</code> çalıştır.
+            </>
+          )}
+        </div>
+      )}
 
       {enr && (
         <p className="mt-4 text-sm leading-relaxed text-ink">

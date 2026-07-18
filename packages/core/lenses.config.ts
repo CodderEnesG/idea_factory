@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ThesisConfig } from "./thesis.config.js";
 import type { Signal } from "./signal.js";
-import type { StoredEnrichment } from "./enrichment.js";
+import { isActionableKind, type StoredEnrichment } from "./enrichment.js";
 
 /* ── Çıktı şeması (THESIS_AND_LENS.md §2) ───────────────────────────────── */
 
@@ -74,10 +74,20 @@ sorusuyla değerlendirmek. Varsayılan tutumun "bu neden çöker?" — bir fırs
 5. Kim deniyor: Türkiye'de zaten kovalayan var mı?
 6. Önerilen aksiyon: kovala / izle / ele — ve neden, bu teze göre.
 
+## Ön kapı: bu sinyal kovalanabilir mi?
+fit, "BU TEŞEBBÜSÜ kovalamalı mıyız" sorusunun cevabıdır — "bu içerik faydalı mı"nın değil.
+Ortada somut bir şirket/ürün/yatırım turu YOKSA (görüş yazısı, deneme, ilke anlatımı,
+araştırma, "şu dersi çıkarın" içeriği) kovalanacak bir şey de yoktur:
+- fit EN FAZLA 20, recommended_action: kill.
+- "Meta-öğrenme değeri var", "çerçevemizi güçlendirir", "değerlendirme merceğimizi keskinleştirir"
+  gibi gerekçeler fit'i YÜKSELTMEZ. Bir fikri faydalı bulman onu fırsat yapmaz.
+- rationale'da neden kovalanamaz olduğunu tek cümlede söyle, uzun özet yazma.
+Zenginleştirme bloğunda signal_kind verilmişse ona uy: essay/research/other → yukarıdaki kural.
+
 ## Fit bant kuralı (0-100, katı)
 - 80-100: teze birebir uyum (kovala-adayı) — YALNIZ confidence:high ile.
 - 50-79: uyum var ama kritik belirsizlik (izle bandı) — confidence low/med tavanı 79.
-- 0-49: uyumsuz / anti-pattern (ele bandı).
+- 0-49: uyumsuz / anti-pattern / kovalanamaz (ele bandı).
 
 ## Kurallar
 - recommended_action bantla çelişemez (fit 85 + kill yasak).
@@ -111,6 +121,7 @@ export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichmen
     enr = `
 
 Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
+- Sinyal tipi: ${e.signal_kind}${isActionableKind(e.signal_kind) ? "" : " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)"}
 - Proje: ${e.project_summary}
 - Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
 - Fonlama: ${funding}

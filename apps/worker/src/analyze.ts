@@ -1,10 +1,42 @@
-import { analyzeSignal, type Signal } from "@idea-factory/core";
+import {
+  analyzeSignal,
+  isActionableKind,
+  StoredEnrichmentSchema,
+  type Signal,
+} from "@idea-factory/core";
 import { db } from "./db.js";
 import { env } from "./env.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
+// Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
+// ProductHunt'ı hiç sıraya sokmuyordu — 64 ürün lansmanı 0 analizle bekliyordu).
+const PER_SOURCE_CAP = Number(process.env["ANALYZE_PER_SOURCE_CAP"] ?? "4");
 
-async function fetchUnanalyzed(limit: number): Promise<Signal[]> {
+/** Kaynak başına tavan uygulayarak sırayı dolaş; kota dolarsa sıradaki kaynağa geç. */
+function balanceBySource(signals: Signal[], limit: number, cap: number): Signal[] {
+  const used = new Map<string, number>();
+  const picked: Signal[] = [];
+  const overflow: Signal[] = [];
+
+  for (const s of signals) {
+    if (picked.length >= limit) break;
+    const n = used.get(s.source) ?? 0;
+    if (n < cap) {
+      used.set(s.source, n + 1);
+      picked.push(s);
+    } else {
+      overflow.push(s);
+    }
+  }
+  // Parti dolmadıysa tavanı aşan artıklarla tamamla (kaynak azsa boş geçmesin).
+  for (const s of overflow) {
+    if (picked.length >= limit) break;
+    picked.push(s);
+  }
+  return picked;
+}
+
+async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped: number }> {
   const { data: analyzed, error: aErr } = await db
     .from("analyses")
     .select("signal_id")
@@ -16,16 +48,25 @@ async function fetchUnanalyzed(limit: number): Promise<Signal[]> {
     .from("signals")
     .select("*")
     .order("fetched_at", { ascending: false })
-    .limit(limit * 4);
+    .limit(limit * 20);
   if (sErr) throw new Error(`signals sorgu hatası: ${sErr.message}`);
 
-  return (signals ?? []).filter((s) => !done.has(s.id as string)).slice(0, limit) as Signal[];
+  const pending = ((signals ?? []) as Signal[]).filter((s) => !done.has(s.id));
+
+  // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
+  const actionable = pending.filter((s) => {
+    const e = StoredEnrichmentSchema.safeParse(s.enrichment);
+    return !e.success || isActionableKind(e.data.signal_kind);
+  });
+
+  return { todo: balanceBySource(actionable, limit, PER_SOURCE_CAP), skipped: pending.length - actionable.length };
 }
 
 async function main(): Promise<void> {
-  const todo = await fetchUnanalyzed(BATCH_LIMIT);
+  const { todo, skipped } = await fetchUnanalyzed(BATCH_LIMIT);
   console.log(
-    `${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()})`,
+    `${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()}` +
+      `, kaynak tavanı=${PER_SOURCE_CAP}${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
   );
 
   let ok = 0;

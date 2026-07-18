@@ -78,3 +78,31 @@ describe("checkArbitrageGuards", () => {
     expect(out.some((v) => v.includes("izle"))).toBe(true);
   });
 });
+
+describe("ön kapı guard'ı (signal_kind)", () => {
+  it("kovalanamaz sinyalde yüksek fit ihlal", () => {
+    const v = checkArbitrageGuards(base, { signalKind: "essay" });
+    expect(v.some((x) => x.includes("fit 85"))).toBe(true);
+    expect(v.some((x) => x.includes("recommended_action=kill olmalı"))).toBe(true);
+  });
+
+  it("kovalanamaz sinyalde fit≤20 + kill temiz geçer", () => {
+    const a: ArbitrageAnalysis = {
+      ...base,
+      fit: 15,
+      confidence: "high",
+      recommended_action: "kill",
+    };
+    expect(checkArbitrageGuards(a, { signalKind: "essay" })).toEqual([]);
+  });
+
+  it("venture/product/funding ön kapıya takılmaz", () => {
+    for (const kind of ["venture", "product", "funding"] as const) {
+      expect(checkArbitrageGuards(base, { signalKind: kind })).toEqual([]);
+    }
+  });
+
+  it("bağlam yoksa ön kapı uygulanmaz (geriye dönük uyum)", () => {
+    expect(checkArbitrageGuards(base)).toEqual([]);
+  });
+});

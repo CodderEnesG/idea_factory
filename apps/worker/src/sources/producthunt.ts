@@ -1,8 +1,26 @@
 import Parser from "rss-parser";
+import { parse } from "node-html-parser";
 import { SignalSchema, shortHash, type Signal } from "@idea-factory/core";
 import type { Source } from "./types.js";
 
 const FEED_URL = "https://www.producthunt.com/feed";
+
+/**
+ * Feed content'i: <p>tagline</p><p><a>Discussion</a> | <a>Link</a></p>.
+ * contentSnippet ikisini birleştirip "Discussion | Link" bırakıyordu — sinyaller içeriksiz
+ * kalıyor, enrich de PH sayfasını çekemiyordu (Cloudflare 403). İlk <p> = gerçek tagline.
+ */
+function extractTagline(content: string | undefined): string {
+  if (!content) return "";
+  const p = parse(content).querySelectorAll("p");
+  for (const node of p) {
+    // Discussion|Link paragrafını atla (yalnız anchor içerir).
+    if (node.querySelector("a")) continue;
+    const t = node.text.replace(/\s+/g, " ").trim();
+    if (t) return t;
+  }
+  return "";
+}
 
 /** ProductHunt RSS — flat feed, tek-adım. Walking skeleton kaynağı (M1). */
 export const productHunt: Source = {
@@ -18,7 +36,11 @@ export const productHunt: Source = {
       const title = item.title?.trim();
       if (!url || !title) continue;
 
-      const summary = (item.contentSnippet ?? item.content ?? "").trim();
+      const summary = extractTagline(item.content) || (item.contentSnippet ?? "").trim();
+      if (!summary) {
+        console.warn(`[producthunt] tagline yok, atlandı: ${url}`);
+        continue;
+      }
       const parsed = SignalSchema.safeParse({
         id: shortHash(url),
         source: "producthunt",
