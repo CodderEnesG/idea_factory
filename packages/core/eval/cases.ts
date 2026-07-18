@@ -3,11 +3,14 @@ import { makeSignal } from "./types.js";
 
 /**
  * Eval seti — HEDEF: 20 vaka (7 kovala / 6 izle / 7 ele). Golden'dan (golden.ts) AYRIK.
- * Mevcut: 15 gerçek vaka (Webrazzi taraması + web araştırması, 2026-07-18), dağılım 5/5/5.
+ * Mevcut: 15 gerçek vaka (Webrazzi taraması + web araştırması, 2026-07-18), dağılım 3/7/5.
+ * (Bounce Watch ×2 güven kapısı kuralı gereği izle'ye çekildi — kanıt bandı erken.)
  * Kotalar: ✓ ≥2 anti-pattern (MeshGrid, Fora, Muzica) · ✓ ≥2 sınırda-izle (Join, DBTalk, Caretta)
  *          ✓ 1 tez-dışı-ama-ilginç (Dronbul) · ✓ mükerrer-çift (Bounce Watch ×2)
  *          ✓ 1 halüsinasyon probu (Caretta — traksiyon verisi gerçekten yok)
- * TODO(network): 20'ye tamamla (+2 kovala, +1 izle, +2 ele) ve her etiketi tek satırla onayla.
+ * TODO(network): 20'ye tamamla (+4 kovala, +2 ele; izle 7→6 için mükerrer çift kovala
+ * tarafına taşınacak — plan: yeni kovala vakalarından birinin ikinci kaynağıyla çift kur,
+ * BW'nin Tech.eu kopyası düşür). Her yeni etiket tek satırla insan onayı ister.
  */
 export const evalCases: EvalCase[] = [
   // ── KOVALA (beklenen: pursue) ───────────────────────────────────────────
@@ -59,6 +62,7 @@ export const evalCases: EvalCase[] = [
     expected: "pursue",
     note: "Sektör birebir; Amazon ekosisteminde kanıtlı model (Helium 10, Perpetua) + organik ilk traksiyon",
   },
+  // ── İZLE (beklenen: watch) ──────────────────────────────────────────────
   {
     signal: makeSignal({
       title: "Bounce Watch — şirket sinyallerini karar motoruna çeviren yapay zeka ajanı",
@@ -72,9 +76,9 @@ export const evalCases: EvalCase[] = [
       market: "TR",
       sector: "B2B SaaS",
     }),
-    expected: "pursue",
+    expected: "watch",
     pairId: "bounce-watch",
-    note: "Ödeyen kurumsal müşteri + net fiyat = WTP kanıtlı; erken kanıt bandı → kovala ama confidence:medium beklenir",
+    note: "Güven kapısı kuralı: kanıt bandı erken (pre-seed, €2,5M) → confidence med → izle; yenileme/büyüme verisi gelirse kovala",
   },
   {
     signal: makeSignal({
@@ -89,11 +93,10 @@ export const evalCases: EvalCase[] = [
       market: "TR",
       sector: "B2B SaaS",
     }),
-    expected: "pursue",
+    expected: "watch",
     pairId: "bounce-watch",
     note: "Mükerrer çift: aynı şirket, farklı kaynak/metin — aynı aksiyon beklenir",
   },
-  // ── İZLE (beklenen: watch) ──────────────────────────────────────────────
   {
     signal: makeSignal({
       title: "SorsX — yapay zeka destekli işe alım platformu",
