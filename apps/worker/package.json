@@ -10,17 +10,20 @@
     "enrich": "tsx src/enrich.ts",
     "analyze": "tsx src/analyze.ts",
     "digest": "tsx src/digest.ts",
-    "tick": "tsx src/ingest.ts && tsx src/enrich.ts && tsx src/analyze.ts && tsx src/digest.ts"
+    "tick": "tsx src/ingest.ts && tsx src/enrich.ts && tsx src/analyze.ts && tsx src/digest.ts",
+    "cron": "tsx src/cron.ts"
   },
   "dependencies": {
     "@idea-factory/core": "workspace:*",
     "@supabase/supabase-js": "^2.46.1",
     "dotenv": "^16.4.5",
+    "node-cron": "^4.6.0",
     "node-html-parser": "^6.1.13",
     "rss-parser": "^3.13.0",
     "ws": "^8.21.1"
   },
   "devDependencies": {
+    "@types/node-cron": "^3.0.11",
     "@types/ws": "^8.18.1"
   }
 }

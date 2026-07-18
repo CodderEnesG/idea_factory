@@ -2,9 +2,11 @@ import type { Signal } from "@idea-factory/core";
 import { db } from "./db.js";
 import { productHunt } from "./sources/producthunt.js";
 import { tldr } from "./sources/tldr.js";
+import { webrazzi } from "./sources/webrazzi.js";
+import { techcrunch } from "./sources/techcrunch.js";
 import type { Source } from "./sources/types.js";
 
-const SOURCES: Source[] = [productHunt, tldr];
+const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch];
 
 /** Batch içi dedup: url + content_hash üzerinden ilk görüleni tut. */
 function dedupeBatch(signals: Signal[]): Signal[] {
@@ -20,20 +22,32 @@ function dedupeBatch(signals: Signal[]): Signal[] {
   return out;
 }
 
+// PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
+// URL uzunluk limitini aşıp "fetch failed" veriyordu (4 kaynak sonrası görüldü) → parçala.
+const EXISTING_CHUNK = 40;
+
 /** DB'de zaten olanları (url veya content_hash) ele — idempotent. */
 async function filterExisting(signals: Signal[]): Promise<Signal[]> {
   if (signals.length === 0) return [];
-  const urls = signals.map((s) => s.url);
-  const hashes = signals.map((s) => s.content_hash);
+  const existingUrl = new Set<string>();
+  const existingHash = new Set<string>();
 
-  const { data, error } = await db
-    .from("signals")
-    .select("url, content_hash")
-    .or(`url.in.(${urls.map(quote).join(",")}),content_hash.in.(${hashes.map(quote).join(",")})`);
-  if (error) throw new Error(`DB sorgu hatası: ${error.message}`);
+  for (let i = 0; i < signals.length; i += EXISTING_CHUNK) {
+    const chunk = signals.slice(i, i + EXISTING_CHUNK);
+    const urls = chunk.map((s) => s.url);
+    const hashes = chunk.map((s) => s.content_hash);
 
-  const existingUrl = new Set((data ?? []).map((r) => r.url));
-  const existingHash = new Set((data ?? []).map((r) => r.content_hash));
+    const { data, error } = await db
+      .from("signals")
+      .select("url, content_hash")
+      .or(`url.in.(${urls.map(quote).join(",")}),content_hash.in.(${hashes.map(quote).join(",")})`);
+    if (error) throw new Error(`DB sorgu hatası: ${error.message}`);
+
+    for (const r of data ?? []) {
+      existingUrl.add(r.url);
+      existingHash.add(r.content_hash);
+    }
+  }
   return signals.filter((s) => !existingUrl.has(s.url) && !existingHash.has(s.content_hash));
 }
 
