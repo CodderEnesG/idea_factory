@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { rank, type ArbitrageAnalysis, type RankedItem, type Signal } from "@idea-factory/core";
+import {
+  isBench,
+  rank,
+  type ArbitrageAnalysis,
+  type RankedItem,
+  type Signal,
+} from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
 import { DEMO_ITEMS } from "../../lib/demo";
 import { OpportunityCard } from "../../components/OpportunityCard";
@@ -20,9 +26,16 @@ async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
   return { items, demo: false };
 }
 
-export default async function Queue() {
+export default async function Queue({
+  searchParams,
+}: {
+  searchParams?: { bench?: string };
+}) {
   const { items, demo } = await loadItems();
-  const ranked = rank(items);
+  const benchOnly = searchParams?.bench === "1";
+  const all = rank(items);
+  const benchCount = all.filter((i) => isBench(i.analysis)).length;
+  const ranked = benchOnly ? all.filter((i) => isBench(i.analysis)) : all;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -35,6 +48,20 @@ export default async function Queue() {
           <p className="mt-1 text-sm text-ink-secondary">
             {ranked.length} fırsat · arbitraj merceği · Türkiye tezi
           </p>
+          <nav className="mt-3 flex gap-2 text-xs">
+            <Link
+              href="/queue"
+              className={`chip ${!benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
+            >
+              Tümü ({all.length})
+            </Link>
+            <Link
+              href="/queue?bench=1"
+              className={`chip ${benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
+            >
+              🏅 Bench ({benchCount})
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -45,6 +72,11 @@ export default async function Queue() {
       )}
 
       <div className="space-y-4">
+        {ranked.length === 0 && benchOnly && (
+          <p className="text-sm text-ink-muted">
+            Bench çıtasını (fit ≥ 80 · güven yüksek) geçen fırsat yok.
+          </p>
+        )}
         {ranked.map((item) => (
           <OpportunityCard key={item.signal.id} item={item} />
         ))}

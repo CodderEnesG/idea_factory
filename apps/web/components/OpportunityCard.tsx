@@ -1,4 +1,10 @@
-import { fitBand, isActionableKind, StoredEnrichmentSchema, type RankedItem } from "@idea-factory/core";
+import {
+  fitBand,
+  isActionableKind,
+  isBench,
+  StoredEnrichmentSchema,
+  type RankedItem,
+} from "@idea-factory/core";
 import { DecisionButtons } from "./DecisionButtons";
 
 const KIND_LABEL = {
@@ -53,6 +59,14 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
             <span className="font-display text-ink">fit {analysis.fit}</span>
             <span className="text-ink-muted">·</span>
             <span className="text-ink-secondary">güven: {analysis.confidence}</span>
+            {isBench(analysis) && (
+              <>
+                <span className="text-ink-muted">·</span>
+                <span className="text-ink" title="Bench çıtası: fit ≥ 80 · güven yüksek">
+                  🏅 bench
+                </span>
+              </>
+            )}
           </div>
           <a
             href={signal.url}
