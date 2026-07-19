@@ -9,6 +9,7 @@ import {
 import { serverDb } from "../../lib/supabase";
 import { DEMO_ITEMS } from "../../lib/demo";
 import { OpportunityCard } from "../../components/OpportunityCard";
+import type { Decision } from "../../components/DecisionButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,28 @@ async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
   return { items, demo: false };
 }
 
+/** Sinyal başına en son karar (decisions bir log; son satır kazanır). */
+async function loadDecisions(): Promise<Map<string, Decision>> {
+  const db = serverDb();
+  const map = new Map<string, Decision>();
+  if (!db) return map;
+  const { data, error } = await db
+    .from("decisions")
+    .select("signal_id, decision")
+    .order("created_at", { ascending: true });
+  if (error || !data) return map;
+  for (const row of data as { signal_id: string; decision: Decision }[]) {
+    map.set(row.signal_id, row.decision);
+  }
+  return map;
+}
+
 export default async function Queue({
   searchParams,
 }: {
   searchParams?: { bench?: string };
 }) {
-  const { items, demo } = await loadItems();
+  const [{ items, demo }, decisions] = await Promise.all([loadItems(), loadDecisions()]);
   const benchOnly = searchParams?.bench === "1";
   const all = rank(items);
   const benchCount = all.filter((i) => isBench(i.analysis)).length;
@@ -78,7 +95,11 @@ export default async function Queue({
           </p>
         )}
         {ranked.map((item) => (
-          <OpportunityCard key={item.signal.id} item={item} />
+          <OpportunityCard
+            key={item.signal.id}
+            item={item}
+            decision={decisions.get(item.signal.id) ?? null}
+          />
         ))}
       </div>
     </main>

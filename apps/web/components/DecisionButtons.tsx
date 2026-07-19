@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Decision = "pursue" | "watch" | "kill";
+export type Decision = "pursue" | "watch" | "kill";
 
 const OPTS: { d: Decision; label: string; cls: string }[] = [
   { d: "pursue", label: "Kovala", cls: "hover:border-pursue hover:text-pursue" },
@@ -16,8 +16,14 @@ const CHOSEN: Record<Decision, string> = {
   kill: "border-kill text-kill",
 };
 
-export function DecisionButtons({ signalId }: { signalId: string }) {
-  const [chosen, setChosen] = useState<Decision | null>(null);
+export function DecisionButtons({
+  signalId,
+  initial = null,
+}: {
+  signalId: string;
+  initial?: Decision | null;
+}) {
+  const [chosen, setChosen] = useState<Decision | null>(initial);
   const [busy, setBusy] = useState(false);
 
   async function decide(d: Decision) {

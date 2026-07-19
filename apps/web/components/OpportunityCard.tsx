@@ -5,7 +5,7 @@ import {
   StoredEnrichmentSchema,
   type RankedItem,
 } from "@idea-factory/core";
-import { DecisionButtons } from "./DecisionButtons";
+import { DecisionButtons, type Decision } from "./DecisionButtons";
 
 const KIND_LABEL = {
   venture: "girişim",
@@ -22,7 +22,13 @@ const BAND = {
   kill: { label: "ELE", text: "text-kill", dot: "bg-kill", ring: "border-l-kill" },
 } as const;
 
-export function OpportunityCard({ item }: { item: RankedItem }) {
+export function OpportunityCard({
+  item,
+  decision = null,
+}: {
+  item: RankedItem;
+  decision?: Decision | null;
+}) {
   const { signal, analysis } = item;
   const band = BAND[fitBand(analysis.fit)];
   const pending = analysis.validation_needed.length > 0;
@@ -152,7 +158,7 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
       )}
 
       <div className="mt-5">
-        <DecisionButtons signalId={signal.id} />
+        <DecisionButtons signalId={signal.id} initial={decision} />
       </div>
     </article>
   );
