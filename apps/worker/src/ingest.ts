@@ -5,22 +5,9 @@ import { tldr } from "./sources/tldr.js";
 import { webrazzi } from "./sources/webrazzi.js";
 import { techcrunch } from "./sources/techcrunch.js";
 import type { Source } from "./sources/types.js";
+import { dedupeBatch, quote } from "./lib/dedupe.js";
 
 const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch];
-
-/** Batch içi dedup: url + content_hash üzerinden ilk görüleni tut. */
-function dedupeBatch(signals: Signal[]): Signal[] {
-  const seenUrl = new Set<string>();
-  const seenHash = new Set<string>();
-  const out: Signal[] = [];
-  for (const s of signals) {
-    if (seenUrl.has(s.url) || seenHash.has(s.content_hash)) continue;
-    seenUrl.add(s.url);
-    seenHash.add(s.content_hash);
-    out.push(s);
-  }
-  return out;
-}
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
 // URL uzunluk limitini aşıp "fetch failed" veriyordu (4 kaynak sonrası görüldü) → parçala.
@@ -49,11 +36,6 @@ async function filterExisting(signals: Signal[]): Promise<Signal[]> {
     }
   }
   return signals.filter((s) => !existingUrl.has(s.url) && !existingHash.has(s.content_hash));
-}
-
-// PostgREST .or() filtresi için değer kaçışı (virgül/parantez içeren url'ler).
-function quote(v: string): string {
-  return `"${v.replace(/"/g, '\\"')}"`;
 }
 
 async function main(): Promise<void> {
