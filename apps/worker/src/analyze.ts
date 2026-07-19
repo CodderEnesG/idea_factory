@@ -37,26 +37,34 @@ function balanceBySource(signals: Signal[], limit: number, cap: number): Signal[
 }
 
 async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped: number }> {
-  const { data: analyzed, error: aErr } = await db
-    .from("analyses")
-    .select("signal_id")
-    .eq("lens", "arbitrage");
-  if (aErr) throw new Error(`analyses sorgu hatası: ${aErr.message}`);
-  const done = new Set((analyzed ?? []).map((r) => r.signal_id as string));
-
   const { data: signals, error: sErr } = await db
     .from("signals")
     .select("*")
     .order("fetched_at", { ascending: false })
     .limit(limit * 20);
   if (sErr) throw new Error(`signals sorgu hatası: ${sErr.message}`);
+  const window = (signals ?? []) as Signal[];
 
-  const pending = ((signals ?? []) as Signal[]).filter((s) => !done.has(s.id));
+  // done-set'i tüm geçmiş yerine yalnız penceredeki id'ler için sor: PostgREST tek istekte
+  // en çok 1000 satır döndürür; tablo büyüyünce kırpılan id'ler "yapılmadı" sanılıp
+  // yeniden analiz ediliyordu (boşa LLM çağrısı).
+  const done = new Set<string>();
+  if (window.length > 0) {
+    const { data: analyzed, error: aErr } = await db
+      .from("analyses")
+      .select("signal_id")
+      .eq("lens", "arbitrage")
+      .in("signal_id", window.map((s) => s.id));
+    if (aErr) throw new Error(`analyses sorgu hatası: ${aErr.message}`);
+    for (const r of analyzed ?? []) done.add(r.signal_id as string);
+  }
+  const pending = window.filter((s) => !done.has(s.id));
 
   // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
+  // signal_kind null = legacy satır (sınıf bilinmiyor) → elemeden geçir.
   const actionable = pending.filter((s) => {
     const e = StoredEnrichmentSchema.safeParse(s.enrichment);
-    return !e.success || isActionableKind(e.data.signal_kind);
+    return !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
   });
 
   return { todo: balanceBySource(actionable, limit, PER_SOURCE_CAP), skipped: pending.length - actionable.length };

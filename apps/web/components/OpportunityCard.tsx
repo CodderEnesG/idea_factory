@@ -39,7 +39,8 @@ export function OpportunityCard({
   const enr = enrParsed.success ? enrParsed.data : null;
   // Karar verilemez kart: ya hiç zenginleştirme yok, ya da ortada kovalanacak teşebbüs yok.
   // Sessizce "? · ?" gösterip kullanıcıyı karar vermeye zorlamak yerine sebebini söyle.
-  const notActionable = enr ? !isActionableKind(enr.signal_kind) : false;
+  // signal_kind null = legacy satır, sınıf bilinmiyor → kovalanamaz damgası vurma.
+  const notActionable = enr?.signal_kind ? !isActionableKind(enr.signal_kind) : false;
   const noData = !enr;
   const facts: string[] = [];
   if (enr) {
@@ -84,7 +85,7 @@ export function OpportunityCard({
           </a>
           <div className="mt-1 text-xs text-ink-muted">
             {signal.source}
-            {enr && <> · {KIND_LABEL[enr.signal_kind]}</>}
+            {enr?.signal_kind && <> · {KIND_LABEL[enr.signal_kind]}</>}
             {signal.market && <> · {signal.market}</>}
             {signal.sector && <> · {signal.sector}</>}
             {enr && !enr.fetch_ok && (
@@ -105,7 +106,7 @@ export function OpportunityCard({
           {notActionable ? (
             <>
               <span className="text-ink">Karar verilecek teşebbüs yok</span> — bu bir{" "}
-              {KIND_LABEL[enr!.signal_kind]}. Arkasında şirket/ürün/yatırım turu olmadığı için
+              {KIND_LABEL[enr!.signal_kind!]}. Arkasında şirket/ürün/yatırım turu olmadığı için
               kovalanamaz; fikir olarak değerliyse tez notlarına geçir.
             </>
           ) : (

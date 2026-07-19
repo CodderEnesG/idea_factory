@@ -127,7 +127,7 @@ describe("signal_kind ön kapısı", () => {
     expect(p).not.toContain("kovalanabilir teşebbüs YOK");
   });
 
-  it("eski satırlarda signal_kind yoksa 'other'a düşer, parse patlamaz", () => {
+  it("eski satırlarda signal_kind yoksa null'a düşer (bilinmiyor ≠ kovalanamaz), parse patlamaz", () => {
     const { signal_kind: _omit, ...legacy } = validExtraction;
     const parsed = StoredEnrichmentSchema.safeParse({
       ...legacy,
@@ -136,7 +136,19 @@ describe("signal_kind ön kapısı", () => {
       page_chars: 10,
     });
     expect(parsed.success).toBe(true);
-    expect(parsed.success && parsed.data.signal_kind).toBe("other");
+    expect(parsed.success && parsed.data.signal_kind).toBe(null);
+  });
+
+  it("signal_kind null (legacy) prompt'ta 'bilinmiyor' olur, ön kapı uyarısı düşmez", () => {
+    const p = buildArbitrageUserPrompt(signal, {
+      ...validExtraction,
+      signal_kind: null,
+      fetch_ok: true,
+      model: "test",
+      page_chars: 100,
+    });
+    expect(p).toContain("Sinyal tipi: bilinmiyor");
+    expect(p).not.toContain("kovalanabilir teşebbüs YOK");
   });
 });
 

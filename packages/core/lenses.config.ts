@@ -128,7 +128,7 @@ export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichmen
     enr = `
 
 Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
-- Sinyal tipi: ${e.signal_kind}${isActionableKind(e.signal_kind) ? "" : " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)"}
+- Sinyal tipi: ${e.signal_kind ?? "bilinmiyor"}${e.signal_kind && !isActionableKind(e.signal_kind) ? " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)" : ""}
 - Proje: ${e.project_summary}
 - Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
 - Fonlama: ${funding}

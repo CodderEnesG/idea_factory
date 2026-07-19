@@ -27,7 +27,11 @@ async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
   return { items, demo: false };
 }
 
-/** Sinyal başına en son karar (decisions bir log; son satır kazanır). */
+/**
+ * Sinyal başına en son karar. decisions bir log; PostgREST tek istekte en çok 1000 satır
+ * döndürdüğü için en-yeniden geriye okuyup ilk görüleni alıyoruz — kırpma en eski
+ * satırları düşürür, son kararları değil (ascending + son-satır-kazanır bunun tersiydi).
+ */
 async function loadDecisions(): Promise<Map<string, Decision>> {
   const db = serverDb();
   const map = new Map<string, Decision>();
@@ -35,10 +39,10 @@ async function loadDecisions(): Promise<Map<string, Decision>> {
   const { data, error } = await db
     .from("decisions")
     .select("signal_id, decision")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
   if (error || !data) return map;
   for (const row of data as { signal_id: string; decision: Decision }[]) {
-    map.set(row.signal_id, row.decision);
+    if (!map.has(row.signal_id)) map.set(row.signal_id, row.decision);
   }
   return map;
 }
