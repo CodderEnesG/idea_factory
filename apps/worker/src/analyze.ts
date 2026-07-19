@@ -6,35 +6,12 @@ import {
 } from "@idea-factory/core";
 import { db } from "./db.js";
 import { env } from "./env.js";
+import { balanceBySource } from "./lib/balance.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
 // ProductHunt'ı hiç sıraya sokmuyordu — 64 ürün lansmanı 0 analizle bekliyordu).
 const PER_SOURCE_CAP = Number(process.env["ANALYZE_PER_SOURCE_CAP"] ?? "4");
-
-/** Kaynak başına tavan uygulayarak sırayı dolaş; kota dolarsa sıradaki kaynağa geç. */
-function balanceBySource(signals: Signal[], limit: number, cap: number): Signal[] {
-  const used = new Map<string, number>();
-  const picked: Signal[] = [];
-  const overflow: Signal[] = [];
-
-  for (const s of signals) {
-    if (picked.length >= limit) break;
-    const n = used.get(s.source) ?? 0;
-    if (n < cap) {
-      used.set(s.source, n + 1);
-      picked.push(s);
-    } else {
-      overflow.push(s);
-    }
-  }
-  // Parti dolmadıysa tavanı aşan artıklarla tamamla (kaynak azsa boş geçmesin).
-  for (const s of overflow) {
-    if (picked.length >= limit) break;
-    picked.push(s);
-  }
-  return picked;
-}
 
 async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped: number }> {
   const { data: signals, error: sErr } = await db

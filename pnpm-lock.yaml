@@ -85,6 +85,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@20.19.43)
 
   packages/core:
     dependencies:

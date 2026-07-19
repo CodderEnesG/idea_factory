@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
     "ingest": "tsx src/ingest.ts",
     "enrich": "tsx src/enrich.ts",
     "analyze": "tsx src/analyze.ts",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node-cron": "^3.0.11",
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "vitest": "^2.1.5"
   }
 }
