@@ -1,5 +1,11 @@
-import { fitBand, isActionableKind, StoredEnrichmentSchema, type RankedItem } from "@idea-factory/core";
-import { DecisionButtons } from "./DecisionButtons";
+import {
+  fitBand,
+  isActionableKind,
+  isBench,
+  StoredEnrichmentSchema,
+  type RankedItem,
+} from "@idea-factory/core";
+import { DecisionButtons, type Decision } from "./DecisionButtons";
 
 const KIND_LABEL = {
   venture: "girişim",
@@ -16,7 +22,13 @@ const BAND = {
   kill: { label: "ELE", text: "text-kill", dot: "bg-kill", ring: "border-l-kill" },
 } as const;
 
-export function OpportunityCard({ item }: { item: RankedItem }) {
+export function OpportunityCard({
+  item,
+  decision = null,
+}: {
+  item: RankedItem;
+  decision?: Decision | null;
+}) {
   const { signal, analysis } = item;
   const band = BAND[fitBand(analysis.fit)];
   const pending = analysis.validation_needed.length > 0;
@@ -27,7 +39,8 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
   const enr = enrParsed.success ? enrParsed.data : null;
   // Karar verilemez kart: ya hiç zenginleştirme yok, ya da ortada kovalanacak teşebbüs yok.
   // Sessizce "? · ?" gösterip kullanıcıyı karar vermeye zorlamak yerine sebebini söyle.
-  const notActionable = enr ? !isActionableKind(enr.signal_kind) : false;
+  // signal_kind null = legacy satır, sınıf bilinmiyor → kovalanamaz damgası vurma.
+  const notActionable = enr?.signal_kind ? !isActionableKind(enr.signal_kind) : false;
   const noData = !enr;
   const facts: string[] = [];
   if (enr) {
@@ -53,6 +66,14 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
             <span className="font-display text-ink">fit {analysis.fit}</span>
             <span className="text-ink-muted">·</span>
             <span className="text-ink-secondary">güven: {analysis.confidence}</span>
+            {isBench(analysis) && (
+              <>
+                <span className="text-ink-muted">·</span>
+                <span className="text-ink" title="Bench çıtası: fit ≥ 80 · güven yüksek">
+                  🏅 bench
+                </span>
+              </>
+            )}
           </div>
           <a
             href={signal.url}
@@ -64,7 +85,7 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
           </a>
           <div className="mt-1 text-xs text-ink-muted">
             {signal.source}
-            {enr && <> · {KIND_LABEL[enr.signal_kind]}</>}
+            {enr?.signal_kind && <> · {KIND_LABEL[enr.signal_kind]}</>}
             {signal.market && <> · {signal.market}</>}
             {signal.sector && <> · {signal.sector}</>}
             {enr && !enr.fetch_ok && (
@@ -85,7 +106,7 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
           {notActionable ? (
             <>
               <span className="text-ink">Karar verilecek teşebbüs yok</span> — bu bir{" "}
-              {KIND_LABEL[enr!.signal_kind]}. Arkasında şirket/ürün/yatırım turu olmadığı için
+              {KIND_LABEL[enr!.signal_kind!]}. Arkasında şirket/ürün/yatırım turu olmadığı için
               kovalanamaz; fikir olarak değerliyse tez notlarına geçir.
             </>
           ) : (
@@ -138,7 +159,7 @@ export function OpportunityCard({ item }: { item: RankedItem }) {
       )}
 
       <div className="mt-5">
-        <DecisionButtons signalId={signal.id} />
+        <DecisionButtons signalId={signal.id} initial={decision} />
       </div>
     </article>
   );

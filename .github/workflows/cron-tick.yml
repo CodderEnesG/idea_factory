@@ -1,0 +1,39 @@
+name: pipeline-tick
+
+# PLAN.md faz 7 alternatifi: cron makine yerine GitHub Actions'ta koşar.
+# Saatler cron.ts varsayılanıyla aynı: 07:00 ve 19:00 Europe/Istanbul (=04:00/16:00 UTC).
+# Gerekli repo secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.
+# (Lokaldeki Vertex/ADC yolu Actions'ta yok; burada AI Studio key kullanılır.)
+on:
+  schedule:
+    - cron: "0 4,16 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: pipeline-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: tick (topla → zenginleştir → analiz → digest)
+        run: pnpm tick
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANALYSIS_PROVIDER: gemini
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}

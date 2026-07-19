@@ -66,6 +66,13 @@ sorusuyla değerlendirmek. Varsayılan tutumun "bu neden çöker?" — bir fırs
 - Risk iştahı: ${t.risk_appetite}
 - Anti-pattern'ler (baştan bastır): ${t.anti_patterns.join("; ")}
 
+## Anti-pattern okuma kuralı (kritik)
+Sinyaldeki şirketin aldığı fonlama sermaye-yoğunluk anti-pattern'ı DEĞİLDİR — tam tersi,
+başka pazarda kanıtlanmış tur/traksiyon OLUMLU kanıttır (aşağıdaki 1. sorunun cevabı).
+Sermaye-yoğunluk anti-pattern'ı BİZİM Türkiye'de kovalayacağımız versiyonun sermaye
+ihtiyacıyla ölçülür: uyarlama düşük sermayeyle kurulabiliyorsa, kaynak şirketin büyük
+fonlaması fit'i DÜŞÜRMEZ, yükseltir.
+
 ## Arbitraj merceği — sırayla sor
 1. Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon.
 2. Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?
@@ -121,7 +128,7 @@ export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichmen
     enr = `
 
 Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
-- Sinyal tipi: ${e.signal_kind}${isActionableKind(e.signal_kind) ? "" : " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)"}
+- Sinyal tipi: ${e.signal_kind ?? "bilinmiyor"}${e.signal_kind && !isActionableKind(e.signal_kind) ? " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)" : ""}
 - Proje: ${e.project_summary}
 - Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
 - Fonlama: ${funding}

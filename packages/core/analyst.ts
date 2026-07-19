@@ -94,7 +94,10 @@ export async function analyzeSignal(
     }
 
     const violations = checkArbitrageGuards(parsed.data, {
-      ...(enrParsed.success ? { signalKind: enrParsed.data.signal_kind } : {}),
+      // signal_kind null = legacy satır — ön kapı guard'ına sınıf bildirme.
+      ...(enrParsed.success && enrParsed.data.signal_kind
+        ? { signalKind: enrParsed.data.signal_kind }
+        : {}),
     });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;

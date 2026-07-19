@@ -50,11 +50,12 @@ export type SignalEnrichment = z.infer<typeof SignalEnrichmentSchema>;
 
 /**
  * DB'de duran şekil: extraction + worker meta'sı.
- * signal_kind alandan önce yazılmış satırlarda yok — parse patlamasın diye "other"a düşer
- * (FORCE_ENRICH=true ile yeniden zenginleştirince gerçek sınıf gelir).
+ * signal_kind alandan önce yazılmış satırlarda yok — bunlar "other" (kovalanamaz) değil
+ * "bilinmiyor"dur: "other"a düşürmek legacy satırları analiz kuyruğundan sessizce sonsuza
+ * dek eliyordu. null'a düşer; tüketiciler null'ı "sınıf yok, elemeden geçir" diye okur.
  */
 export const StoredEnrichmentSchema = SignalEnrichmentSchema.extend({
-  signal_kind: SignalKind.catch("other"),
+  signal_kind: SignalKind.nullable().catch(null),
   fetch_ok: z.boolean(),
   model: z.string(),
   page_chars: z.number().int().nullable(),

@@ -1,6 +1,7 @@
 import { rank, type RankedItem } from "./ranker.js";
 import { fitBand } from "./lenses.config.js";
 import { StoredEnrichmentSchema } from "./enrichment.js";
+import { isBench, BENCH_MIN_FIT } from "./bench.js";
 
 const BAND_LABEL = { pursue: "🟢 KOVALA", watch: "🟡 İZLE", kill: "🔴 ELE" } as const;
 
@@ -36,6 +37,15 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
 
   const lines: string[] = [`# ${title}`, ""];
 
+  // Bench satırı — topN'e bakılmaksızın tüm çıtayı geçenler (BENCH.md havuz adayları).
+  const bench = ranked.filter((r) => isBench(r.analysis));
+  if (bench.length > 0) {
+    lines.push(
+      `**🏅 Bench:** ${bench.length} fırsat çıtayı geçiyor (fit ≥ ${BENCH_MIN_FIT} · güven yüksek) — BENCH.md havuz adayı.`,
+      "",
+    );
+  }
+
   if (shortlist.length === 0) {
     lines.push("_Eşik üstü fırsat yok._", "");
   }
@@ -43,7 +53,7 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
   for (const { signal, analysis } of shortlist) {
     const band = BAND_LABEL[fitBand(analysis.fit)];
     lines.push(
-      `## ${band} · fit ${analysis.fit} · ${signal.title}`,
+      `## ${band} · fit ${analysis.fit}${isBench(analysis) ? " · 🏅 bench" : ""} · ${signal.title}`,
       `${signal.url}`,
       "",
       analysis.rationale,

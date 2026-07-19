@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { rank, type ArbitrageAnalysis, type RankedItem, type Signal } from "@idea-factory/core";
+import {
+  isBench,
+  rank,
+  type ArbitrageAnalysis,
+  type RankedItem,
+  type Signal,
+} from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
 import { DEMO_ITEMS } from "../../lib/demo";
 import { OpportunityCard } from "../../components/OpportunityCard";
+import type { Decision } from "../../components/DecisionButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +27,36 @@ async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
   return { items, demo: false };
 }
 
-export default async function Queue() {
-  const { items, demo } = await loadItems();
-  const ranked = rank(items);
+/**
+ * Sinyal başına en son karar. decisions bir log; PostgREST tek istekte en çok 1000 satır
+ * döndürdüğü için en-yeniden geriye okuyup ilk görüleni alıyoruz — kırpma en eski
+ * satırları düşürür, son kararları değil (ascending + son-satır-kazanır bunun tersiydi).
+ */
+async function loadDecisions(): Promise<Map<string, Decision>> {
+  const db = serverDb();
+  const map = new Map<string, Decision>();
+  if (!db) return map;
+  const { data, error } = await db
+    .from("decisions")
+    .select("signal_id, decision")
+    .order("created_at", { ascending: false });
+  if (error || !data) return map;
+  for (const row of data as { signal_id: string; decision: Decision }[]) {
+    if (!map.has(row.signal_id)) map.set(row.signal_id, row.decision);
+  }
+  return map;
+}
+
+export default async function Queue({
+  searchParams,
+}: {
+  searchParams?: { bench?: string };
+}) {
+  const [{ items, demo }, decisions] = await Promise.all([loadItems(), loadDecisions()]);
+  const benchOnly = searchParams?.bench === "1";
+  const all = rank(items);
+  const benchCount = all.filter((i) => isBench(i.analysis)).length;
+  const ranked = benchOnly ? all.filter((i) => isBench(i.analysis)) : all;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -35,6 +69,20 @@ export default async function Queue() {
           <p className="mt-1 text-sm text-ink-secondary">
             {ranked.length} fırsat · arbitraj merceği · Türkiye tezi
           </p>
+          <nav className="mt-3 flex gap-2 text-xs">
+            <Link
+              href="/queue"
+              className={`chip ${!benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
+            >
+              Tümü ({all.length})
+            </Link>
+            <Link
+              href="/queue?bench=1"
+              className={`chip ${benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
+            >
+              🏅 Bench ({benchCount})
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -45,8 +93,17 @@ export default async function Queue() {
       )}
 
       <div className="space-y-4">
+        {ranked.length === 0 && benchOnly && (
+          <p className="text-sm text-ink-muted">
+            Bench çıtasını (fit ≥ 80 · güven yüksek) geçen fırsat yok.
+          </p>
+        )}
         {ranked.map((item) => (
-          <OpportunityCard key={item.signal.id} item={item} />
+          <OpportunityCard
+            key={item.signal.id}
+            item={item}
+            decision={decisions.get(item.signal.id) ?? null}
+          />
         ))}
       </div>
     </main>
