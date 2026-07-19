@@ -29,6 +29,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # worker, core'u dist/ üzerinden import eder — temiz checkout'ta önce derlenmeli.
+      - run: pnpm --filter @idea-factory/core build
+
       - name: tick (topla → zenginleştir → analiz → digest)
         run: pnpm tick
         env:
