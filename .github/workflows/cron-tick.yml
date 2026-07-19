@@ -2,8 +2,10 @@ name: pipeline-tick
 
 # PLAN.md faz 7 alternatifi: cron makine yerine GitHub Actions'ta koşar.
 # Saatler cron.ts varsayılanıyla aynı: 07:00 ve 19:00 Europe/Istanbul (=04:00/16:00 UTC).
-# Gerekli repo secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.
-# (Lokaldeki Vertex/ADC yolu Actions'ta yok; burada AI Studio key kullanılır.)
+# Gerekli repo secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GCP_SA_KEY.
+# GCP_SA_KEY = "Vertex AI User" rollü service account'un JSON anahtarı (tamamı).
+# Lokaldeki gibi Vertex/ADC kullanılır → kullanım GCP $300 kredisinden düşer.
+# (Eski AI Studio key yolu kaldırıldı: proje kredisi bitti, key tipi karmaşası vardı.)
 on:
   schedule:
     - cron: "0 4,16 * * *"
@@ -29,6 +31,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Vertex ADC: JSON anahtarı geçici dosyaya yazar, GOOGLE_APPLICATION_CREDENTIALS'ı
+      # sonraki adımlara export eder — @google/genai bunu otomatik bulur.
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
       # worker, core'u dist/ üzerinden import eder — temiz checkout'ta önce derlenmeli.
       - run: pnpm --filter @idea-factory/core build
 
@@ -38,8 +46,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANALYSIS_PROVIDER: gemini
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
+          GEMINI_USE_VERTEX: "true"
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT || 'idea-factory-502619' }}
+          GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION || 'us-central1' }}
+          # Lokal Vertex'te kanıtlanmış model (3.5-flash Vertex projesinde yoktu).
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
 
       # Digest runner diskinde kalıyordu, koşu bitince siliniyordu — artifact olarak sakla.
       # if: always() → tick kırmızıysa bile o ana kadar yazılan digest kaybolmasın.
