@@ -40,3 +40,14 @@ jobs:
           ANALYSIS_PROVIDER: gemini
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash' }}
+
+      # Digest runner diskinde kalıyordu, koşu bitince siliniyordu — artifact olarak sakla.
+      # if: always() → tick kırmızıysa bile o ana kadar yazılan digest kaybolmasın.
+      - name: digest'i artifact olarak yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ github.run_id }}
+          path: digests/*.md
+          if-no-files-found: ignore
+          retention-days: 30

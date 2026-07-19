@@ -98,6 +98,12 @@ async function main(): Promise<void> {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, workerLoop));
 
   console.log(`bitti: ${ok}/${todo.length} zenginleştirildi`);
+
+  // Hepsi patladıysa (kota/anahtar/ağ) sessiz yeşil kalma — cron kırmızı görsün.
+  // Kısmi başarı yeşildir: kalanlar sonraki tick'te otomatik denenir.
+  if (todo.length > 0 && ok === 0) {
+    throw new Error(`toplu başarısızlık: 0/${todo.length} zenginleştirildi (kota/anahtar kontrol et)`);
+  }
 }
 
 main()
