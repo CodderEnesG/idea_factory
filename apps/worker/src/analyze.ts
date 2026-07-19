@@ -106,6 +106,12 @@ async function main(): Promise<void> {
     }
   }
   console.log(`bitti: ${ok}/${todo.length} analiz yazıldı`);
+
+  // Hepsi patladıysa (kota/anahtar/ağ) sessiz yeşil kalma — cron kırmızı görsün.
+  // Kısmi başarı yeşildir: kalanlar sonraki tick'te otomatik denenir.
+  if (todo.length > 0 && ok === 0) {
+    throw new Error(`toplu başarısızlık: 0/${todo.length} analiz yazıldı (kota/anahtar kontrol et)`);
+  }
 }
 
 main()
