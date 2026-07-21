@@ -12,3 +12,5 @@ export * from "./bench.js";
 export * from "./digest.js";
 export * from "./knowledge.js";
 export * from "./hash.js";
+// Golden few-shot çapaları — üretim analistine prompt materyali (THESIS_AND_LENS §3a).
+export { golden } from "./eval/golden.js";

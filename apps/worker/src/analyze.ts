@@ -1,5 +1,6 @@
 import {
   analyzeSignal,
+  golden,
   isActionableKind,
   StoredEnrichmentSchema,
   type Signal,
@@ -12,6 +13,9 @@ const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
 // ProductHunt'ı hiç sıraya sokmuyordu — 64 ürün lansmanı 0 analizle bekliyordu).
 const PER_SOURCE_CAP = Number(process.env["ANALYZE_PER_SOURCE_CAP"] ?? "4");
+// Tüm kovalanabilir sinyalleri golden kalibrasyonuyla baştan analiz için (done-atlamasını
+// devre dışı bırakır, upsert eski satırın üstüne yazar). enrich.ts FORCE_ENRICH deseni.
+const FORCE = process.env["ANALYZE_FORCE"] === "true";
 
 async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped: number }> {
   const { data: signals, error: sErr } = await db
@@ -26,7 +30,7 @@ async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped
   // en çok 1000 satır döndürür; tablo büyüyünce kırpılan id'ler "yapılmadı" sanılıp
   // yeniden analiz ediliyordu (boşa LLM çağrısı).
   const done = new Set<string>();
-  if (window.length > 0) {
+  if (!FORCE && window.length > 0) {
     const { data: analyzed, error: aErr } = await db
       .from("analyses")
       .select("signal_id")
@@ -35,6 +39,7 @@ async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped
     if (aErr) throw new Error(`analyses sorgu hatası: ${aErr.message}`);
     for (const r of analyzed ?? []) done.add(r.signal_id as string);
   }
+  // FORCE: done boş kalır → tümü yeniden analiz edilir (upsert eski satırı ezer).
   const pending = window.filter((s) => !done.has(s.id));
 
   // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
@@ -51,13 +56,14 @@ async function main(): Promise<void> {
   const { todo, skipped } = await fetchUnanalyzed(BATCH_LIMIT);
   console.log(
     `${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()}` +
-      `, kaynak tavanı=${PER_SOURCE_CAP}${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
+      `, golden few-shot=${golden.length}, kaynak tavanı=${PER_SOURCE_CAP}${FORCE ? ", FORCE" : ""}` +
+      `${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
   );
 
   let ok = 0;
   for (const signal of todo) {
     try {
-      const a = await analyzeSignal(signal); // sağlayıcı/model env'den (ANALYSIS_PROVIDER)
+      const a = await analyzeSignal(signal, { fewShot: golden }); // golden çapalar + env provider/model
       const { error } = await db.from("analyses").upsert(
         {
           signal_id: signal.id,
