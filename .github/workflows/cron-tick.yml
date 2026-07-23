@@ -18,7 +18,7 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +46,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANALYSIS_PROVIDER: gemini
+          # Varsayılan 25/10 ingest hızına yetişmiyordu (enrich backlog birikiyordu).
+          # Yükseltildi; concurrency düşük tutuluyor (Vertex 429 önlemi).
+          ENRICH_LIMIT: ${{ vars.ENRICH_LIMIT || '100' }}
+          ANALYZE_LIMIT: ${{ vars.ANALYZE_LIMIT || '40' }}
+          ANALYZE_PER_SOURCE_CAP: ${{ vars.ANALYZE_PER_SOURCE_CAP || '12' }}
           GEMINI_USE_VERTEX: "true"
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT || 'idea-factory-502619' }}
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION || 'us-central1' }}

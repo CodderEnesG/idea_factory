@@ -10,3 +10,4 @@ dist
 
 # Üretilen digest raporları
 digests/
+.vercel
