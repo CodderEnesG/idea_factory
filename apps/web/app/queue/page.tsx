@@ -7,9 +7,12 @@ import {
   type Signal,
 } from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
+import { getSession } from "../../lib/auth";
 import { DEMO_ITEMS } from "../../lib/demo";
 import { OpportunityCard } from "../../components/OpportunityCard";
-import type { Decision } from "../../components/DecisionButtons";
+import type { Decision, UserDecision } from "../../components/DecisionButtons";
+import type { Comment } from "../../components/Comments";
+import { LogoutButton } from "../../components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -28,21 +31,47 @@ async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
 }
 
 /**
- * Sinyal başına en son karar. decisions bir log; PostgREST tek istekte en çok 1000 satır
- * döndürdüğü için en-yeniden geriye okuyup ilk görüleni alıyoruz — kırpma en eski
- * satırları düşürür, son kararları değil (ascending + son-satır-kazanır bunun tersiydi).
+ * Sinyal başına TÜM kullanıcıların en son kararı. decisions bir log; en-yeniden geriye okuyup
+ * (signal_id, decided_by) başına ilk görüleni (=en yeni) alıyoruz. İşbirlikçi: her kullanıcının
+ * kendi kararı ayrı yaşar, kimse diğerini ezmez.
  */
-async function loadDecisions(): Promise<Map<string, Decision>> {
+async function loadDecisions(): Promise<Map<string, UserDecision[]>> {
   const db = serverDb();
-  const map = new Map<string, Decision>();
+  const map = new Map<string, UserDecision[]>();
   if (!db) return map;
   const { data, error } = await db
     .from("decisions")
-    .select("signal_id, decision")
+    .select("signal_id, decision, decided_by, created_at")
     .order("created_at", { ascending: false });
   if (error || !data) return map;
-  for (const row of data as { signal_id: string; decision: Decision }[]) {
-    if (!map.has(row.signal_id)) map.set(row.signal_id, row.decision);
+  const seen = new Set<string>(); // `${signal_id}|${user}`
+  for (const row of data as { signal_id: string; decision: Decision; decided_by: string | null }[]) {
+    const user = row.decided_by ?? "web";
+    const key = `${row.signal_id}|${user}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const arr = map.get(row.signal_id) ?? [];
+    arr.push({ user, decision: row.decision });
+    map.set(row.signal_id, arr);
+  }
+  return map;
+}
+
+/** Sinyal başına yorum thread'i (eskiden yeniye). */
+async function loadComments(): Promise<Map<string, Comment[]>> {
+  const db = serverDb();
+  const map = new Map<string, Comment[]>();
+  if (!db) return map;
+  const { data, error } = await db
+    .from("comments")
+    .select("id, signal_id, author, body, created_at")
+    .order("created_at", { ascending: true });
+  if (error || !data) return map;
+  for (const row of data as (Comment & { signal_id: string })[]) {
+    const { signal_id, ...c } = row;
+    const arr = map.get(signal_id) ?? [];
+    arr.push(c);
+    map.set(signal_id, arr);
   }
   return map;
 }
@@ -52,15 +81,21 @@ export default async function Queue({
 }: {
   searchParams?: { bench?: string };
 }) {
-  const [{ items, demo }, decisions] = await Promise.all([loadItems(), loadDecisions()]);
+  const [{ items, demo }, decisions, comments, me] = await Promise.all([
+    loadItems(),
+    loadDecisions(),
+    loadComments(),
+    getSession(),
+  ]);
   const benchOnly = searchParams?.bench === "1";
   const all = rank(items);
   const benchCount = all.filter((i) => isBench(i.analysis)).length;
   const ranked = benchOnly ? all.filter((i) => isBench(i.analysis)) : all;
+  const meName = me?.username ?? "web";
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <header className="mb-8 flex items-center justify-between">
+      <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <Link href="/" className="text-sm text-ink-muted hover:text-ink">
             ← Idea Factory
@@ -84,11 +119,17 @@ export default async function Queue({
             </Link>
           </nav>
         </div>
+        {me && (
+          <div className="shrink-0 text-right">
+            <div className="text-sm text-ink">{me.display_name}</div>
+            <LogoutButton />
+          </div>
+        )}
       </header>
 
       {demo && (
         <div className="mb-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-brand">
-          Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>'e key ekle.
+          Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
         </div>
       )}
 
@@ -98,13 +139,20 @@ export default async function Queue({
             Bench çıtasını (fit ≥ 80 · güven yüksek) geçen fırsat yok.
           </p>
         )}
-        {ranked.map((item) => (
-          <OpportunityCard
-            key={item.signal.id}
-            item={item}
-            decision={decisions.get(item.signal.id) ?? null}
-          />
-        ))}
+        {ranked.map((item) => {
+          const dec = decisions.get(item.signal.id) ?? [];
+          const mine = dec.find((d) => d.user === meName)?.decision ?? null;
+          const others = dec.filter((d) => d.user !== meName);
+          return (
+            <OpportunityCard
+              key={item.signal.id}
+              item={item}
+              mine={mine}
+              others={others}
+              comments={comments.get(item.signal.id) ?? []}
+            />
+          );
+        })}
       </div>
     </main>
   );

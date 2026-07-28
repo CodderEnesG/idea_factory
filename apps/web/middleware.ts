@@ -1,22 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySession, authEnabled } from "./lib/session";
 
-// Dahili araç ama Vercel URL'i public — WEB_BASIC_AUTH="kullanici:parola" set edilirse
-// tüm sayfalar + API basic auth ister. Env yoksa açık kalır (lokal dev, demo modu).
-const CRED = process.env["WEB_BASIC_AUTH"];
+// Per-user session gate. AUTH_SECRET yoksa açık (lokal dev/demo — mevcut "env yoksa açık" deseni).
+// Public: login sayfası + login API. Diğer her şey (sayfalar + /api/*) geçerli oturum ister.
+const PUBLIC = ["/login", "/api/auth/login"];
 
-export function middleware(req: NextRequest) {
-  if (!CRED) return NextResponse.next();
+export async function middleware(req: NextRequest) {
+  if (!authEnabled()) return NextResponse.next();
 
-  const header = req.headers.get("authorization");
-  if (header?.startsWith("Basic ")) {
-    // Edge runtime: Buffer yok, atob var.
-    const given = atob(header.slice(6));
-    if (given === CRED) return NextResponse.next();
+  const { pathname } = req.nextUrl;
+  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    return NextResponse.next();
   }
-  return new NextResponse("Kimlik doğrulama gerekli", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="idea-factory"' },
-  });
+
+  const user = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  if (user) return NextResponse.next();
+
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ ok: false, error: "kimlik doğrulama gerekli" }, { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  url.searchParams.set("next", pathname);
+  return NextResponse.redirect(url);
 }
 
 export const config = {

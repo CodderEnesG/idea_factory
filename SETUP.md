@@ -43,10 +43,27 @@ cp .env.example .env      # key'leri doldur (.env.local da okunur, öncelikli)
 - `ANTHROPIC_API_KEY`, `ANALYSIS_MODEL` — Claude sonrası için
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — worker
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — web
+- `AUTH_SECRET` — ekip incelemesi login'i (boşsa auth kapalı = açık, lokal/demo). Public URL'de
+  MUTLAKA set et: `openssl rand -hex 32`
 
 > Analist sağlayıcı-bağımsız: MVP Gemini (ucuz, grounding kapalı), Claude tek env ile devreye girer.
 
-Supabase: proje aç → SQL Editor'de `supabase/migrations/0001_init.sql` çalıştır.
+Supabase: proje aç → SQL Editor'de migration'ları sırayla çalıştır:
+`0001_init.sql` → `0002` → `0003` → `0004_rls.sql` → `0005_members_comments.sql` (ekip incelemesi:
+members + comments; per-user karar indeksi).
+
+### Ekip incelemesi (per-user auth + işbirlikçi kararlar + yorum)
+İki kişi fikirlere kovala/izle/ele atar (birbirini ezmez, aynı sinyalde ayrı satır) + yorum yazar.
+1. `AUTH_SECRET` set et (yukarı).
+2. Üye ekle (parola scrypt hash'lenir, düz metin DB'ye girmez):
+   ```bash
+   pnpm --filter @idea-factory/web add-member emir "Emir" guclu-parola
+   pnpm --filter @idea-factory/web add-member ali  "Ali"  guclu-parola
+   ```
+3. `/login` → giriş. Kartta kendi kararın düzenlenebilir, takım arkadaşınınki salt-okunur rozet.
+
+> Kararlar+yorumlar per-user damgalanıp saklanır (gelecek turda analiste geri beslenecek —
+> `packages/core/knowledge.ts` TODO). Bu tur sadece veri biriktirir.
 
 ## Çalıştır
 
@@ -72,7 +89,8 @@ pnpm web                  # kuyruk UI (localhost:3000; Supabase env yoksa demo m
 - Ranker = fit-bant + tazelik; kompozit = faz 2.
 
 ## Deploy (M8)
-- **Web**: Vercel (root `apps/web`, `transpilePackages` ile core). Env: `NEXT_PUBLIC_SUPABASE_*`.
+- **Web**: Vercel (root `apps/web`, `transpilePackages` ile core). Env: `SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_*`, **`AUTH_SECRET`** (public URL'de zorunlu).
 - **Worker/cron**: ayrı süreç — GitHub Actions cron ya da küçük VM; `pnpm --filter worker tick`.
 - **DB**: Supabase (prod projesi + migration).
 - Sertleştirme: `/review` + `/cso`, SDK'yı en son sürüme bump (web_search/pause_turn tipleri).
