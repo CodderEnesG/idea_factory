@@ -1,0 +1,109 @@
+import type { Signal } from "@idea-factory/core";
+
+const MAX_NOTES = 8;
+
+export interface RelatedSignal {
+  id: string;
+  title: string;
+  sector: string | null;
+  market: string | null;
+}
+
+export interface DecisionRow {
+  decision: string;
+  note: string | null;
+  decided_by: string | null;
+  created_at: string;
+  signal: RelatedSignal | null;
+}
+
+export interface CommentRow {
+  body: string;
+  author: string;
+  created_at: string;
+  signal: RelatedSignal | null;
+}
+
+function normalize(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+function tokens(s: string): Set<string> {
+  return new Set(
+    normalize(s)
+      .split(/[^a-z0-9ğüşıöç]+/)
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Bir alan çiftinin (sector veya market) örtüşme puanı: tam eşleşme (boşluk/büyük-küçük
+ * harf bağımsız) = 3, paylaşılan kelime başına 1 puan, örtüşme yoksa 0. Embedding değil —
+ * "SaaS" ↔ "B2B SaaS" gibi alt-küme örtüşmelerini ucuza yakalayan sözcüksel bir yaklaşım.
+ */
+function fieldScore(a: string | null, b: string | null): number {
+  if (!a || !b) return 0;
+  if (normalize(a) === normalize(b)) return 3;
+  let shared = 0;
+  const tb = tokens(b);
+  for (const t of tokens(a)) if (tb.has(t)) shared++;
+  return shared;
+}
+
+/** Sinyal ↔ ilgili-sinyal alaka puanı: sector + market alan skorlarının toplamı (0 = alakasız). */
+function relevance(signal: Signal, related: RelatedSignal | null): number {
+  if (!related) return 0;
+  return fieldScore(signal.sector, related.sector) + fieldScore(signal.market, related.market);
+}
+
+function byRelevanceThenRecency<T extends { created_at: string }>(
+  scored: Array<{ row: T; score: number }>,
+): T[] {
+  return [...scored]
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return Date.parse(b.row.created_at) - Date.parse(a.row.created_at);
+    })
+    .map((s) => s.row);
+}
+
+/**
+ * Geçmiş ekip kararları + yorumlarından, bu sinyalle alakalı notları derler. Sıralama önce
+ * alaka puanı (fieldScore), sonra tazelik tiebreak — ranker.ts'teki bant+tazelik deseniyle
+ * aynı felsefe (skor birinci, tazelik yalnız eşitlerde belirleyici). decisions append-only →
+ * (ilgili-sinyal, kullanıcı) başına yalnız en-yeni karar sayılır.
+ */
+export function buildNotes(
+  signal: Signal,
+  decisionRows: DecisionRow[],
+  commentRows: CommentRow[],
+): string[] {
+  const latestByUser = new Map<string, DecisionRow>();
+  for (const row of decisionRows) {
+    if (relevance(signal, row.signal) === 0) continue;
+    const key = `${row.signal!.id}:${row.decided_by ?? "?"}`;
+    const prev = latestByUser.get(key);
+    if (!prev || Date.parse(row.created_at) > Date.parse(prev.created_at)) {
+      latestByUser.set(key, row);
+    }
+  }
+  const rankedDecisions = byRelevanceThenRecency(
+    [...latestByUser.values()].map((row) => ({ row, score: relevance(signal, row.signal) })),
+  ).slice(0, MAX_NOTES);
+  const decisionNotes = rankedDecisions.map((row) => {
+    const who = row.decided_by ?? "ekip";
+    const note = row.note ? ` — "${row.note}"` : "";
+    return `${who}: "${row.signal!.title}" için ${row.decision}${note}`;
+  });
+
+  const rankedComments = byRelevanceThenRecency(
+    commentRows
+      .filter((row) => relevance(signal, row.signal) > 0)
+      .map((row) => ({ row, score: relevance(signal, row.signal) })),
+  ).slice(0, MAX_NOTES);
+  const commentNotes = rankedComments.map(
+    (row) => `${row.author} ("${row.signal!.title}" yorumu): ${row.body}`,
+  );
+
+  return [...decisionNotes, ...commentNotes];
+}

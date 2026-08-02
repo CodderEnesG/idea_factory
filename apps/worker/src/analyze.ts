@@ -8,6 +8,7 @@ import {
 import { db } from "./db.js";
 import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";
+import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
@@ -60,10 +61,11 @@ async function main(): Promise<void> {
       `${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
   );
 
+  const knowledge = supabaseKnowledgeLayer();
   let ok = 0;
   for (const signal of todo) {
     try {
-      const a = await analyzeSignal(signal, { fewShot: golden }); // golden çapalar + env provider/model
+      const a = await analyzeSignal(signal, { fewShot: golden, knowledge }); // golden çapalar + ekip geçmişi + env provider/model
       const { error } = await db.from("analyses").upsert(
         {
           signal_id: signal.id,
