@@ -62,8 +62,9 @@ members + comments; per-user karar indeksi).
    ```
 3. `/login` → giriş. Kartta kendi kararın düzenlenebilir, takım arkadaşınınki salt-okunur rozet.
 
-> Kararlar+yorumlar per-user damgalanıp saklanır (gelecek turda analiste geri beslenecek —
-> `packages/core/knowledge.ts` TODO). Bu tur sadece veri biriktirir.
+> Kararlar+yorumlar per-user damgalanıp saklanır ve analiste geri besleniyor: aynı sektör/
+> pazardaki geçmiş kararlar+yorumlar `İlgili geçmiş bağlam` olarak prompt'a girer
+> (bkz. `apps/worker/src/lib/knowledge.ts`).
 
 ## Çalıştır
 
@@ -85,7 +86,8 @@ pnpm web                  # kuyruk UI (localhost:3000; Supabase env yoksa demo m
 ## v1 kapsam notları
 - Tek mercek (arbitraj), tek model (config `ANALYSIS_MODEL`, Opus). Kademeli model = faz 2.
 - Dedup naif (url + content-hash). Entity-resolution = faz 2.
-- Knowledge Layer boş stub; gbrain/RAG + memory = faz 2.
+- Knowledge Layer: sözcüksel (tam eşleşme/kelime örtüşmesi) eşleştirme; semantik arama
+  (embedding/gbrain) = faz 2.
 - Ranker = fit-bant + tazelik; kompozit = faz 2.
 
 ## Deploy (M8)
