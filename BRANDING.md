@@ -131,12 +131,23 @@
 
 ## 6. Marka Adı
 
-**IdeaFact** — kesinleşti. Domain/tescil kontrolü henüz yapılmadı (bkz. §7 madde 1).
+**IdeaFact** — kesinleşti.
+
+**Domain/tescil kontrol sonucu (2026-08-04, temel web taraması):**
+- `.com` — kayıtlı, PerfectDomain üzerinden **satılık** (parked sayfa, teklif usulü fiyat).
+- `.io` / `.ai` — DNS kaydı yok (NXDOMAIN) → muhtemelen doğrudan kayıt için müsait.
+- **Ticari çakışma:** yazılım/SaaS alanında aktif bir "IdeaFact" şirketi bulunamadı. İki
+  isim-benzeri kullanım var, ikisi de düşük risk: Instagram'da ~3.000 takipçili kişisel/meme
+  hesabı (@ideafact — iş değil), ve PNP Games kataloğunda küçük bir print-and-play oyun
+  üreticisi etiketi (farklı sektör, sayfası artık erişilemiyor/403).
+- Bu **resmi bir marka/patent taraması değil**, temel bir web taraması. Kilitlemeden önce
+  gerçek bir tescil aramasının (USPTO/TÜRKPATENT) yapılması önerilir.
 
 ## 7. Yol Haritası (Sıradaki Adımlar)
 
-1. **Domain + temel marka/tescil kontrolü** — isim kilitlendi (IdeaFact); .com/.io/.ai müsaitliği
-   ve belirgin ticari çakışma taraması henüz yapılmadı.
+1. **Domain kayıt kararı + resmi tescil taraması** — temel web taraması yapıldı (bkz. §6):
+   `.io`/`.ai` muhtemelen müsait, `.com` satılık. Kalan: hangi TLD'nin satın alınacağına karar
+   + USPTO/TÜRKPATENT üzerinden resmi bir marka taraması (bu bir hukuki tarama değil).
 2. **BRANDING.md'nin ürün metinlerine uygulanması** — onboarding, digest, landing page kopyası;
    ayrıca §8.3'teki renk/logo uygulama işleri bu adımın kapsamında.
 
