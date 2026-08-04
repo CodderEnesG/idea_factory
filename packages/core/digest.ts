@@ -31,7 +31,7 @@ function buildKunye(enrichment: unknown): string | null {
 
 export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): string {
   const topN = opts.topN ?? 10;
-  const title = opts.title ?? "Idea Factory — Fırsat Digest'i";
+  const title = opts.title ?? "IdeaFact — Fırsat Digest'i";
   const ranked = rank(items);
   const shortlist = ranked.filter((r) => fitBand(r.analysis.fit) !== "kill").slice(0, topN);
 

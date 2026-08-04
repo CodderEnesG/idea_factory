@@ -8,7 +8,7 @@ const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", 
 const body = Figtree({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Idea Factory — Tez-odaklı Pazar İstihbaratı",
+  title: "IdeaFact — Tez-odaklı Pazar İstihbaratı",
   description: "Sinyal içeri → tezine göre sıralı, gerekçeli, sorgulanabilir fırsatlar dışarı.",
 };
 

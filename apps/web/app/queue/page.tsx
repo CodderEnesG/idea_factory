@@ -98,7 +98,7 @@ export default async function Queue({
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-            ← Idea Factory
+            ← IdeaFact
           </Link>
           <h1 className="mt-1 font-display text-3xl font-bold">Fırsat Kuyruğu</h1>
           <p className="mt-1 text-sm text-ink-secondary">

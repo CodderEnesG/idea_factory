@@ -7,7 +7,7 @@ function Nav() {
         <div className="grid h-8 w-8 place-items-center rounded-btn bg-brand text-brand-fg font-display font-bold">
           IF
         </div>
-        <span className="font-display text-lg font-semibold tracking-tight">Idea Factory</span>
+        <span className="font-display text-lg font-semibold tracking-tight">IdeaFact</span>
       </div>
       <div className="flex items-center gap-6 text-sm text-ink-secondary">
         <Link href="/queue" className="hover:text-ink">
