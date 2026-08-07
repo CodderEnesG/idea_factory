@@ -4,10 +4,11 @@ import { productHunt } from "./sources/producthunt.js";
 import { tldr } from "./sources/tldr.js";
 import { webrazzi } from "./sources/webrazzi.js";
 import { techcrunch } from "./sources/techcrunch.js";
+import { ycombinator } from "./sources/ycombinator.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 
-const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch];
+const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch, ycombinator];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
 // URL uzunluk limitini aşıp "fetch failed" veriyordu (4 kaynak sonrası görüldü) → parçala.
