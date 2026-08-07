@@ -1,11 +1,17 @@
 import {
   analyzeSignal,
+  arbitrageLens,
   golden,
   isActionableKind,
   lenses,
   StoredEnrichmentSchema,
+  type FewShotExample,
   type Signal,
 } from "@idea-factory/core";
+
+// golden yalnız arbitraj için kalibre edilmiş (THESIS_AND_LENS.md §3a) — başka mercek yanlış
+// hizalanır. Yeni merceğin kendi golden seti yoksa boş few-shot ile başlar.
+const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [arbitrageLens.id]: golden };
 import { db } from "./db.js";
 import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";
@@ -63,10 +69,11 @@ async function main(): Promise<void> {
   let totalOk = 0;
 
   for (const lens of lenses) {
+    const fewShot = FEW_SHOT_BY_LENS[lens.id] ?? [];
     const { todo, skipped } = await fetchUnanalyzed(lens.id, BATCH_LIMIT);
     console.log(
       `[${lens.id}] ${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()}` +
-        `, golden few-shot=${golden.length}, kaynak tavanı=${PER_SOURCE_CAP}${FORCE ? ", FORCE" : ""}` +
+        `, few-shot=${fewShot.length}, kaynak tavanı=${PER_SOURCE_CAP}${FORCE ? ", FORCE" : ""}` +
         `${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
     );
 
@@ -74,7 +81,7 @@ async function main(): Promise<void> {
     let ok = 0;
     for (const signal of todo) {
       try {
-        const a = await analyzeSignal(signal, lens, { fewShot: golden, knowledge }); // golden çapalar + ekip geçmişi + env provider/model
+        const a = await analyzeSignal(signal, lens, { fewShot, knowledge }); // mercek-özel çapalar + ekip geçmişi + env provider/model
         const { error } = await db.from("analyses").upsert(
           {
             signal_id: signal.id,
@@ -82,7 +89,7 @@ async function main(): Promise<void> {
             fit: a.fit,
             rationale: a.rationale,
             evidence: a.evidence,
-            adaptation_notes: "adaptation_notes" in a ? a.adaptation_notes : "",
+            adaptation_notes: lens.extraNote(a),
             risks: a.risks,
             confidence: a.confidence,
             validation_needed: a.validation_needed,

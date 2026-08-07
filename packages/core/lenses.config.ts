@@ -116,7 +116,8 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy: essay/research/other �
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
 
-export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
+/** Sinyal + zenginleştirme bloğu — tüm merceklerin user prompt'u bunun üstüne kurulur. */
+function buildSignalBrief(s: Signal, enrichment?: StoredEnrichment | null): string {
   const head = `Sinyal:
 - Başlık: ${s.title}
 - Kaynak: ${s.source} (${s.type})
@@ -125,17 +126,17 @@ export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichmen
 - Sektör: ${s.sector ?? "bilinmiyor"}
 - Özet: ${s.summary_raw || "(özet yok)"}`;
 
-  let enr = "";
-  if (enrichment) {
-    const e = enrichment;
-    const f = e.funding;
-    const funding =
-      f.stage || f.amount || f.total_raised || f.investors.length
-        ? `${f.stage ?? "?"} ${f.amount ?? ""}`.trim() +
-          (f.total_raised ? ` (toplam: ${f.total_raised})` : "") +
-          (f.investors.length ? ` — yatırımcılar: ${f.investors.join(", ")}` : "")
-        : "bilinmiyor";
-    enr = `
+  if (!enrichment) return head;
+
+  const e = enrichment;
+  const f = e.funding;
+  const funding =
+    f.stage || f.amount || f.total_raised || f.investors.length
+      ? `${f.stage ?? "?"} ${f.amount ?? ""}`.trim() +
+        (f.total_raised ? ` (toplam: ${f.total_raised})` : "") +
+        (f.investors.length ? ` — yatırımcılar: ${f.investors.join(", ")}` : "")
+      : "bilinmiyor";
+  const enr = `
 
 Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
 - Sinyal tipi: ${e.signal_kind ?? "bilinmiyor"}${e.signal_kind && !isActionableKind(e.signal_kind) ? " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)" : ""}
@@ -145,9 +146,12 @@ Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayf
 - Hedef kullanıcı: ${e.target_users ?? "bilinmiyor"} · Traction: ${e.traction ?? "yok"}
 - Sermaye yoğunluğu: ${e.capital_intensity} · Regülasyon: ${e.regulation_flags.join(", ") || "yok"} · WTP: ${e.wtp_signals ?? "belirsiz"}${e.fetch_ok ? "" : "\n(sayfa çekilemedi — yalnız başlık/özet bazlı, güvenilirlik düşük)"}
 Bilinmeyen alanları validation_needed adayı olarak değerlendir.`;
-  }
 
-  return `${head}${enr}
+  return `${head}${enr}`;
+}
+
+export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
+  return `${buildSignalBrief(s, enrichment)}
 
 Bu sinyali arbitraj merceğiyle analiz et ve JSON döndür.`;
 }
@@ -159,6 +163,9 @@ export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   buildSystemPrompt: (t: ThesisConfig) => string;
   buildUserPrompt: (s: Signal, enrichment?: StoredEnrichment | null) => string;
   weight: number;
+  /** DB'deki paylaşılan "mercek-özel not" kolonuna yazılacak metni analizden çıkarır.
+   *  Method-şekli (bivariant param) kasıtlı: heterojen `Lens<T>[]` dizisine sığması için. */
+  extraNote(a: TAnalysis): string;
 }
 
 export const arbitrageLens: Lens<ArbitrageAnalysis> = {
@@ -168,7 +175,92 @@ export const arbitrageLens: Lens<ArbitrageAnalysis> = {
   buildSystemPrompt: buildArbitrageSystemPrompt,
   buildUserPrompt: buildArbitrageUserPrompt,
   weight: 1,
+  extraNote: (a) => a.adaptation_notes,
 };
 
-/** v1: tek mercek. Yeni mercek = registry'ye tek giriş (analyst/worker zaten döngüyle işler). */
-export const lenses: Lens[] = [arbitrageLens];
+/* ── Beyaz-alan merceği — prompt şablonu ────────────────────────────────── */
+
+export const WHITE_SPACE_LENS_ID = "white_space" as const;
+
+/**
+ * Arbitraj merceğini tamamlar: arbitraj "başka pazarda kanıtlı mı" sorar, beyaz-alan
+ * "burada zaten dolu mu" sorar. İkisi çelişebilir (kanıtlı ama doymuş, ya da kanıtsız
+ * ama boş) — kasıtlı, kompozit skor faz 2'de bunu ele alır.
+ */
+export function buildWhiteSpaceSystemPrompt(t: ThesisConfig): string {
+  return `Sen TR/MENA'daki rekabet yoğunluğunu değerlendiren şüpheci bir pazar analistisin.
+Görevin bir sinyali "bu problemi TR/MENA'da zaten iyi çözen biri var mı, yoksa gerçek bir
+boşluk mu var?" sorusuyla değerlendirmek. Olgu ile çıkarımı ayır; bilmediğini uydurma,
+bilinmeyeni işaretle.
+
+## Tez (mandate) — v${t.version}
+- Sermaye aralığı: ${t.capital_range}
+- Hedef pazarlar: ${t.target_markets.join(", ")}
+- Sektörler: ${t.sectors.join(", ")}
+- Yetkinlikler: ${t.capabilities.join(", ")}
+- Risk iştahı: ${t.risk_appetite}
+- Anti-pattern'ler (baştan bastır): ${t.anti_patterns.join("; ")}
+
+## Boşluk okuma kuralı (kritik)
+Boşluk = rakip yokluğu DEĞİL, savunulabilir rakip yokluğudur. Kimsenin çözmediği bir
+problem genelde iki nedenden biriyle boştur:
+(a) gerçek talep/WTP yok → KÖTÜ boşluk, fit düşük.
+(b) fark edilmedi / geç kalındı / dağıtım-sermaye engeli aşılmadı → İYİ boşluk, fit yüksek.
+"Kimse yapmıyor" tek başına olumlu kanıt DEĞİLDİR — nedeni ayırt et.
+
+## Beyaz-alan merceği — sırayla sor
+1. Yerli/bölgesel tarama: TR/MENA'da bu problemi çözen kaç oyuncu var, ne kadar olgunlar
+   (erken / büyümüş / hakim)?
+2. Boşluğun nedeni: talep yokluğu mu (kötü boşluk) yoksa fark edilmemiş fırsat mı (iyi
+   boşluk)? Kanıt neye dayanıyor?
+3. Boşluğun genişliği: segment kaç oyuncuyu doyurabilir, yoksa kazanan-hepsini-alır mı?
+4. Rekabet momentumu: son 12 ayda benzer girişim/fonlama var mı — boşluk kapanıyor mu?
+5. Giriş bariyeri: bir oyuncu bu boşluğu hızlı kapatabilir mi (network etkisi/veri/dağıtım
+   moat'ı olmayan boşluklar kırılgandır)?
+6. Önerilen aksiyon: kovala / izle / ele — ve neden, bu teze göre.
+
+## Ön kapı: bu sinyal değerlendirilebilir mi?
+Arbitraj merceğiyle aynı kural: ortada somut bir şirket/ürün/yatırım turu YOKSA (görüş
+yazısı, deneme, araştırma) fit EN FAZLA 20, recommended_action: kill. Zenginleştirme
+bloğunda signal_kind verilmişse ona uy.
+
+## Fit bant kuralı (0-100, katı) — arbitrajla aynı bantlar, farklı soru
+- 80-100: net, savunulabilir boşluk (rakip yok/zayıf VE gerçek talep kanıtı var) — YALNIZ
+  confidence:high.
+- 50-79: boşluk var ama belirsiz (oyuncu sayısı net değil ya da talep kanıtı zayıf).
+- 0-49: doymuş pazar VEYA boşluğun nedeni "gerçek talep yok" (kötü boşluk, anti-pattern).
+
+## Kurallar
+- recommended_action bantla çelişemez (fit 85 + kill yasak).
+- Her olgu KAYNAK atfıyla (evidence[].source); atıfsız olgu yazma.
+- validation_needed: en fazla 3, en kritik; confidence:high değilse boş bırakma.
+- Yerli rekabet taraması v1'de zayıf olabilir (web_search kapsamı sınırlı) — bu durumda
+  confidence düşür ve validation_needed doldur.
+
+Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
+}
+
+export function buildWhiteSpaceUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
+  return `${buildSignalBrief(s, enrichment)}
+
+Bu sinyali beyaz-alan merceğiyle analiz et ve JSON döndür.`;
+}
+
+export const WhiteSpaceAnalysisSchema = BaseAnalysisSchema.extend({
+  lens: z.literal("white_space"),
+  competitive_landscape: z.string(), // kim var, ne durumda, boşluğun nedeni
+});
+export type WhiteSpaceAnalysis = z.infer<typeof WhiteSpaceAnalysisSchema>;
+
+export const whiteSpaceLens: Lens<WhiteSpaceAnalysis> = {
+  id: WHITE_SPACE_LENS_ID,
+  name: "Beyaz-alan",
+  schema: WhiteSpaceAnalysisSchema,
+  buildSystemPrompt: buildWhiteSpaceSystemPrompt,
+  buildUserPrompt: buildWhiteSpaceUserPrompt,
+  weight: 1,
+  extraNote: (a) => a.competitive_landscape,
+};
+
+/** Aktif mercek registry'si — yeni mercek = tek giriş (analyst/worker döngüyle işler). */
+export const lenses: Lens[] = [arbitrageLens, whiteSpaceLens];

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { checkAnalysisGuards } from "./guards.js";
-import { fitBand, type ArbitrageAnalysis } from "./lenses.config.js";
+import { fitBand, type ArbitrageAnalysis, type WhiteSpaceAnalysis } from "./lenses.config.js";
 
 const base: ArbitrageAnalysis = {
   lens: "arbitrage",
@@ -104,5 +104,29 @@ describe("ön kapı guard'ı (signal_kind)", () => {
 
   it("bağlam yoksa ön kapı uygulanmaz (geriye dönük uyum)", () => {
     expect(checkAnalysisGuards(base)).toEqual([]);
+  });
+});
+
+describe("checkAnalysisGuards — mercek-bağımsızlık (white_space)", () => {
+  const whiteSpace: WhiteSpaceAnalysis = {
+    lens: "white_space",
+    fit: 82,
+    rationale: "yerli oyuncu yok, talep kanıtı güçlü",
+    evidence: [{ fact: "TR'de doğrudan rakip bulunamadı", source: "https://example.com" }],
+    competitive_landscape: "en yakın oyuncu dolaylı, farklı segment",
+    risks: ["boşluk hızla kapanabilir"],
+    confidence: "high",
+    validation_needed: [],
+    recommended_action: "pursue",
+    tags: [],
+  };
+
+  it("arbitrajla aynı kurallar white_space şekline de uygulanır (temiz geçer)", () => {
+    expect(checkAnalysisGuards(whiteSpace)).toEqual([]);
+  });
+
+  it("white_space'te de bant-aksiyon çelişkisi yakalanır", () => {
+    const bad = { ...whiteSpace, recommended_action: "kill" as const };
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("bant-aksiyon"))).toBe(true);
   });
 });
