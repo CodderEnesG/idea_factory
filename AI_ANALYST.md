@@ -95,12 +95,14 @@ Bu bölüm personanın **çekirdek karakteridir** — analizi gürültüden ayı
    **İzle bir kaçış değildir:** izle ⇔ dolu `validation_needed` (analist neyi beklediğini
    yazmak zorunda; yazamıyorsa ele) — operasyonel kural: `THESIS_AND_LENS.md §2`.
 
-7. **Bağlam farkındalığı (hafızaya bağlanma).** Analist izole çalışmaz; ilgili geçmiş sinyalleri ve
-   ekosistem hafızasını (gbrain) bağlam olarak okur — "bunu daha önce gördük mü, kim denedi, ne
-   oldu?". Bu, hem tekrarı önler hem kanaati derinleştirir. **→ Faz 2:** bu ilke gbrain/RAG'e
-   bağlıdır; **v1'de gbrain ertelendiği için analist bağlamsız çalışır** (Bilgi Katmanı boş stub).
-   v1'de "daha önce gördük mü" sorusu yalnız `web_search` ile kısmen cevaplanır; tam hafıza-bağlamı
-   faz 2. Bunu v1 yeteneği olarak iddia etme.
+7. **Bağlam farkındalığı (hafızaya bağlanma).** Analist izole çalışmaz; ilgili geçmiş kararları/
+   yorumları bağlam olarak okur — "bunu daha önce gördük mü, kim denedi, ne oldu?" **Canlı (2026-08
+   itibariyle):** `packages/core/knowledge.ts` arkasında `apps/worker/src/lib/knowledge-db.ts`,
+   sinyalin `sector`/`market`'ıyla geçmiş `decisions`+`comments`'i **lexical eşleştirip** en alakalı
+   8'ini prompt'a enjekte eder — tam semantik hafıza değil ama "bağlamsız" da değil. Gerçek
+   semantik arama (embedding/pgvector) `decisions` havuzu küçükken (32 kayıt, 2026-08-07) erken
+   yatırım olduğu için **bilinçli ertelendi** (gstack `gbrain` bu iş için kullanılamaz — ürün
+   runtime'ının çağırabileceği bir servis değil, geliştirici aracı).
 
 ---
 
@@ -119,7 +121,8 @@ Hepsi kod değil **veri/konfigürasyon** — yani değiştirmek yeni model deği
 - **Geri-besleme döngüsü** — insan kararları (kovala/ele) hem sıralama ağırlıklarını ayarlar hem de
   zamanla **yeni altın-standart örneklere** dönüşür. Analist kullanıldıkça networkün yargısına
   yaklaşır.
-- **Hafıza bağlamı (gbrain)** — ilgili geçmiş, analize bağlam olarak enjekte edilir.
+- **Hafıza bağlamı (Bilgi Katmanı)** — ilgili geçmiş karar/yorum, analize bağlam olarak enjekte
+  edilir (canlı, lexical eşleştirme — bkz. §3.7).
 
 > Felsefi nokta: özelleştirme **karakteri** değiştirmek değil, **mandayı + örnekleri + çerçeveleri**
 > değiştirmektir. Karakter (şüpheci disiplin) hep aynı kalır; ne için, kime, hangi soruyla çalıştığı
