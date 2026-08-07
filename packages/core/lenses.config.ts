@@ -22,17 +22,27 @@ export const ValidationItem = z.object({
   how_to_verify: z.string().min(1), // nasıl doğrulanır (web / insan / mülakat)
 });
 
-export const ArbitrageAnalysisSchema = z.object({
-  lens: z.literal("arbitrage"),
+/**
+ * Merceklerin ortak çıktı iskeleti — guard'lar ve ranker/UI bu alanlara bakar.
+ * Her mercek bunu `.extend()` ile kendi `lens` literal'i + ekstra alanlarla genişletir
+ * (bkz. `ArbitrageAnalysisSchema`). Yeni mercek eklemek şemayı değil bu tabanı bozmaz.
+ */
+export const BaseAnalysisSchema = z.object({
+  lens: z.string(),
   fit: z.number().int().min(0).max(100), // teze uyum — katı bant kuralı
   rationale: z.string().min(1),
   evidence: z.array(EvidenceItem),
-  adaptation_notes: z.string(), // neyi uyarla, ne kırılır
   risks: z.array(z.string()), // en güçlü kill gerekçesi dahil
   confidence: Confidence,
   validation_needed: z.array(ValidationItem).max(3), // zorunlu Validation Block
   recommended_action: RecommendedAction,
   tags: z.array(z.string()).default([]),
+});
+export type BaseAnalysis = z.infer<typeof BaseAnalysisSchema>;
+
+export const ArbitrageAnalysisSchema = BaseAnalysisSchema.extend({
+  lens: z.literal("arbitrage"),
+  adaptation_notes: z.string(), // neyi uyarla, ne kırılır
 });
 export type ArbitrageAnalysis = z.infer<typeof ArbitrageAnalysisSchema>;
 
@@ -142,16 +152,16 @@ Bilinmeyen alanları validation_needed adayı olarak değerlendir.`;
 Bu sinyali arbitraj merceğiyle analiz et ve JSON döndür.`;
 }
 
-export interface Lens {
-  id: typeof ARBITRAGE_LENS_ID;
+export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
+  id: string;
   name: string;
-  schema: typeof ArbitrageAnalysisSchema;
+  schema: z.ZodType<TAnalysis, z.ZodTypeDef, unknown>;
   buildSystemPrompt: (t: ThesisConfig) => string;
   buildUserPrompt: (s: Signal, enrichment?: StoredEnrichment | null) => string;
   weight: number;
 }
 
-export const arbitrageLens: Lens = {
+export const arbitrageLens: Lens<ArbitrageAnalysis> = {
   id: ARBITRAGE_LENS_ID,
   name: "Arbitraj",
   schema: ArbitrageAnalysisSchema,
@@ -160,5 +170,5 @@ export const arbitrageLens: Lens = {
   weight: 1,
 };
 
-/** v1: tek mercek. Yeni mercek = tek giriş. */
+/** v1: tek mercek. Yeni mercek = registry'ye tek giriş (analyst/worker zaten döngüyle işler). */
 export const lenses: Lens[] = [arbitrageLens];

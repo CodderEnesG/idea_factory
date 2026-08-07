@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { analyzeSignal } from "../analyst.js";
-import type { RecommendedAction } from "../lenses.config.js";
+import { arbitrageLens, type RecommendedAction } from "../lenses.config.js";
 import { golden } from "./golden.js";
 import { evalCases } from "./cases.js";
 
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   for (const c of evalCases) {
     let got: RecommendedAction;
     try {
-      const a = await analyzeSignal(c.signal, { fewShot: golden });
+      const a = await analyzeSignal(c.signal, arbitrageLens, { fewShot: golden });
       got = a.recommended_action;
     } catch (e) {
       console.error(`  ✗ ${c.signal.title.slice(0, 50)}:`, e instanceof Error ? e.message : e);

@@ -1,12 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
-import {
-  ArbitrageAnalysisSchema,
-  buildArbitrageSystemPrompt,
-  buildArbitrageUserPrompt,
-  type ArbitrageAnalysis,
-} from "./lenses.config.js";
+import type { BaseAnalysis, Lens } from "./lenses.config.js";
 import { thesis as defaultThesis, type ThesisConfig } from "./thesis.config.js";
-import { checkArbitrageGuards } from "./guards.js";
+import { checkAnalysisGuards } from "./guards.js";
 import { emptyKnowledgeLayer, type KnowledgeLayer } from "./knowledge.js";
 import { StoredEnrichmentSchema } from "./enrichment.js";
 import type { Signal } from "./signal.js";
@@ -15,9 +10,9 @@ import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 
 /** Golden few-shot çapası: bir sinyal + onun onaylı analizi. */
-export interface FewShotExample {
+export interface FewShotExample<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   signal: Pick<Signal, "title" | "source" | "type" | "url" | "market" | "sector" | "summary_raw">;
-  analysis: ArbitrageAnalysis;
+  analysis: TAnalysis;
 }
 
 export type ProviderName = "gemini" | "anthropic";
@@ -54,13 +49,14 @@ ${JSON.stringify(ex.analysis)}`;
 }
 
 /**
- * Bir sinyali arbitraj merceğiyle analiz et. Sağlayıcı-bağımsız (MVP: Gemini, sonra Claude).
+ * Bir sinyali verilen mercekle analiz et. Sağlayıcı-bağımsız (MVP: Gemini, sonra Claude).
  * Yapısal JSON → zod + mantık guard'ları; ihlalde prompt'a geri bildirim ekleyip yeniden dener.
  */
-export async function analyzeSignal(
+export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
   signal: Signal,
+  lens: Lens<TAnalysis>,
   opts: AnalyzeOptions = {},
-): Promise<ArbitrageAnalysis> {
+): Promise<TAnalysis> {
   const provider = pickProvider(opts);
   const thesis = opts.thesis ?? defaultThesis;
   const knowledge = opts.knowledge ?? emptyKnowledgeLayer;
@@ -70,8 +66,8 @@ export async function analyzeSignal(
   const ctxText =
     ctx.notes.length > 0 ? `\n\nİlgili geçmiş bağlam:\n- ${ctx.notes.join("\n- ")}` : "";
 
-  const system = buildArbitrageSystemPrompt(thesis) + renderFewShot(opts.fewShot ?? []);
-  const jsonSchema = zodToJsonSchema(ArbitrageAnalysisSchema, { target: "jsonSchema7" }) as Record<
+  const system = lens.buildSystemPrompt(thesis) + renderFewShot(opts.fewShot ?? []);
+  const jsonSchema = zodToJsonSchema(lens.schema, { target: "jsonSchema7" }) as Record<
     string,
     unknown
   >;
@@ -79,21 +75,20 @@ export async function analyzeSignal(
 
   // Zenginleştirme varsa prompt'a olgu bloğu olarak gir (yoksa bugünkü davranış).
   const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
-  const baseUser =
-    buildArbitrageUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText;
+  const baseUser = lens.buildUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText;
   let feedback = "";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const user = feedback ? `${baseUser}\n\n${feedback}` : baseUser;
     const raw = await provider.generate({ system, user, jsonSchema });
 
-    const parsed = ArbitrageAnalysisSchema.safeParse(raw);
+    const parsed = lens.schema.safeParse(raw);
     if (!parsed.success) {
       feedback = `Önceki çıktı şema hatası verdi: ${parsed.error.message}. Şemaya uygun düzelt.`;
       continue;
     }
 
-    const violations = checkArbitrageGuards(parsed.data, {
+    const violations = checkAnalysisGuards(parsed.data, {
       // signal_kind null = legacy satır — ön kapı guard'ına sınıf bildirme.
       ...(enrParsed.success && enrParsed.data.signal_kind
         ? { signalKind: enrParsed.data.signal_kind }
@@ -107,5 +102,7 @@ export async function analyzeSignal(
     return parsed.data;
   }
 
-  throw new Error(`analist (${provider.name}) ${maxRetries + 1} denemede geçerli analiz üretemedi (${signal.url})`);
+  throw new Error(
+    `analist (${provider.name}) ${maxRetries + 1} denemede geçerli analiz üretemedi (${signal.url})`,
+  );
 }

@@ -1,4 +1,4 @@
-import type { ArbitrageAnalysis } from "./lenses.config.js";
+import type { BaseAnalysis } from "./lenses.config.js";
 import { fitBand } from "./lenses.config.js";
 import { isActionableKind, type SignalKind } from "./enrichment.js";
 
@@ -13,9 +13,10 @@ export const NON_ACTIONABLE_FIT_CAP = 20;
 /**
  * Zod-sonrası mantık guard'ları (PLAN.md §Bileşen 6). Şema geçerli ama karar
  * tutarsız olabilir — ihlal listesi dönerse analiz yeniden denenir.
- * Boş liste = geçti.
+ * Boş liste = geçti. Yalnız ortak alanlara (`BaseAnalysis`) bakar — her mercek
+ * için aynı kurallar geçerli, mercek-özel guard gerekirse ayrıca eklenir.
  */
-export function checkArbitrageGuards(a: ArbitrageAnalysis, ctx: GuardContext = {}): string[] {
+export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): string[] {
   const v: string[] = [];
 
   // (a) bant-aksiyon tutarlılığı: fit bandı ile recommended_action çelişemez.
