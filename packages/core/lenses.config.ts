@@ -166,6 +166,8 @@ export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   /** DB'deki paylaşılan "mercek-özel not" kolonuna yazılacak metni analizden çıkarır.
    *  Method-şekli (bivariant param) kasıtlı: heterojen `Lens<T>[]` dizisine sığması için. */
   extraNote(a: TAnalysis): string;
+  /** UI'da extraNote'un önüne konan etiket (ör. "Uyarlama", "Rekabet ortamı"). */
+  extraNoteLabel: string;
 }
 
 export const arbitrageLens: Lens<ArbitrageAnalysis> = {
@@ -176,6 +178,7 @@ export const arbitrageLens: Lens<ArbitrageAnalysis> = {
   buildUserPrompt: buildArbitrageUserPrompt,
   weight: 1,
   extraNote: (a) => a.adaptation_notes,
+  extraNoteLabel: "Uyarlama",
 };
 
 /* ── Beyaz-alan merceği — prompt şablonu ────────────────────────────────── */
@@ -260,6 +263,7 @@ export const whiteSpaceLens: Lens<WhiteSpaceAnalysis> = {
   buildUserPrompt: buildWhiteSpaceUserPrompt,
   weight: 1,
   extraNote: (a) => a.competitive_landscape,
+  extraNoteLabel: "Rekabet ortamı",
 };
 
 /** Aktif mercek registry'si — yeni mercek = tek giriş (analyst/worker döngüyle işler). */

@@ -35,7 +35,7 @@ function item(id: string, fit: number, validation = false): RankedItem {
     recommended_action: action,
     tags: [],
   };
-  return { signal, analysis };
+  return { signal, analyses: { arbitrage: analysis } };
 }
 
 describe("buildDigest", () => {

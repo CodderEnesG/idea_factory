@@ -1,5 +1,5 @@
-import { rank, type RankedItem } from "./ranker.js";
-import { fitBand } from "./lenses.config.js";
+import { composite, rank, type RankedItem } from "./ranker.js";
+import { lenses } from "./lenses.config.js";
 import { StoredEnrichmentSchema } from "./enrichment.js";
 import { isBench, BENCH_MIN_FIT } from "./bench.js";
 
@@ -33,12 +33,12 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
   const topN = opts.topN ?? 10;
   const title = opts.title ?? "IdeaFact — Fırsat Digest'i";
   const ranked = rank(items);
-  const shortlist = ranked.filter((r) => fitBand(r.analysis.fit) !== "kill").slice(0, topN);
+  const shortlist = ranked.filter((r) => composite(r.analyses).band !== "kill").slice(0, topN);
 
   const lines: string[] = [`# ${title}`, ""];
 
   // Bench satırı — topN'e bakılmaksızın tüm çıtayı geçenler (BENCH.md havuz adayları).
-  const bench = ranked.filter((r) => isBench(r.analysis));
+  const bench = ranked.filter((r) => isBench(composite(r.analyses)));
   if (bench.length > 0) {
     lines.push(
       `**🏅 Bench:** ${bench.length} fırsat çıtayı geçiyor (fit ≥ ${BENCH_MIN_FIT} · güven yüksek) — BENCH.md havuz adayı.`,
@@ -50,30 +50,39 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
     lines.push("_Eşik üstü fırsat yok._", "");
   }
 
-  for (const { signal, analysis } of shortlist) {
-    const band = BAND_LABEL[fitBand(analysis.fit)];
+  for (const { signal, analyses } of shortlist) {
+    const comp = composite(analyses);
+    const band = BAND_LABEL[comp.band];
     lines.push(
-      `## ${band} · fit ${analysis.fit}${isBench(analysis) ? " · 🏅 bench" : ""} · ${signal.title}`,
+      `## ${band} · fit ${comp.fit}${isBench(comp) ? " · 🏅 bench" : ""} · ${signal.title}`,
       `${signal.url}`,
-      "",
-      analysis.rationale,
       "",
     );
     const kunye = buildKunye(signal.enrichment);
     if (kunye) lines.push(`**Künye:** ${kunye}`, "");
-    if (analysis.adaptation_notes) lines.push(`**Uyarlama:** ${analysis.adaptation_notes}`, "");
-    if (analysis.risks.length) lines.push(`**Riskler:** ${analysis.risks.join("; ")}`, "");
-    lines.push(`_Güven: ${analysis.confidence}_`, "");
+
+    // Her aktif mercek kendi paragrafında — kompozit skor yalnız sıralar, gerekçe mercek-özeldir.
+    for (const lens of lenses) {
+      const a = analyses[lens.id];
+      if (!a) continue;
+      lines.push(`**${lens.name}** (fit ${a.fit} · güven ${a.confidence}): ${a.rationale}`, "");
+      if (lens.extraNote(a)) lines.push(`_${lens.extraNoteLabel}:_ ${lens.extraNote(a)}`, "");
+      if (a.risks.length) lines.push(`_Riskler:_ ${a.risks.join("; ")}`, "");
+    }
   }
 
-  // Doğrulama bekleyenler — analistin istediği eksik veriler, insana görev listesi.
-  const pending = shortlist.filter((r) => r.analysis.validation_needed.length > 0);
+  // Doğrulama bekleyenler — analistin istediği eksik veriler, insana görev listesi (mercek etiketli).
+  const pending = shortlist.filter((r) => Object.values(r.analyses).some((a) => a.validation_needed.length > 0));
   if (pending.length > 0) {
     lines.push("---", "", "## 🔎 Doğrulama Bekleyenler", "");
-    for (const { signal, analysis } of pending) {
+    for (const { signal, analyses } of pending) {
       lines.push(`### ${signal.title}`);
-      for (const v of analysis.validation_needed) {
-        lines.push(`- **${v.data}** — ${v.why} _(nasıl: ${v.how_to_verify})_`);
+      for (const lens of lenses) {
+        const a = analyses[lens.id];
+        if (!a || a.validation_needed.length === 0) continue;
+        for (const v of a.validation_needed) {
+          lines.push(`- **[${lens.name}] ${v.data}** — ${v.why} _(nasıl: ${v.how_to_verify})_`);
+        }
       }
       lines.push("");
     }
