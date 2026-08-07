@@ -59,6 +59,10 @@ export const StoredEnrichmentSchema = SignalEnrichmentSchema.extend({
   fetch_ok: z.boolean(),
   model: z.string(),
   page_chars: z.number().int().nullable(),
+  // triage.ts'in ayrı, ucuz çağrısıyla doldurulur (enrichSignal'ın değil) — bkz. triage.ts.
+  // Henüz triage edilmemiş / eski satırlarda null; analyze.ts bunu "nötr" sayar.
+  triage_score: z.number().int().min(0).max(100).nullable().catch(null),
+  triage_reason: z.string().nullable().catch(null),
 });
 export type StoredEnrichment = z.infer<typeof StoredEnrichmentSchema>;
 

@@ -116,8 +116,8 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy: essay/research/other �
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
 
-/** Sinyal + zenginleştirme bloğu — tüm merceklerin user prompt'u bunun üstüne kurulur. */
-function buildSignalBrief(s: Signal, enrichment?: StoredEnrichment | null): string {
+/** Sinyal + zenginleştirme bloğu — tüm merceklerin (ve triage'ın) user prompt'u bunun üstüne kurulur. */
+export function buildSignalBrief(s: Signal, enrichment?: StoredEnrichment | null): string {
   const head = `Sinyal:
 - Başlık: ${s.title}
 - Kaynak: ${s.source} (${s.type})

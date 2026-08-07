@@ -12,6 +12,7 @@
     "test": "pnpm -r test",
     "ingest": "pnpm --filter @idea-factory/worker ingest",
     "enrich": "pnpm --filter @idea-factory/worker enrich",
+    "triage": "pnpm --filter @idea-factory/worker triage",
     "analyze": "pnpm --filter @idea-factory/worker analyze",
     "digest": "pnpm --filter @idea-factory/worker digest",
     "tick": "pnpm --filter @idea-factory/worker tick",

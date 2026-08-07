@@ -152,6 +152,33 @@ describe("signal_kind ön kapısı", () => {
   });
 });
 
+describe("triage_score (StoredEnrichmentSchema)", () => {
+  it("eski satırlarda triage_score/triage_reason yoksa null'a düşer, parse patlamaz", () => {
+    const parsed = StoredEnrichmentSchema.safeParse({
+      ...validExtraction,
+      fetch_ok: true,
+      model: "test",
+      page_chars: 10,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.triage_score).toBe(null);
+    expect(parsed.success && parsed.data.triage_reason).toBe(null);
+  });
+
+  it("triage.ts'in yazdığı score/reason korunur", () => {
+    const parsed = StoredEnrichmentSchema.safeParse({
+      ...validExtraction,
+      fetch_ok: true,
+      model: "test",
+      page_chars: 10,
+      triage_score: 85,
+      triage_reason: "güçlü aday",
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.triage_score).toBe(85);
+  });
+});
+
 describe("isActionableKind", () => {
   it("teşebbüs olanları ayırır", () => {
     expect(["venture", "product", "funding"].every((k) => isActionableKind(k as never))).toBe(true);
