@@ -37,7 +37,7 @@ export default function Login() {
 
   return (
     <main className="mx-auto flex min-h-[80vh] max-w-sm flex-col justify-center px-6">
-      <h1 className="font-display text-2xl font-bold text-ink">Idea Factory</h1>
+      <h1 className="font-display text-2xl font-bold text-ink">IdeaFact</h1>
       <p className="mt-1 text-sm text-ink-secondary">Ekip incelemesi — giriş yap.</p>
 
       <form onSubmit={submit} className="mt-6 space-y-3">

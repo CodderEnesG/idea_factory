@@ -40,7 +40,7 @@ jobs:
       # worker, core'u dist/ üzerinden import eder — temiz checkout'ta önce derlenmeli.
       - run: pnpm --filter @idea-factory/core build
 
-      - name: tick (topla → zenginleştir → analiz → digest)
+      - name: tick (topla → zenginleştir → ön-ele → analiz → digest)
         run: pnpm tick
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -49,6 +49,8 @@ jobs:
           # Varsayılan 25/10 ingest hızına yetişmiyordu (enrich backlog birikiyordu).
           # Yükseltildi; concurrency düşük tutuluyor (Vertex 429 önlemi).
           ENRICH_LIMIT: ${{ vars.ENRICH_LIMIT || '100' }}
+          # Ön-eleme ucuz+hızlı — enrich ile aynı ölçekte, analyze'ın önündeki tüm backlog'u kapsasın.
+          TRIAGE_LIMIT: ${{ vars.TRIAGE_LIMIT || '100' }}
           ANALYZE_LIMIT: ${{ vars.ANALYZE_LIMIT || '40' }}
           ANALYZE_PER_SOURCE_CAP: ${{ vars.ANALYZE_PER_SOURCE_CAP || '12' }}
           GEMINI_USE_VERTEX: "true"

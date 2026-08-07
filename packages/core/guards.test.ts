@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { checkArbitrageGuards } from "./guards.js";
-import { fitBand, type ArbitrageAnalysis } from "./lenses.config.js";
+import { checkAnalysisGuards } from "./guards.js";
+import { fitBand, type ArbitrageAnalysis, type WhiteSpaceAnalysis } from "./lenses.config.js";
 
 const base: ArbitrageAnalysis = {
   lens: "arbitrage",
@@ -25,9 +25,9 @@ describe("fitBand", () => {
   });
 });
 
-describe("checkArbitrageGuards", () => {
+describe("checkAnalysisGuards", () => {
   it("geçerli pursue temiz geçer", () => {
-    expect(checkArbitrageGuards(base)).toEqual([]);
+    expect(checkAnalysisGuards(base)).toEqual([]);
   });
 
   it("geçerli watch (dolu validation_needed) temiz geçer", () => {
@@ -38,12 +38,12 @@ describe("checkArbitrageGuards", () => {
       recommended_action: "watch",
       validation_needed: [{ data: "yerel CAC", why: "modeli değiştirir", how_to_verify: "mülakat" }],
     };
-    expect(checkArbitrageGuards(watch)).toEqual([]);
+    expect(checkAnalysisGuards(watch)).toEqual([]);
   });
 
   it("bant-aksiyon çelişkisi yakalanır (fit 85 + kill)", () => {
     const bad = { ...base, recommended_action: "kill" as const };
-    expect(checkArbitrageGuards(bad).some((v) => v.includes("bant-aksiyon"))).toBe(true);
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("bant-aksiyon"))).toBe(true);
   });
 
   it("güven kapısı: 80+ ama high değil", () => {
@@ -53,17 +53,17 @@ describe("checkArbitrageGuards", () => {
       recommended_action: "pursue",
       validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }],
     };
-    expect(checkArbitrageGuards(bad).some((v) => v.includes("güven kapısı"))).toBe(true);
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("güven kapısı"))).toBe(true);
   });
 
   it("pursue kanıtsız reddedilir", () => {
     const bad = { ...base, evidence: [] };
-    expect(checkArbitrageGuards(bad).some((v) => v.includes("kanıtsız"))).toBe(true);
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("kanıtsız"))).toBe(true);
   });
 
   it("atıfsız olgu reddedilir", () => {
     const bad = { ...base, evidence: [{ fact: "büyüme", source: "" }] };
-    expect(checkArbitrageGuards(bad).some((v) => v.includes("atıfsız"))).toBe(true);
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("atıfsız"))).toBe(true);
   });
 
   it("izle boş validation_needed ile geçersiz", () => {
@@ -74,14 +74,14 @@ describe("checkArbitrageGuards", () => {
       recommended_action: "watch",
       validation_needed: [],
     };
-    const out = checkArbitrageGuards(bad);
+    const out = checkAnalysisGuards(bad);
     expect(out.some((v) => v.includes("izle"))).toBe(true);
   });
 });
 
 describe("ön kapı guard'ı (signal_kind)", () => {
   it("kovalanamaz sinyalde yüksek fit ihlal", () => {
-    const v = checkArbitrageGuards(base, { signalKind: "essay" });
+    const v = checkAnalysisGuards(base, { signalKind: "essay" });
     expect(v.some((x) => x.includes("fit 85"))).toBe(true);
     expect(v.some((x) => x.includes("recommended_action=kill olmalı"))).toBe(true);
   });
@@ -93,16 +93,40 @@ describe("ön kapı guard'ı (signal_kind)", () => {
       confidence: "high",
       recommended_action: "kill",
     };
-    expect(checkArbitrageGuards(a, { signalKind: "essay" })).toEqual([]);
+    expect(checkAnalysisGuards(a, { signalKind: "essay" })).toEqual([]);
   });
 
   it("venture/product/funding ön kapıya takılmaz", () => {
     for (const kind of ["venture", "product", "funding"] as const) {
-      expect(checkArbitrageGuards(base, { signalKind: kind })).toEqual([]);
+      expect(checkAnalysisGuards(base, { signalKind: kind })).toEqual([]);
     }
   });
 
   it("bağlam yoksa ön kapı uygulanmaz (geriye dönük uyum)", () => {
-    expect(checkArbitrageGuards(base)).toEqual([]);
+    expect(checkAnalysisGuards(base)).toEqual([]);
+  });
+});
+
+describe("checkAnalysisGuards — mercek-bağımsızlık (white_space)", () => {
+  const whiteSpace: WhiteSpaceAnalysis = {
+    lens: "white_space",
+    fit: 82,
+    rationale: "yerli oyuncu yok, talep kanıtı güçlü",
+    evidence: [{ fact: "TR'de doğrudan rakip bulunamadı", source: "https://example.com" }],
+    competitive_landscape: "en yakın oyuncu dolaylı, farklı segment",
+    risks: ["boşluk hızla kapanabilir"],
+    confidence: "high",
+    validation_needed: [],
+    recommended_action: "pursue",
+    tags: [],
+  };
+
+  it("arbitrajla aynı kurallar white_space şekline de uygulanır (temiz geçer)", () => {
+    expect(checkAnalysisGuards(whiteSpace)).toEqual([]);
+  });
+
+  it("white_space'te de bant-aksiyon çelişkisi yakalanır", () => {
+    const bad = { ...whiteSpace, recommended_action: "kill" as const };
+    expect(checkAnalysisGuards(bad).some((v) => v.includes("bant-aksiyon"))).toBe(true);
   });
 });

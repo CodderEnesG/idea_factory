@@ -37,14 +37,19 @@ değil — yani değiştirmek yeni model değil, yeni ayar gerektirir.
 risk iştahı, anti-pattern'ler. Bu, analistin *neyi iyi sayacağının* sabit zemini. Bir fonun
 yatırım mandası gibi. (Bkz. `THESIS_AND_LENS.md` — somut Türkiye/MENA değerleri.)
 
-### Katman 2 — Küratörlü bilgi tabanı (RAG — asıl "pazar hafızası") · **FAZ 2**
-> **v1'de kapalı:** gbrain/RAG faz 2'ye ertelendi; Bilgi Katmanı v1'de boş stub. v1 analist yalnız
-> Katman 1 (tez) + Katman 3 (canlı web) + Katman 4 (few-shot) ile çalışır — geçmiş-hafıza bağlamı yok.
+### Katman 2 — Küratörlü bilgi tabanı ("pazar hafızası")
+> **Canlı, ama lexical (2026-08 itibariyle):** Bilgi Katmanı boş stub değil — `decisions`+
+> `comments`'i sinyalin `sector`/`market`'ıyla eşleştirip bağlam olarak enjekte ediyor. **Gerçek
+> RAG (embedding/pgvector) bilinçli ertelendi**: `decisions` havuzu küçükken (32 kayıt,
+> 2026-08-07) erken yatırım olurdu; 50-100 kayda çıkınca yeniden değerlendirilecek. gstack
+> `gbrain` bu iş için kullanılamaz — geliştirici aracı, ürün runtime'ının çağırabileceği bir
+> embedding servisi değil; gerçek semantik arama **kendi Supabase'imize kurulacak `pgvector`**
+> ile olur.
 
-Analistin uzun-vadeli hafızası. **gstack `gbrain` (Supabase + `pgvector`)** omurga: geçmiş
-sinyaller, şirketler, kurucular, fonlama olayları, pazar/regülasyon notları embedding'lenip
-kalıcı tabana yazılır. Analiz anında, sinyalle **semantik olarak en alakalı** geçmiş bağlam
-çekilip prompt'a enjekte edilir (RAG — retrieval-augmented generation).
+Analistin uzun-vadeli hafızası. Nihai hedef: geçmiş sinyaller, şirketler, kurucular, fonlama
+olayları, pazar/regülasyon notları embedding'lenip kalıcı tabana yazılsın; analiz anında,
+sinyalle **semantik olarak en alakalı** geçmiş bağlam çekilip prompt'a enjekte edilsin (RAG —
+retrieval-augmented generation). Bugün bunun yerine lexical (sector/market) eşleştirme var.
 
 Bu sayede analist "bu fikri daha önce gördük mü? kim denedi? ne oldu? bu pazarda regülasyon
 nasıl?" sorularını **uydurmadan**, kayıtlı bilgiyle cevaplar. Bilgi compound eder: her analiz
@@ -123,6 +128,8 @@ Türkiye uzmanısın" demekle olmaz (o sadece tondur). Gerçek tanıma, bilgi ta
 ---
 
 ### Sonraki adım
-Bu felsefe onaylanırsa somut karşılığı: `gbrain` kurulumu (`/setup-gbrain`), bilgi tabanı şeması,
-web-tool entegrasyonu ve few-shot örnek setinin küratörlenmesi. Tez ve mercek somutu için bkz.
+Bu felsefe onaylandı, somut karşılığının çoğu landed: lexical Bilgi Katmanı (Katman 2, canlı),
+web-tool entegrasyonu (Katman 3), few-shot örnek seti (Katman 4, yalnız arbitraj — beyaz-alan
+merceğinin kendi seti henüz yok). Kalan: gerçek pgvector semantik arama (bilinçli ertelendi,
+Katman 2'deki not). Tez ve mercek somutu için bkz.
 `THESIS_AND_LENS.md`.

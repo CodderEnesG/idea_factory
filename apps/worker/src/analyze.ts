@@ -1,10 +1,17 @@
 import {
   analyzeSignal,
+  arbitrageLens,
   golden,
   isActionableKind,
+  lenses,
   StoredEnrichmentSchema,
+  type FewShotExample,
   type Signal,
 } from "@idea-factory/core";
+
+// golden yalnız arbitraj için kalibre edilmiş (THESIS_AND_LENS.md §3a) — başka mercek yanlış
+// hizalanır. Yeni merceğin kendi golden seti yoksa boş few-shot ile başlar.
+const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [arbitrageLens.id]: golden };
 import { db } from "./db.js";
 import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";
@@ -17,85 +24,108 @@ const PER_SOURCE_CAP = Number(process.env["ANALYZE_PER_SOURCE_CAP"] ?? "4");
 // Tüm kovalanabilir sinyalleri golden kalibrasyonuyla baştan analiz için (done-atlamasını
 // devre dışı bırakır, upsert eski satırın üstüne yazar). enrich.ts FORCE_ENRICH deseni.
 const FORCE = process.env["ANALYZE_FORCE"] === "true";
+// Henüz triage edilmemiş (triage.ts çalışmadı/başarısız oldu) sinyal kaybolmasın — nötr say.
+const NEUTRAL_TRIAGE_SCORE = 50;
 
-async function fetchUnanalyzed(limit: number): Promise<{ todo: Signal[]; skipped: number }> {
-  const { data: signals, error: sErr } = await db
+/**
+ * Tüm merceklerin ortaklaşa çektiği aday havuzu: triage_score'a göre önceliklenir
+ * (pahalı çok-mercekli analiz artık tazelik sırasına değil ucuz ön-tahmine göre gider),
+ * sonra kaynak-adaleti tavanı geniş bir pay üstünde uygulanır — her mercek bunu kendi
+ * done-check'iyle daha da daraltır (bkz. `doneSetFor`).
+ */
+async function fetchShortlist(limit: number): Promise<{ shortlist: Signal[]; skipped: number }> {
+  const { data, error } = await db
     .from("signals")
     .select("*")
     .order("fetched_at", { ascending: false })
     .limit(limit * 20);
-  if (sErr) throw new Error(`signals sorgu hatası: ${sErr.message}`);
-  const window = (signals ?? []) as Signal[];
-
-  // done-set'i tüm geçmiş yerine yalnız penceredeki id'ler için sor: PostgREST tek istekte
-  // en çok 1000 satır döndürür; tablo büyüyünce kırpılan id'ler "yapılmadı" sanılıp
-  // yeniden analiz ediliyordu (boşa LLM çağrısı).
-  const done = new Set<string>();
-  if (!FORCE && window.length > 0) {
-    const { data: analyzed, error: aErr } = await db
-      .from("analyses")
-      .select("signal_id")
-      .eq("lens", "arbitrage")
-      .in("signal_id", window.map((s) => s.id));
-    if (aErr) throw new Error(`analyses sorgu hatası: ${aErr.message}`);
-    for (const r of analyzed ?? []) done.add(r.signal_id as string);
-  }
-  // FORCE: done boş kalır → tümü yeniden analiz edilir (upsert eski satırı ezer).
-  const pending = window.filter((s) => !done.has(s.id));
+  if (error) throw new Error(`signals sorgu hatası: ${error.message}`);
+  const window = (data ?? []) as Signal[];
 
   // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
   // signal_kind null = legacy satır (sınıf bilinmiyor) → elemeden geçir.
-  const actionable = pending.filter((s) => {
-    const e = StoredEnrichmentSchema.safeParse(s.enrichment);
-    return !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
-  });
+  const scored = window
+    .map((s) => {
+      const e = StoredEnrichmentSchema.safeParse(s.enrichment);
+      const actionable = !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
+      const score = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
+      return { signal: s, actionable, score };
+    })
+    .filter((x) => x.actionable)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.signal);
 
-  return { todo: balanceBySource(actionable, limit, PER_SOURCE_CAP), skipped: pending.length - actionable.length };
+  const shortlist = balanceBySource(scored, limit * Math.max(lenses.length, 1), PER_SOURCE_CAP);
+  return { shortlist, skipped: window.length - scored.length };
+}
+
+/** Belirli bir mercek için, kısa liste içinden hangileri zaten analiz edilmiş. */
+async function doneSetFor(lensId: string, signalIds: string[]): Promise<Set<string>> {
+  if (FORCE || signalIds.length === 0) return new Set();
+  const { data, error } = await db
+    .from("analyses")
+    .select("signal_id")
+    .eq("lens", lensId)
+    .in("signal_id", signalIds);
+  if (error) throw new Error(`analyses sorgu hatası: ${error.message}`);
+  return new Set((data ?? []).map((r) => r.signal_id as string));
 }
 
 async function main(): Promise<void> {
-  const { todo, skipped } = await fetchUnanalyzed(BATCH_LIMIT);
-  console.log(
-    `${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()}` +
-      `, golden few-shot=${golden.length}, kaynak tavanı=${PER_SOURCE_CAP}${FORCE ? ", FORCE" : ""}` +
-      `${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
-  );
-
   const knowledge = supabaseKnowledgeLayer();
-  let ok = 0;
-  for (const signal of todo) {
-    try {
-      const a = await analyzeSignal(signal, { fewShot: golden, knowledge }); // golden çapalar + ekip geçmişi + env provider/model
-      const { error } = await db.from("analyses").upsert(
-        {
-          signal_id: signal.id,
-          lens: a.lens,
-          fit: a.fit,
-          rationale: a.rationale,
-          evidence: a.evidence,
-          adaptation_notes: a.adaptation_notes,
-          risks: a.risks,
-          confidence: a.confidence,
-          validation_needed: a.validation_needed,
-          recommended_action: a.recommended_action,
-          tags: a.tags,
-          model: env.analysisModel(),
-        },
-        { onConflict: "signal_id,lens" },
-      );
-      if (error) throw new Error(error.message);
-      ok++;
-      console.log(`  ✓ ${a.recommended_action} fit=${a.fit} — ${signal.title.slice(0, 60)}`);
-    } catch (e) {
-      console.error(`  ✗ ${signal.url}:`, e instanceof Error ? e.message : e);
+  const { shortlist, skipped } = await fetchShortlist(BATCH_LIMIT);
+  let totalTodo = 0;
+  let totalOk = 0;
+
+  for (const lens of lenses) {
+    const fewShot = FEW_SHOT_BY_LENS[lens.id] ?? [];
+    const done = await doneSetFor(lens.id, shortlist.map((s) => s.id));
+    const todo = shortlist.filter((s) => !done.has(s.id)).slice(0, BATCH_LIMIT);
+    console.log(
+      `[${lens.id}] ${todo.length} sinyal analiz edilecek (provider=${env.provider()}, model=${env.analysisModel()}` +
+        `, few-shot=${fewShot.length}, kaynak tavanı=${PER_SOURCE_CAP}${FORCE ? ", FORCE" : ""}` +
+        `${skipped > 0 ? `, ${skipped} kovalanamaz sinyal atlandı` : ""})`,
+    );
+
+    totalTodo += todo.length;
+    let ok = 0;
+    for (const signal of todo) {
+      try {
+        const a = await analyzeSignal(signal, lens, { fewShot, knowledge }); // mercek-özel çapalar + ekip geçmişi + env provider/model
+        const { error } = await db.from("analyses").upsert(
+          {
+            signal_id: signal.id,
+            lens: a.lens,
+            fit: a.fit,
+            rationale: a.rationale,
+            evidence: a.evidence,
+            adaptation_notes: lens.extraNote(a),
+            risks: a.risks,
+            confidence: a.confidence,
+            validation_needed: a.validation_needed,
+            recommended_action: a.recommended_action,
+            tags: a.tags,
+            model: env.analysisModel(),
+          },
+          { onConflict: "signal_id,lens" },
+        );
+        if (error) throw new Error(error.message);
+        ok++;
+        console.log(`  ✓ ${a.recommended_action} fit=${a.fit} — ${signal.title.slice(0, 60)}`);
+      } catch (e) {
+        console.error(`  ✗ ${signal.url}:`, e instanceof Error ? e.message : e);
+      }
     }
+    console.log(`[${lens.id}] bitti: ${ok}/${todo.length} analiz yazıldı`);
+    totalOk += ok;
   }
-  console.log(`bitti: ${ok}/${todo.length} analiz yazıldı`);
+
+  console.log(`toplam: ${totalOk}/${totalTodo} analiz yazıldı (${lenses.length} mercek)`);
 
   // Hepsi patladıysa (kota/anahtar/ağ) sessiz yeşil kalma — cron kırmızı görsün.
   // Kısmi başarı yeşildir: kalanlar sonraki tick'te otomatik denenir.
-  if (todo.length > 0 && ok === 0) {
-    throw new Error(`toplu başarısızlık: 0/${todo.length} analiz yazıldı (kota/anahtar kontrol et)`);
+  if (totalTodo > 0 && totalOk === 0) {
+    throw new Error(`toplu başarısızlık: 0/${totalTodo} analiz yazıldı (kota/anahtar kontrol et)`);
   }
 }
 

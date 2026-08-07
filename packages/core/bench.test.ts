@@ -30,7 +30,7 @@ function mkItem(fit: number, confidence: ArbitrageAnalysis["confidence"]): Ranke
     recommended_action: fit >= 80 ? "pursue" : fit >= 50 ? "watch" : "kill",
     tags: [],
   };
-  return { signal, analysis };
+  return { signal, analyses: { arbitrage: analysis } };
 }
 
 describe("isBench", () => {
@@ -51,7 +51,7 @@ describe("benchItems", () => {
     const items = [mkItem(85, "high"), mkItem(85, "med"), mkItem(60, "high"), mkItem(30, "low")];
     const out = benchItems(items);
     expect(out).toHaveLength(1);
-    expect(out[0].analysis.fit).toBe(85);
-    expect(out[0].analysis.confidence).toBe("high");
+    expect(out[0].analyses["arbitrage"]?.fit).toBe(85);
+    expect(out[0].analyses["arbitrage"]?.confidence).toBe("high");
   });
 });

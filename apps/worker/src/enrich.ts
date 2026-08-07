@@ -57,6 +57,8 @@ async function handle(signal: Signal): Promise<boolean> {
       fetch_ok: text !== null,
       model: env.analysisModel(),
       page_chars: text?.length ?? null,
+      triage_score: null, // triage.ts ayrı, ucuz bir çağrıyla doldurur
+      triage_reason: null,
     };
     const patch: Record<string, unknown> = {
       enrichment: stored,

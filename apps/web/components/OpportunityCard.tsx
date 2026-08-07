@@ -1,7 +1,8 @@
 import {
-  fitBand,
+  composite,
   isActionableKind,
   isBench,
+  lenses,
   StoredEnrichmentSchema,
   type RankedItem,
 } from "@idea-factory/core";
@@ -34,9 +35,11 @@ export function OpportunityCard({
   others?: UserDecision[];
   comments?: Comment[];
 }) {
-  const { signal, analysis } = item;
-  const band = BAND[fitBand(analysis.fit)];
-  const pending = analysis.validation_needed.length > 0;
+  const { signal, analyses } = item;
+  const comp = composite(analyses);
+  const band = BAND[comp.band];
+  const activeLenses = lenses.filter((l) => analyses[l.id]);
+  const pending = Object.values(analyses).some((a) => a.validation_needed.length > 0);
 
   const enrParsed = StoredEnrichmentSchema.safeParse(
     (signal as { enrichment?: unknown }).enrichment,
@@ -68,10 +71,10 @@ export function OpportunityCard({
               <span className={`h-2 w-2 rounded-full ${band.dot}`} /> {band.label}
             </span>
             <span className="text-ink-muted">·</span>
-            <span className="font-display text-ink">fit {analysis.fit}</span>
+            <span className="font-display text-ink">fit {comp.fit}</span>
             <span className="text-ink-muted">·</span>
-            <span className="text-ink-secondary">güven: {analysis.confidence}</span>
-            {isBench(analysis) && (
+            <span className="text-ink-secondary">güven: {comp.confidence}</span>
+            {isBench(comp) && (
               <>
                 <span className="text-ink-muted">·</span>
                 <span className="text-ink" title="Bench çıtası: fit ≥ 80 · güven yüksek">
@@ -130,38 +133,51 @@ export function OpportunityCard({
         </p>
       )}
 
-      <p className="mt-4 text-sm leading-relaxed text-ink-secondary">{analysis.rationale}</p>
+      {activeLenses.map((lens, i) => {
+        const a = analyses[lens.id]!;
+        const note = lens.extraNote(a);
+        return (
+          <div key={lens.id} className={i > 0 ? "mt-4 border-t border-hair pt-4" : "mt-4"}>
+            {activeLenses.length > 1 && (
+              <div className="text-xs font-medium text-ink-muted">
+                {lens.name} · fit {a.fit} · güven: {a.confidence}
+              </div>
+            )}
+            <p className="mt-1 text-sm leading-relaxed text-ink-secondary">{a.rationale}</p>
 
-      {analysis.adaptation_notes && (
-        <p className="mt-3 text-sm text-ink-secondary">
-          <span className="text-ink-muted">Uyarlama: </span>
-          {analysis.adaptation_notes}
-        </p>
-      )}
+            {note && (
+              <p className="mt-2 text-sm text-ink-secondary">
+                <span className="text-ink-muted">{lens.extraNoteLabel}: </span>
+                {note}
+              </p>
+            )}
 
-      {analysis.risks.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {analysis.risks.map((r, i) => (
-            <span key={i} className="chip">
-              ⚠ {r}
-            </span>
-          ))}
-        </div>
-      )}
+            {a.risks.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {a.risks.map((r, ri) => (
+                  <span key={ri} className="chip">
+                    ⚠ {r}
+                  </span>
+                ))}
+              </div>
+            )}
 
-      {pending && (
-        <div className="mt-4 rounded-btn border border-hair bg-elevated p-3">
-          <div className="text-xs font-medium text-brand">Doğrulama görevleri</div>
-          <ul className="mt-2 space-y-1.5">
-            {analysis.validation_needed.map((v, i) => (
-              <li key={i} className="text-xs text-ink-secondary">
-                <span className="text-ink">{v.data}</span> — {v.why}{" "}
-                <span className="text-ink-muted">(nasıl: {v.how_to_verify})</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+            {a.validation_needed.length > 0 && (
+              <div className="mt-3 rounded-btn border border-hair bg-elevated p-3">
+                <div className="text-xs font-medium text-brand">Doğrulama görevleri</div>
+                <ul className="mt-2 space-y-1.5">
+                  {a.validation_needed.map((v, vi) => (
+                    <li key={vi} className="text-xs text-ink-secondary">
+                      <span className="text-ink">{v.data}</span> — {v.why}{" "}
+                      <span className="text-ink-muted">(nasıl: {v.how_to_verify})</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       <div className="mt-5">
         <DecisionButtons signalId={signal.id} mine={mine} others={others} />

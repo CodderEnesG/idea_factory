@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 
 /**
  * PLAN.md faz 7: ingest+analiz cron'a bağlanır. Tek tick = pnpm run tick
- * (topla → zenginleştir → analiz → digest). Uzun ömürlü süreç:
+ * (topla → zenginleştir → ön-ele → analiz → digest). Uzun ömürlü süreç:
  *   pnpm cron            — varsayılan: her gün 07:00 ve 19:00 (Europe/Istanbul)
  *   CRON_SCHEDULE="0 8 * * *" pnpm cron
  *   CRON_RUN_ON_START=true pnpm cron   — başlar başlamaz bir tick koş
@@ -46,5 +46,5 @@ if (!cron.validate(SCHEDULE)) {
 }
 
 cron.schedule(SCHEDULE, tick, { timezone: TZ });
-console.log(`[cron] zamanlandı: "${SCHEDULE}" (${TZ}) — topla→zenginleştir→analiz→digest`);
+console.log(`[cron] zamanlandı: "${SCHEDULE}" (${TZ}) — topla→zenginleştir→ön-ele→analiz→digest`);
 if (RUN_ON_START) tick();
