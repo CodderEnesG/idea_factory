@@ -153,57 +153,61 @@
 
 ## 8. Renk Sistemi
 
-> Metodoloji: gstack `dataviz` skill'i (`references/color-formula.md`, `references/palette.md`)
-> ve `scripts/validate_palette.js`. Kural: **renk en son gelir** — önce iş (kimlik / durum), sonra
-> ton. Aşağıdaki her hex, validator'dan geçmiştir (kontrast + OKLCH lightness-band + chroma
-> floor); eyeball ile seçilmiş değer yok.
+> **2026-08-08 revizyon:** Kullanıcı orijinal Sinyal Amberi kimliğinden hoşnut kalmadı ve
+> tasarımı genel olarak "çok basit" buldu — kimlik menekşeye (violet) geçirildi, arayüz
+> cam-efektli (glassmorphism) + neon-glow bir yöne taşındı. Bu revizyon `/design-shotgun` ile
+> 3 yön (Terminal Menekşe / Editoryal Menekşe / Neon Sinyal Izgarası) üretilip kullanıcıya
+> kıyaslatıldıktan sonra **Neon Sinyal Izgarası** seçilerek yapıldı. Not: bu tur `dataviz`
+> validator script'i (`scripts/validate_palette.js`) bu ortamda bulunamadığı için **çalıştırılmadı**
+> — aşağıdaki menekşe/magenta hex'leri kontrast için gözle kontrol edildi, orijinal §8.1'in
+> formal OKLCH/chroma-floor doğrulaması kadar katı değil. Fonksiyonel durum paleti (§8.2)
+> DOKUNULMADI — zaten doğrulanmıştı, kimlik değişikliğinden bağımsız kalması gerekiyordu.
+>
+> Eski metodoloji notu (§8.1'in ilk hâli için geçerliydi, hâlâ referans): gstack `dataviz`
+> skill'i (`references/color-formula.md`, `references/palette.md`) ve `scripts/validate_palette.js`.
+> Kural: **renk en son gelir** — önce iş (kimlik / durum), sonra ton.
 
 ### 8.1 Kimlik paleti (marka)
 
-Jenerik "startup mavisi/moru" yerine **"operatör konsolu"** fikrinden türedi: radar/sonar
-ekranlarının ve eski terminal ekranlarının koyu-zemin + tek-keskin-renk estetiği — hem "koyu zemin
-öncelikli" (§1) kararıyla hem de **Şüpheci Operatör** kişiliğiyle (§4) birebir örtüşüyor.
+Jenerik "startup moru/gradyanı" klişesinden kaçınmak için önceki "operatör konsolu" fikri
+korundu, ama tonu menekşe/magenta'ya kaydı ve zemine cam-efekti (glassmorphism) + yumuşak
+glow eklendi — "satılacakmış derecede güzel", 2026 SaaS hissi hedeflendi. Bu, §1'in "koyu zemin
+öncelikli" kararıyla uyumlu kalıyor; **Şüpheci Operatör** kişiliği (§4) artık amber yerine
+menekşe ile ifade ediliyor.
 
-| Rol | Hex | Neden (renk psikolojisi) |
+| Rol | Hex | Neden |
 |---|---|---|
-| **Derin Gece** (koyu zemin, birincil) | `#0d1013` | Lacivert değil, neredeyse-siyah soğuk bir gri-siyah — çoğu B2B/fintech'in kullandığı "güven mavisi" klişesinden kaçınır. Düşük uyarım = "gürültüden yorulmuş" hedef kitleye (§3) az uyaran, yüksek odak zemini. |
-| **Kağıt** (açık zemin, ikincil) | `#faf9f6` | Steril klinik beyaz değil, hafif sıcak — okunabilir ama soğuk/mesafeli hissettirmez. |
-| **Sinyal Amberi** (koyu zeminde) | `#c07a28` | Kırmızı (alarm) ile yeşil (klişe "onay/para") arasında — "dikkate değer, değerli, tartılmış" okunur; ne alarm ne kör onay = **kalibreli güven**in renk karşılığı. Radar/terminal operatör ekranlarının klasik ambar tonuna gönderme — "Operatör" kimliğini pekiştirir. Kategorideki hiçbir rakip (§8 rekabet haritası — CB Insights, Tracxn, Specter/Harmonic) bu tonu kullanmıyor, yeşil/mavi doygunluğunu kırar. |
-| **Sinyal Amberi** (açık zeminde) | `#a8661c` | Aynı gerekçe, açık zemin kontrastı için koyulaştırılmış adım. |
-| Birincil metin (koyu zemin) | `#f5f4f0` | — |
-| Birincil metin (açık zemin) | `#111214` | — |
-| İkincil/muted metin | `#8f8d86` | Her iki zeminde de ≥ okunabilir, ama hiyerarşide geri çekilir. |
+| **Derin Gece** (koyu zemin, birincil) | `#0a0a0f` | Neredeyse-siyah, hafif mor alt-ton — önceki `#0d1013`'ten biraz daha koyu, üstüne binen menekşe/magenta glow'ların net görünmesi için. |
+| **Sinyal Menekşesi** (birincil marka rengi) | `#7c3aed` | Kırmızı/yeşil klişelerinden uzak, "dikkate değer" okunuyor; kategorideki rakiplerin (CB Insights, Tracxn, Specter/Harmonic) hiçbiri bu tonu kullanmıyor. Önceki amber kimliğin yerini bilinçli olarak alıyor (kullanıcı kararı — bkz. üstteki revizyon notu). |
+| **İkincil vurgu (gradyan durağı)** | `#d946ef` (magenta) | Tek başına marka rengi değil — yalnız glow/gradyan/hover durumlarında `brand`'le birlikte kullanılır, kimlik karışıklığını önlemek için hiçbir yerde tek başına "bu marka" anlamına gelmez. |
+| Birincil metin (koyu zemin) | `#f7f6fb` | — |
+| İkincil/muted metin | `#8a86a3` / `#c7c3d9` | Hiyerarşide geri çekilir, ama okunabilir kalır. |
 
-**Doğrulama:** `#c07a28` (koyu, yüzey `#0d1013`) ve `#a8661c` (açık, yüzey `#faf9f6`) —
-kontrast ≥ 3:1, chroma-floor ve OKLCH lightness-band **PASS**. (Ham `#d98e32` denemesi
-lightness-band'in dışında kaldığı için `#c07a28`'e adımlandı — bkz. `color-formula.md`
-"snap-to-passing".)
+**Açık mod:** Bu revizyonda tanımlanmadı — önceki §8.1'in `#faf9f6` açık-zemin çifti şimdilik
+düşürüldü (kurumsal/beyaz-etiketli sunum ihtiyacı çıkarsa ayrıca ele alınmalı).
 
-### 8.2 Fonksiyonel durum paleti (kovala / izle / ele)
+### 8.2 Fonksiyonel durum paleti (kovala / izle / ele) — DEĞİŞMEDİ
 
-`THESIS_AND_LENS.md §2`'deki 3-bantlı aksiyon sistemi artık bir renk karşılığına sahip. Bunlar
-**kimlik amberinden kasıtlı olarak farklı** — marka rengiyle ürün-içi durum rengi karışmasın diye
-(`color-formula.md`: "status colors are reserved, never reused for identity/series"). `dataviz`
-referans paletinin doğrulanmış status skalasından alındı (3 bant — "serious" adımı v1'de
-kullanılmıyor, kovala/izle/ele üçe tam oturuyor):
+`THESIS_AND_LENS.md §2`'deki 3-bantlı aksiyon sistemi hâlâ aynı, önceden doğrulanmış hex'lerde:
 
 | Bant | Renk | Hex | Kural |
 |---|---|---|---|
 | **Kovala** (fit 80-100, yalnız confidence: high) | Yeşil | `#0ca30c` | Her yerde ikon + etiketle birlikte gösterilir, **asla yalnız renkle değil** |
-| **İzle** (fit 50-79) | Sarı-amber | `#fab219` | Açık zeminde kontrast düşük (by design) — bu yüzden görünür etiket zorunlu, renk tek başına yeterli değil |
+| **İzle** (fit 50-79) | Sarı-amber | `#fab219` | Renk tek başına yeterli değil, görünür etiket zorunlu |
 | **Ele** (fit 0-49) | Kırmızı | `#d03b3b` | — |
 
-**Neden kimlik ambere benzemesin diye ayrı tutuldu:** Marka ambersi (`#c07a28`/`#a8661c`) ile
-İzle sarısı (`#fab219`) aynı aile ama belirgin şekilde farklı adımda — biri "bu marka" derken
-diğeri "bu sinyal henüz belirsiz" demeli; ikisi karışırsa kullanıcı logo ile durum rozetini
-karıştırabilir.
+**Neden değişmedi:** Status renkleri kimlikten bağımsız, "reserved" (`color-formula.md`:
+"status colors are reserved, never reused for identity/series") — kimlik ambersi menekşeye
+geçince İzle sarısı (`#fab219`) ile marka rengi arasındaki eski karışma riski zaten kendiliğinden
+ortadan kalktı (artık aynı aile değiller), o yüzden dokunmaya gerek kalmadı.
 
 ### 8.3 Açık iş
 
-- Koyu/açık mod her ikisi de tanımlı ama **koyu mod birincil** (§1 kararıyla tutarlı) — açık mod
-  yalnızca kurumsal/beyaz-etiketli sunumlar için ikincil.
-- Bu paletin gerçek arayüz bileşenlerinde (kuyruk kartları, digest, dashboard) uygulanması §7
-  madde 2'nin kapsamına giriyor — henüz yapılmadı.
-- Logo/logotype (§1) bu paletle birlikte somutlaştırılmalı — "mercek/filtre" fikri artık
-  Derin Gece zemin + Sinyal Amberi ile net bir görsel yön kazandı.
+- Yeni palete resmi `dataviz` validator koşusu yapılmadı (yukarıdaki not) — script bu ortamda
+  bulunamadı; fırsat çıkarsa çalıştırılıp bu bölüm güncellenmeli.
+- Açık mod (light mode) bu revizyonda tanımsız kaldı.
+- Logo/logotype (§1) yeni menekşe/magenta gradyanla somutlaştırılmalı — şu an yalnız navbar'daki
+  küçük gradyan nokta + `IF` ikonu var, tam bir logotype yok.
+- Uygulandığı yüzeyler: landing, login, kuyruk sayfası (navbar + kart + filtre), `icon.svg`.
+  Digest (e-posta/markdown çıktısı) henüz gözden geçirilmedi — ayrı bir iş.
 

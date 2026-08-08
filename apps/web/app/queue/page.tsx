@@ -1,20 +1,12 @@
-import Link from "next/link";
-import {
-  composite,
-  isBench,
-  lenses,
-  rank,
-  type BaseAnalysis,
-  type RankedItem,
-  type Signal,
-} from "@idea-factory/core";
+import { lenses, rank, type BaseAnalysis, type RankedItem, type Signal } from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
 import { getSession } from "../../lib/auth";
 import { DEMO_ITEMS } from "../../lib/demo";
-import { OpportunityCard } from "../../components/OpportunityCard";
+import { buildCardView } from "../../lib/build-card-view";
+import { Navbar } from "../../components/Navbar";
+import { QueueBoard } from "../../components/QueueBoard";
 import type { Decision, UserDecision } from "../../components/DecisionButtons";
 import type { Comment } from "../../components/Comments";
-import { LogoutButton } from "../../components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -83,153 +75,36 @@ async function loadComments(): Promise<Map<string, Comment[]>> {
   return map;
 }
 
-/** Bir sinyalde ben ve/veya arkadaş yorum yapmış ya da karar vermiş mi. */
-function activityFor(
-  signalId: string,
-  decisions: Map<string, UserDecision[]>,
-  comments: Map<string, Comment[]>,
-  meName: string,
-): { mine: boolean; friend: boolean } {
-  const dec = decisions.get(signalId) ?? [];
-  const cs = comments.get(signalId) ?? [];
-  const mine = dec.some((d) => d.user === meName) || cs.some((c) => c.author === meName);
-  const friend = dec.some((d) => d.user !== meName) || cs.some((c) => c.author !== meName);
-  return { mine, friend };
-}
-
-type Activity = "mine" | "friend" | "both";
-
-export default async function Queue({
-  searchParams,
-}: {
-  searchParams?: { bench?: string; activity?: string };
-}) {
+export default async function Queue() {
   const [{ items, demo }, decisions, comments, me] = await Promise.all([
     loadItems(),
     loadDecisions(),
     loadComments(),
     getSession(),
   ]);
-  const benchOnly = searchParams?.bench === "1";
-  const activity =
-    searchParams?.activity === "mine" || searchParams?.activity === "friend" || searchParams?.activity === "both"
-      ? (searchParams.activity as Activity)
-      : null;
-  const all = rank(items);
   const meName = me?.username ?? "web";
-  const benchCount = all.filter((i) => isBench(composite(i.analyses))).length;
-  const mineCount = all.filter((i) => activityFor(i.signal.id, decisions, comments, meName).mine).length;
-  const friendCount = all.filter((i) => activityFor(i.signal.id, decisions, comments, meName).friend).length;
-  const bothCount = all.filter((i) => {
-    const a = activityFor(i.signal.id, decisions, comments, meName);
-    return a.mine && a.friend;
-  }).length;
-  let ranked = benchOnly ? all.filter((i) => isBench(composite(i.analyses))) : all;
-  if (activity) {
-    ranked = ranked.filter((i) => {
-      const a = activityFor(i.signal.id, decisions, comments, meName);
-      if (activity === "mine") return a.mine;
-      if (activity === "friend") return a.friend;
-      return a.mine && a.friend;
-    });
-  }
-  const lensSummary = lenses.map((l) => l.name).join(" + ");
-
-  const queueHref = (params: { bench?: boolean; activity?: Activity | null }) => {
-    const qs = new URLSearchParams();
-    if (params.bench) qs.set("bench", "1");
-    if (params.activity) qs.set("activity", params.activity);
-    const s = qs.toString();
-    return s ? `/queue?${s}` : "/queue";
-  };
+  const cards = rank(items).map((item) => {
+    const dec = decisions.get(item.signal.id) ?? [];
+    const mine = dec.find((d) => d.user === meName)?.decision ?? null;
+    const others = dec.filter((d) => d.user !== meName);
+    return buildCardView(item, mine, others, comments.get(item.signal.id) ?? []);
+  });
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <header className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-            ← IdeaFact
-          </Link>
-          <h1 className="mt-1 font-display text-3xl font-bold">Fırsat Kuyruğu</h1>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {ranked.length} fırsat · {lensSummary} · Türkiye tezi
-          </p>
-          <nav className="mt-3 flex gap-2 text-xs">
-            <Link
-              href={queueHref({ bench: false, activity })}
-              className={`chip ${!benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              Tümü ({all.length})
-            </Link>
-            <Link
-              href={queueHref({ bench: true, activity })}
-              className={`chip ${benchOnly ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              🏅 Bench ({benchCount})
-            </Link>
-          </nav>
-          <nav className="mt-2 flex gap-2 text-xs">
-            <Link
-              href={queueHref({ bench: benchOnly, activity: null })}
-              className={`chip ${!activity ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              Hepsi
-            </Link>
-            <Link
-              href={queueHref({ bench: benchOnly, activity: "mine" })}
-              className={`chip ${activity === "mine" ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              Benim ({mineCount})
-            </Link>
-            <Link
-              href={queueHref({ bench: benchOnly, activity: "friend" })}
-              className={`chip ${activity === "friend" ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              Arkadaş ({friendCount})
-            </Link>
-            <Link
-              href={queueHref({ bench: benchOnly, activity: "both" })}
-              className={`chip ${activity === "both" ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`}
-            >
-              İkisi de ({bothCount})
-            </Link>
-          </nav>
-        </div>
-        {me && (
-          <div className="shrink-0 text-right">
-            <div className="text-sm text-ink">{me.display_name}</div>
-            <LogoutButton />
+    <>
+      <Navbar me={me} />
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        {demo && (
+          <div className="mb-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-brand">
+            Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
           </div>
         )}
-      </header>
-
-      {demo && (
-        <div className="mb-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-brand">
-          Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {ranked.length === 0 && benchOnly && (
-          <p className="text-sm text-ink-muted">
-            Bench çıtasını (fit ≥ 80 · güven yüksek) geçen fırsat yok.
-          </p>
-        )}
-        {ranked.map((item) => {
-          const dec = decisions.get(item.signal.id) ?? [];
-          const mine = dec.find((d) => d.user === meName)?.decision ?? null;
-          const others = dec.filter((d) => d.user !== meName);
-          return (
-            <OpportunityCard
-              key={item.signal.id}
-              item={item}
-              mine={mine}
-              others={others}
-              comments={comments.get(item.signal.id) ?? []}
-            />
-          );
-        })}
-      </div>
-    </main>
+        <QueueBoard
+          items={cards}
+          meName={meName}
+          lensSummary={lenses.map((l) => l.name).join(" + ")}
+        />
+      </main>
+    </>
   );
 }

@@ -1,0 +1,56 @@
+import type { Decision, UserDecision } from "../components/DecisionButtons";
+import type { Comment } from "../components/Comments";
+
+/**
+ * Kuyruk kartının UI'a hazır, tamamen serileştirilebilir görünümü. `@idea-factory/core`
+ * (enrichment.ts üzerinden @google/genai + @anthropic-ai/sdk'yi zincirler) yalnız
+ * `build-card-view.ts`'te (server-only) içe aktarılır — bu şekil, istemci bileşenlerinin
+ * (QueueBoard/OpportunityCard) core paketine hiç dokunmadan çalışmasını sağlar, aksi halde
+ * webpack client bundle'ında `node:crypto` (hash.ts) hatası verir.
+ */
+export type Band = "pursue" | "watch" | "kill";
+export type Confidence = "low" | "med" | "high";
+
+export interface ValidationTask {
+  data: string;
+  why: string;
+  how_to_verify: string;
+}
+
+export interface LensView {
+  id: string;
+  name: string;
+  fit: number;
+  confidence: Confidence;
+  rationale: string;
+  extraNoteLabel: string;
+  note: string;
+  risks: string[];
+  validation_needed: ValidationTask[];
+}
+
+export interface CardView {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  market: string | null;
+  sector: string | null;
+  postedAt: string | null;
+  fetchedAt: string;
+  kindLabel: string | null;
+  fit: number;
+  confidence: Confidence;
+  band: Band;
+  bench: boolean;
+  notActionable: boolean;
+  noData: boolean;
+  fetchOk: boolean;
+  summary: string | null;
+  facts: string[];
+  pending: boolean;
+  lensViews: LensView[];
+  mine: Decision | null;
+  others: UserDecision[];
+  comments: Comment[];
+}

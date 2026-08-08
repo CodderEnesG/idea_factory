@@ -1,24 +1,25 @@
 import type { Config } from "tailwindcss";
 
-/** IdeaFact Dark — BRANDING.md §8 (Derin Gece + Sinyal Amberi) design system tokenları. */
+/** IdeaFact Dark — BRANDING.md §8 (Derin Gece + Sinyal Menekşesi) design system tokenları. */
 export default {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        canvas: "#0d1013",
-        surface: "#16191d",
-        elevated: "#1e2227",
-        glow: "#2a2116",
-        brand: { DEFAULT: "#c07a28", fg: "#0d1013" },
-        ink: { DEFAULT: "#f5f4f0", secondary: "#c7c5bd", muted: "#8f8d86" },
+        canvas: "#0a0a0f",
+        surface: "#151320",
+        elevated: "#1c1929",
+        glow: "#241b3a",
+        brand: { DEFAULT: "#7c3aed", fg: "#ffffff" },
+        brand2: "#d946ef",
+        ink: { DEFAULT: "#f7f6fb", secondary: "#c7c3d9", muted: "#8a86a3" },
         pursue: "#0ca30c",
         watch: "#fab219",
         kill: "#d03b3b",
       },
       borderColor: {
-        hair: "rgba(245,244,240,0.08)",
-        strong: "rgba(192,122,40,0.35)",
+        hair: "rgba(247,246,251,0.08)",
+        strong: "rgba(124,58,237,0.4)",
       },
       borderRadius: { card: "16px", btn: "12px" },
       fontFamily: {
@@ -26,8 +27,8 @@ export default {
         sans: ["var(--font-body)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        glow: "0 0 120px 10px rgba(42,33,22,0.85)",
-        brand: "0 0 24px 0 rgba(192,122,40,0.3)",
+        glow: "0 0 120px 10px rgba(124,58,237,0.25)",
+        brand: "0 0 24px 0 rgba(124,58,237,0.35)",
       },
     },
   },

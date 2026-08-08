@@ -148,6 +148,67 @@ Kaynaklar ─▶ Ingestion Worker ─▶ Normalize+Dedup ─▶ DB ────�
 
 ---
 
+## 10. Faz 3 — Admin araçları, düzenlenebilir tez/mercek, çıktı çeşitlendirme, AI Yorumcusu (planlandı 2026-08-08, henüz uygulanmadı)
+
+Kullanıcı kararıyla netleşen kapsam — sırayla:
+
+**A. Admin rolü (önkoşul, B ve E'yi paylaşır).** `members` tablosuna `is_admin boolean default false`
+eklenir, session (JWT) bunu taşır, `lib/auth.ts`'e `requireAdmin()` benzeri bir kontrol eklenir,
+`add-member.ts`'e `--admin` bayrağı eklenir.
+
+**B. Tez editable.** `thesis_versions` tablosu (jsonb + version + aktif mi + kim/ne zaman)
+— kaydetmek yeni versiyon açar (mevcut "versioned" felsefesi korunur, eski versiyonlar
+denetim/rollback için durur). Worker her pipeline koşusunda aktif versiyonu DB'den çeker;
+`thesis.config.ts`'teki değer yalnız ilk-kurulum/DB-erişilemez fallback'i olur. Admin formu:
+`/admin/tez` — capital_range/risk_appetite serbest metin, target_markets/sectors/capabilities/
+anti_patterns etiket-listesi editörü.
+
+**C. Mercek editable — iskeletli soru editörü (kullanıcı kararı: tam serbest prompt DEĞİL).**
+Karar gerekçesi: `arbitrageLens`/`whiteSpaceLens` kendi Zod şeması + kalibre golden eval setiyle
+geliyor — admin panelinden birebir yeniden üretilemez, kalitesiz mercek riski yüksek. Bunun yerine:
+- Yeni admin-mercekleri ortak jenerik şemayı kullanır: `BaseAnalysisSchema` + tek genel `extra_note`
+  alanı (admin "ek not etiketi"ni de girer, örn. "Zamanlama notu").
+- Admin SADECE "bu mercek neyi sorsun" (domain soru listesi) + ad + ağırlık + etiket girer.
+  Guard kuralları (bant-aksiyon tutarlılığı, atıfsız-olgu reddi, güven kapısı) ve tez-enjeksiyonu
+  KODDA SABİT kalır — admin bunları bozamaz.
+- `lenses` DB tablosu (id, name, weight, extra_note_label, questions, active, created_at).
+  Arbitraj/beyaz-alan builtin kalır (DB'de yok, silinemez/düzenlenemez); admin sadece EKLER.
+  Worker runtime'da `lenses.config.ts`'in statik dizisi + DB'den çekilen aktif custom mercekleri
+  birleştirir.
+- Kart UI'ı zaten veri-güdümlü (`CardView.lensViews`) — yeni mercek otomatik render olur,
+  UI tarafında ek iş gerekmez.
+- `/admin/mercekler` — liste + ekle/düzenle/aktif-pasif formu.
+
+**D. Çıktı katmanı çeşitlendirme — ikisi birlikte (kullanıcı kararı).** Sıfır ek AI maliyeti,
+mevcut veriden agregasyon:
+- **Sektör Haritası** (`/harita`): sinyalleri sektör×pazara göre gruplar, bant dağılımı +
+  bench yoğunluğu gösterir.
+- **Trend Raporu** (`/trend`): `posted_at`/`fetched_at` üzerinden haftalık bucket'lanmış
+  sektör/kaynak/bant dağılım değişimi. Grafik eklenirse önce `dataviz` skill'i yüklenmeli
+  (renk/mark kuralları için).
+- İkisi de tüm ekibe açık (admin kısıtı yok) — Navbar'a link eklenir.
+
+**E. AI Yorumcusu — çok-ajanlı tartışma odası (admin-only, kullanıcı kararı).**
+- Tetikleme: admin bir fırsat kartında "AI Yorumcusu başlat" butonuna basar — otomatik/toplu
+  DEĞİL (1134+ sinyalde koşturmak maliyetli, admin seçtiğinde tetiklenir).
+- Roster (kullanıcı onayı — önerilen varsayılan): **İyimser Kurucu / Şüpheci Yatırımcı /
+  Pazar-Rekabet Analisti + Moderatör**. Her rol 2 tur (açılış + itiraz/rebuttal), Moderatör
+  1 sentez turu — sabit ve öngörülebilir çağrı sayısı (maliyet kontrolü).
+- Kurallar: her turda kanıt atfı zorunlu (mevcut guard felsefesiyle tutarlı), önceki
+  konuşmacıya adıyla atıfla itiraz edebilir, rol dışına çıkamaz, son turda kendi kovala/izle/ele
+  pozisyonunu netleştirmek zorunda.
+- Sonuç: tam transkript + Moderatörün sentezlediği nihai kovala/izle/ele + yorum. `analyses`
+  tablosuna DEĞİL, ayrı `debates` tablosuna yazılır (nitel tartışma, ağırlıklı-ortalama
+  kompozit skora karışmaz). `signal_id, created_by, transcript jsonb, final_verdict,
+  final_commentary, created_at`.
+- Görünürlük: yalnız adminler görür/tetikler (kullanıcı kararı) — kartın mevcut aç/kapa
+  desenine uyan admin-only bir bölüm.
+
+**Uygulama sırası (henüz başlanmadı, sıradaki oturumun konusu):** A (admin rolü) küçük ve
+B/E'yi açtığı için önce gelmeli önerisi asistanda; kullanıcı onayı bekleniyor.
+
+---
+
 ## Doğrulama
 - Faz 2 sonrası: ingest çalıştır → `SELECT count(*) FROM signals > 0`, dup URL yok.
 - Faz 3 sonrası: bilinen bir yurt dışı launch makul `arbitrage_fit` + Türkiye için `adaptation_notes` alır; bozuk model çıktısı yakalanır (zod guard); **boş/eksik `validation_needed` ile izle çıktısı ve bant-aksiyon çelişkisi mantık guard'da reddedilir**.

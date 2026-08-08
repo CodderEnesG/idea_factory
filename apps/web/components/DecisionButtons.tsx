@@ -59,7 +59,7 @@ export function DecisionButtons({
             key={o.d}
             disabled={busy}
             onClick={() => decide(o.d)}
-            className={`rounded-btn border bg-elevated px-4 py-2 text-sm text-ink transition disabled:opacity-50 ${
+            className={`rounded-full border bg-elevated px-4 py-2 text-sm text-ink transition disabled:opacity-50 ${
               chosen === o.d ? CHOSEN[o.d] : `border-hair ${o.cls}`
             }`}
           >
