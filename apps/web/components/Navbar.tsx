@@ -20,9 +20,14 @@ export function Navbar({ me }: { me: SessionUser | null }) {
             Kuyruk
           </Link>
           {me?.is_admin && (
-            <Link href="/admin/tez" className="py-4 -my-4 text-ink-secondary hover:text-ink">
-              Tez
-            </Link>
+            <>
+              <Link href="/admin/tez" className="py-4 -my-4 text-ink-secondary hover:text-ink">
+                Tez
+              </Link>
+              <Link href="/admin/mercekler" className="py-4 -my-4 text-ink-secondary hover:text-ink">
+                Mercekler
+              </Link>
+            </>
           )}
         </nav>
         {me && (

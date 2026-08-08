@@ -2,8 +2,8 @@ import {
   composite,
   isActionableKind,
   isBench,
-  lenses,
   StoredEnrichmentSchema,
+  type Lens,
   type RankedItem,
 } from "@idea-factory/core";
 import type { Decision, UserDecision } from "../components/DecisionButtons";
@@ -19,12 +19,14 @@ const KIND_LABEL: Record<string, string> = {
   other: "sınıflanmadı",
 };
 
-/** Server-only: `RankedItem` + karar/yorum verisini tek, serileştirilebilir `CardView`'a düzleştirir. */
+/** Server-only: `RankedItem` + karar/yorum verisini tek, serileştirilebilir `CardView`'a düzleştirir.
+ *  `lensRegistry`: builtin + aktif admin-mercekleri (bkz. `/admin/mercekler`) birleşik dizi. */
 export function buildCardView(
   item: RankedItem,
   mine: Decision | null,
   others: UserDecision[],
   comments: Comment[],
+  lensRegistry: Lens[],
 ): CardView {
   const { signal, analyses } = item;
   const comp = composite(analyses);
@@ -45,7 +47,7 @@ export function buildCardView(
     if (enr.traction) facts.push(`📈 ${enr.traction}`);
   }
 
-  const lensViews = lenses
+  const lensViews = lensRegistry
     .filter((l) => analyses[l.id])
     .map((l) => {
       const a = analyses[l.id]!;

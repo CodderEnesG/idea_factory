@@ -268,3 +268,79 @@ export const whiteSpaceLens: Lens<WhiteSpaceAnalysis> = {
 
 /** Aktif mercek registry'si — yeni mercek = tek giriş (analyst/worker döngüyle işler). */
 export const lenses: Lens[] = [arbitrageLens, whiteSpaceLens];
+
+/* ── Admin-mercekleri — iskeletli soru editörü (PLAN.md §10-C) ─────────────
+ * Admin panelinden (`/admin/mercekler`) DB'ye eklenen mercekler. Admin YALNIZ ad + ağırlık +
+ * "extra_note" etiketi + domain soru listesi girer — ön kapı / fit-bant / atıf / güven-kapısı
+ * kuralları burada SABİT kalır (arbitraj/beyaz-alan ile birebir aynı), admin bunları bozamaz.
+ * Bu yüzden builtin mercekler (arbitraj/beyaz-alan) kendi Zod şeması + kalibre golden setiyle
+ * kalır, admin-mercekleri ortak genel şemayı (BaseAnalysisSchema + extra_note) kullanır. */
+
+export interface CustomLensDef {
+  id: string; // slug, DB `lenses.lens_id`
+  name: string;
+  weight: number;
+  extraNoteLabel: string;
+  questions: string[]; // admin'in girdiği domain soru listesi, sırayla sorulur
+}
+
+export function buildCustomLensSchema(id: string) {
+  return BaseAnalysisSchema.extend({
+    lens: z.literal(id),
+    extra_note: z.string(), // admin'in extraNoteLabel'ıyla etiketlenen tek genel alan
+  });
+}
+export type CustomAnalysis = z.infer<ReturnType<typeof buildCustomLensSchema>>;
+
+function buildCustomSystemPrompt(def: CustomLensDef, t: ThesisConfig): string {
+  return `Sen şüpheci bir operatör-yatırımcı analistsin. Görevin bir mandanın (tez) emrinde
+çalışmak: her sinyali "${def.name}" merceğinden değerlendirmek — "bu, bizim mandamıza göre
+kovalanmaya değer mi, neden, ne kadar eminim?" Olgu ile çıkarımı ayır; bilmediğini uydurma,
+bilinmeyeni işaretle.
+
+## Tez (mandate) — v${t.version}
+- Sermaye aralığı: ${t.capital_range}
+- Hedef pazarlar: ${t.target_markets.join(", ")}
+- Sektörler: ${t.sectors.join(", ")}
+- Yetkinlikler: ${t.capabilities.join(", ")}
+- Risk iştahı: ${t.risk_appetite}
+- Anti-pattern'ler (baştan bastır): ${t.anti_patterns.join("; ")}
+
+## ${def.name} merceği — sırayla sor
+${def.questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+Son olarak: Önerilen aksiyon: kovala / izle / ele — ve neden, bu teze göre.
+
+## Ön kapı: bu sinyal kovalanabilir mi?
+fit, "BU TEŞEBBÜSÜ kovalamalı mıyız" sorusunun cevabıdır — "bu içerik faydalı mı"nın değil.
+Ortada somut bir şirket/ürün/yatırım turu YOKSA (görüş yazısı, deneme, ilke anlatımı,
+araştırma) kovalanacak bir şey de yoktur: fit EN FAZLA 20, recommended_action: kill.
+Zenginleştirme bloğunda signal_kind verilmişse ona uy.
+
+## Fit bant kuralı (0-100, katı)
+- 80-100: teze birebir uyum (kovala-adayı) — YALNIZ confidence:high ile.
+- 50-79: uyum var ama kritik belirsizlik (izle bandı) — confidence low/med tavanı 79.
+- 0-49: uyumsuz / anti-pattern / kovalanamaz (ele bandı).
+
+## Kurallar
+- recommended_action bantla çelişemez (fit 85 + kill yasak).
+- Her olgu KAYNAK atfıyla (evidence[].source); atıfsız olgu yazma.
+- validation_needed: en fazla 3, en kritik; confidence:high değilse boş bırakma.
+- extra_note alanına "${def.extraNoteLabel}" başlığı altında özet bir not yaz.
+
+Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
+}
+
+/** Admin panelindeki bir mercek tanımından çalışan bir `Lens` üretir (worker + UI paylaşır). */
+export function buildCustomLens(def: CustomLensDef): Lens<CustomAnalysis> {
+  return {
+    id: def.id,
+    name: def.name,
+    schema: buildCustomLensSchema(def.id),
+    buildSystemPrompt: (t) => buildCustomSystemPrompt(def, t),
+    buildUserPrompt: (s, e) =>
+      `${buildSignalBrief(s, e)}\n\nBu sinyali ${def.name} merceğiyle analiz et ve JSON döndür.`,
+    weight: def.weight,
+    extraNote: (a) => a.extra_note,
+    extraNoteLabel: def.extraNoteLabel,
+  };
+}

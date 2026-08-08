@@ -17,6 +17,7 @@ import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";
 import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
+import { loadActiveCustomLenses } from "./lib/lenses-db.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
@@ -34,7 +35,10 @@ const NEUTRAL_TRIAGE_SCORE = 50;
  * sonra kaynak-adaleti tavanı geniş bir pay üstünde uygulanır — her mercek bunu kendi
  * done-check'iyle daha da daraltır (bkz. `doneSetFor`).
  */
-async function fetchShortlist(limit: number): Promise<{ shortlist: Signal[]; skipped: number }> {
+async function fetchShortlist(
+  limit: number,
+  lensCount: number,
+): Promise<{ shortlist: Signal[]; skipped: number }> {
   const { data, error } = await db
     .from("signals")
     .select("*")
@@ -56,7 +60,7 @@ async function fetchShortlist(limit: number): Promise<{ shortlist: Signal[]; ski
     .sort((a, b) => b.score - a.score)
     .map((x) => x.signal);
 
-  const shortlist = balanceBySource(scored, limit * Math.max(lenses.length, 1), PER_SOURCE_CAP);
+  const shortlist = balanceBySource(scored, limit * Math.max(lensCount, 1), PER_SOURCE_CAP);
   return { shortlist, skipped: window.length - scored.length };
 }
 
@@ -75,11 +79,13 @@ async function doneSetFor(lensId: string, signalIds: string[]): Promise<Set<stri
 async function main(): Promise<void> {
   const knowledge = supabaseKnowledgeLayer();
   const thesis = await loadActiveThesis(); // /admin/tez'de kaydedilmiş aktif versiyon, yoksa thesis.config.ts
-  const { shortlist, skipped } = await fetchShortlist(BATCH_LIMIT);
+  const customLenses = await loadActiveCustomLenses(); // /admin/mercekler'de eklenmiş aktif admin-mercekleri
+  const allLenses = [...lenses, ...customLenses];
+  const { shortlist, skipped } = await fetchShortlist(BATCH_LIMIT, allLenses.length);
   let totalTodo = 0;
   let totalOk = 0;
 
-  for (const lens of lenses) {
+  for (const lens of allLenses) {
     const fewShot = FEW_SHOT_BY_LENS[lens.id] ?? [];
     const done = await doneSetFor(lens.id, shortlist.map((s) => s.id));
     const todo = shortlist.filter((s) => !done.has(s.id)).slice(0, BATCH_LIMIT);
@@ -122,7 +128,7 @@ async function main(): Promise<void> {
     totalOk += ok;
   }
 
-  console.log(`toplam: ${totalOk}/${totalTodo} analiz yazıldı (${lenses.length} mercek)`);
+  console.log(`toplam: ${totalOk}/${totalTodo} analiz yazıldı (${allLenses.length} mercek)`);
 
   // Hepsi patladıysa (kota/anahtar/ağ) sessiz yeşil kalma — cron kırmızı görsün.
   // Kısmi başarı yeşildir: kalanlar sonraki tick'te otomatik denenir.
