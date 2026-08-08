@@ -1,24 +1,10 @@
-import { thesis as defaultThesis, type ThesisConfig } from "@idea-factory/core";
-import { serverDb } from "../../../lib/supabase";
 import { requireAdmin } from "../../../lib/auth";
 import { getSession } from "../../../lib/auth";
+import { loadActiveThesis } from "../../../lib/active-thesis";
 import { Navbar } from "../../../components/Navbar";
 import { ThesisForm } from "../../../components/ThesisForm";
 
 export const dynamic = "force-dynamic";
-
-async function loadActiveThesis(): Promise<ThesisConfig> {
-  const db = serverDb();
-  if (!db) return defaultThesis;
-  const { data } = await db
-    .from("thesis_versions")
-    .select("config")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data ? (data.config as ThesisConfig) : defaultThesis;
-}
 
 export default async function AdminTezPage() {
   const [admin, me] = await Promise.all([requireAdmin(), getSession()]);

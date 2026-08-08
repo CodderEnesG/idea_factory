@@ -204,7 +204,7 @@ mevcut veriden agregasyon:
 - Görünürlük: yalnız adminler görür/tetikler (kullanıcı kararı) — kartın mevcut aç/kapa
   desenine uyan admin-only bir bölüm.
 
-**Uygulama sırası:** A → B → C → D sırayla uygulandı (2026-08-09). E (AI Yorumcusu) sırada.
+**Uygulama sırası:** A → B → C → D → E sırayla uygulandı (2026-08-09). Faz 3 tamamlandı.
 
 ---
 

@@ -8,7 +8,7 @@ import {
 } from "@idea-factory/core";
 import type { Decision, UserDecision } from "../components/DecisionButtons";
 import type { Comment } from "../components/Comments";
-import type { CardView } from "./card-view";
+import type { CardView, DebateView } from "./card-view";
 
 const KIND_LABEL: Record<string, string> = {
   venture: "girişim",
@@ -20,13 +20,16 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /** Server-only: `RankedItem` + karar/yorum verisini tek, serileştirilebilir `CardView`'a düzleştirir.
- *  `lensRegistry`: builtin + aktif admin-mercekleri (bkz. `/admin/mercekler`) birleşik dizi. */
+ *  `lensRegistry`: builtin + aktif admin-mercekleri (bkz. `/admin/mercekler`) birleşik dizi.
+ *  `debates`/`isAdmin`: AI Yorumcusu (Faz 3-E) admin-only — admin değilse boş dizi geçilir. */
 export function buildCardView(
   item: RankedItem,
   mine: Decision | null,
   others: UserDecision[],
   comments: Comment[],
   lensRegistry: Lens[],
+  isAdmin: boolean,
+  debates: DebateView[],
 ): CardView {
   const { signal, analyses } = item;
   const comp = composite(analyses);
@@ -88,5 +91,7 @@ export function buildCardView(
     mine,
     others,
     comments,
+    isAdmin,
+    debates,
   };
 }

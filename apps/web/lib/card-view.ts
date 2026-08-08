@@ -29,6 +29,23 @@ export interface LensView {
   validation_needed: ValidationTask[];
 }
 
+export interface DebateTurnView {
+  speaker: string;
+  message: string;
+  evidence: { fact: string; source: string }[];
+  rebuts: string[];
+  position?: Band;
+}
+
+export interface DebateView {
+  id: string;
+  transcript: DebateTurnView[];
+  final_verdict: Band;
+  final_commentary: string;
+  created_by: string;
+  created_at: string;
+}
+
 export interface CardView {
   id: string;
   title: string;
@@ -53,4 +70,6 @@ export interface CardView {
   mine: Decision | null;
   others: UserDecision[];
   comments: Comment[];
+  isAdmin: boolean;
+  debates: DebateView[];
 }

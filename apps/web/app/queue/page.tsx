@@ -13,6 +13,7 @@ import { Navbar } from "../../components/Navbar";
 import { QueueBoard } from "../../components/QueueBoard";
 import type { Decision, UserDecision } from "../../components/DecisionButtons";
 import type { Comment } from "../../components/Comments";
+import type { DebateView } from "../../lib/card-view";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,26 @@ async function loadLensRegistry(): Promise<Lens[]> {
   return [...lenses, ...custom.map(buildCustomLens)];
 }
 
+/** AI Yorumcusu transkriptleri — admin-only, `isAdmin` false ise boş harita döner (gereksiz sorgu yok). */
+async function loadDebates(isAdmin: boolean): Promise<Map<string, DebateView[]>> {
+  const map = new Map<string, DebateView[]>();
+  if (!isAdmin) return map;
+  const db = serverDb();
+  if (!db) return map;
+  const { data, error } = await db
+    .from("debates")
+    .select("id, signal_id, transcript, final_verdict, final_commentary, created_by, created_at")
+    .order("created_at", { ascending: false });
+  if (error || !data) return map;
+  for (const row of data as (DebateView & { signal_id: string })[]) {
+    const { signal_id, ...d } = row;
+    const arr = map.get(signal_id) ?? [];
+    arr.push(d);
+    map.set(signal_id, arr);
+  }
+  return map;
+}
+
 export default async function Queue() {
   const [{ items, demo }, decisions, comments, me, lensRegistry] = await Promise.all([
     loadItems(),
@@ -97,12 +118,22 @@ export default async function Queue() {
     getSession(),
     loadLensRegistry(),
   ]);
+  const isAdmin = me?.is_admin ?? false;
+  const debates = await loadDebates(isAdmin);
   const meName = me?.username ?? "web";
   const cards = rank(items).map((item) => {
     const dec = decisions.get(item.signal.id) ?? [];
     const mine = dec.find((d) => d.user === meName)?.decision ?? null;
     const others = dec.filter((d) => d.user !== meName);
-    return buildCardView(item, mine, others, comments.get(item.signal.id) ?? [], lensRegistry);
+    return buildCardView(
+      item,
+      mine,
+      others,
+      comments.get(item.signal.id) ?? [],
+      lensRegistry,
+      isAdmin,
+      debates.get(item.signal.id) ?? [],
+    );
   });
 
   return (

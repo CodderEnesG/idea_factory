@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CardView } from "../lib/card-view";
 import { DecisionButtons } from "./DecisionButtons";
 import { Comments } from "./Comments";
+import { DebateRoom } from "./DebateRoom";
 
 const BAND = {
   pursue: { label: "KOVALA", text: "text-pursue", dot: "bg-pursue", border: "border-t-pursue", hex: "#0ca30c" },
@@ -154,6 +155,8 @@ export function OpportunityCard({ item }: { item: CardView }) {
           ))}
 
           <Comments signalId={item.id} initial={item.comments} />
+
+          {item.isAdmin && <DebateRoom signalId={item.id} initial={item.debates} />}
         </div>
       )}
 
