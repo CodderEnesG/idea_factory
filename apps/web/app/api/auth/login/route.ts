@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await db
     .from("members")
-    .select("username, display_name, password_hash")
+    .select("username, display_name, password_hash, is_admin")
     .eq("username", body.username)
     .maybeSingle();
 
@@ -27,7 +27,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "geçersiz kullanıcı adı veya parola" }, { status: 401 });
   }
 
-  const token = await signSession({ username: data.username, display_name: data.display_name });
+  const token = await signSession({
+    username: data.username,
+    display_name: data.display_name,
+    is_admin: data.is_admin === true,
+  });
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

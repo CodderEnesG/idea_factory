@@ -9,6 +9,7 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 gün
 export interface SessionUser {
   username: string;
   display_name: string;
+  is_admin: boolean;
 }
 
 function secret(): Uint8Array | null {
@@ -24,7 +25,11 @@ export function authEnabled(): boolean {
 export async function signSession(user: SessionUser): Promise<string> {
   const key = secret();
   if (!key) throw new Error("AUTH_SECRET yok — oturum imzalanamaz");
-  return await new SignJWT({ username: user.username, display_name: user.display_name })
+  return await new SignJWT({
+    username: user.username,
+    display_name: user.display_name,
+    is_admin: user.is_admin,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
@@ -41,8 +46,10 @@ export async function verifySession(
     const { payload } = await jwtVerify(token, key);
     const username = payload["username"];
     const display_name = payload["display_name"];
+    // eski tokenlarda is_admin yok (0006 öncesi imzalandı) → varsayılan false.
+    const is_admin = payload["is_admin"] === true;
     if (typeof username === "string" && typeof display_name === "string") {
-      return { username, display_name };
+      return { username, display_name, is_admin };
     }
     return null;
   } catch {

@@ -50,14 +50,15 @@ cp .env.example .env      # key'leri doldur (.env.local da okunur, öncelikli)
 
 Supabase: proje aç → SQL Editor'de migration'ları sırayla çalıştır:
 `0001_init.sql` → `0002` → `0003` → `0004_rls.sql` → `0005_members_comments.sql` (ekip incelemesi:
-members + comments; per-user karar indeksi).
+members + comments; per-user karar indeksi) → `0006_admin.sql` (admin rolü).
 
 ### Ekip incelemesi (per-user auth + işbirlikçi kararlar + yorum)
 İki kişi fikirlere kovala/izle/ele atar (birbirini ezmez, aynı sinyalde ayrı satır) + yorum yazar.
 1. `AUTH_SECRET` set et (yukarı).
-2. Üye ekle (parola scrypt hash'lenir, düz metin DB'ye girmez):
+2. Üye ekle (parola scrypt hash'lenir, düz metin DB'ye girmez); `--admin` ile admin yetkisi verilir
+   (tez/mercek düzenleme + AI Yorumcusu tetikleme):
    ```bash
-   pnpm --filter @idea-factory/web add-member emir "Emir" guclu-parola
+   pnpm --filter @idea-factory/web add-member emir "Emir" guclu-parola --admin
    pnpm --filter @idea-factory/web add-member ali  "Ali"  guclu-parola
    ```
 3. `/login` → giriş. Kartta kendi kararın düzenlenebilir, takım arkadaşınınki salt-okunur rozet.

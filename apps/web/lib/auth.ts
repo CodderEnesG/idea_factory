@@ -9,3 +9,9 @@ export async function getSession(): Promise<SessionUser | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   return verifySession(token);
 }
+
+/** Mevcut oturum admin ise kullanıcıyı döner, değilse (oturum yok / admin değil) null. */
+export async function requireAdmin(): Promise<SessionUser | null> {
+  const session = await getSession();
+  return session?.is_admin ? session : null;
+}
