@@ -204,8 +204,7 @@ mevcut veriden agregasyon:
 - Görünürlük: yalnız adminler görür/tetikler (kullanıcı kararı) — kartın mevcut aç/kapa
   desenine uyan admin-only bir bölüm.
 
-**Uygulama sırası (henüz başlanmadı, sıradaki oturumun konusu):** A (admin rolü) küçük ve
-B/E'yi açtığı için önce gelmeli önerisi asistanda; kullanıcı onayı bekleniyor.
+**Uygulama sırası:** A → B → C → D sırayla uygulandı (2026-08-09). E (AI Yorumcusu) sırada.
 
 ---
 

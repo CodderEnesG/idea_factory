@@ -7,7 +7,13 @@ function initialsOf(name: string): string {
   return (parts[0]?.[0] ?? "?").toUpperCase() + (parts[1]?.[0]?.toUpperCase() ?? "");
 }
 
-export function Navbar({ me }: { me: SessionUser | null }) {
+type NavKey = "queue" | "harita" | "trend" | "tez" | "mercekler";
+
+const TAB_ACTIVE = "border-b-2 border-brand py-4 -my-4 text-ink";
+const TAB_INACTIVE = "py-4 -my-4 text-ink-secondary hover:text-ink";
+
+export function Navbar({ me, current }: { me: SessionUser | null; current?: NavKey }) {
+  const tab = (k: NavKey) => (k === current ? TAB_ACTIVE : TAB_INACTIVE);
   return (
     <div className="sticky top-0 z-10 border-b border-hair bg-canvas/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-8 px-6">
@@ -16,15 +22,21 @@ export function Navbar({ me }: { me: SessionUser | null }) {
           <span className="font-display text-sm font-bold tracking-wide text-ink">IDEAFACT</span>
         </Link>
         <nav className="flex gap-6 text-sm">
-          <Link href="/queue" className="border-b-2 border-brand py-4 -my-4 text-ink">
+          <Link href="/queue" className={tab("queue")}>
             Kuyruk
+          </Link>
+          <Link href="/harita" className={tab("harita")}>
+            Harita
+          </Link>
+          <Link href="/trend" className={tab("trend")}>
+            Trend
           </Link>
           {me?.is_admin && (
             <>
-              <Link href="/admin/tez" className="py-4 -my-4 text-ink-secondary hover:text-ink">
+              <Link href="/admin/tez" className={tab("tez")}>
                 Tez
               </Link>
-              <Link href="/admin/mercekler" className="py-4 -my-4 text-ink-secondary hover:text-ink">
+              <Link href="/admin/mercekler" className={tab("mercekler")}>
                 Mercekler
               </Link>
             </>

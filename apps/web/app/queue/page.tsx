@@ -2,15 +2,12 @@ import {
   buildCustomLens,
   lenses,
   rank,
-  type BaseAnalysis,
   type CustomLensDef,
   type Lens,
-  type RankedItem,
-  type Signal,
 } from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
 import { getSession } from "../../lib/auth";
-import { DEMO_ITEMS } from "../../lib/demo";
+import { loadItems } from "../../lib/load-items";
 import { buildCardView } from "../../lib/build-card-view";
 import { Navbar } from "../../components/Navbar";
 import { QueueBoard } from "../../components/QueueBoard";
@@ -18,25 +15,6 @@ import type { Decision, UserDecision } from "../../components/DecisionButtons";
 import type { Comment } from "../../components/Comments";
 
 export const dynamic = "force-dynamic";
-
-/** Tüm merceklerin analiz satırlarını çeker, sinyal başına `analyses` haritasında gruplar. */
-async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
-  const db = serverDb();
-  if (!db) return { items: DEMO_ITEMS, demo: true };
-  const { data, error } = await db.from("analyses").select("*, signals(*)");
-  if (error || !data || data.length === 0) return { items: DEMO_ITEMS, demo: true };
-
-  const bySignal = new Map<string, RankedItem>();
-  for (const r of data) {
-    const { signals, ...rest } = r as Record<string, unknown> & { signals?: Signal };
-    if (!signals) continue;
-    const analysis = rest as unknown as BaseAnalysis;
-    const item = bySignal.get(signals.id);
-    if (item) item.analyses[analysis.lens] = analysis;
-    else bySignal.set(signals.id, { signal: signals, analyses: { [analysis.lens]: analysis } });
-  }
-  return { items: [...bySignal.values()], demo: false };
-}
 
 /**
  * Sinyal başına TÜM kullanıcıların en son kararı. decisions bir log; en-yeniden geriye okuyup
@@ -129,7 +107,7 @@ export default async function Queue() {
 
   return (
     <>
-      <Navbar me={me} />
+      <Navbar me={me} current="queue" />
       <main className="mx-auto max-w-5xl px-6 py-8">
         {demo && (
           <div className="mb-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-brand">

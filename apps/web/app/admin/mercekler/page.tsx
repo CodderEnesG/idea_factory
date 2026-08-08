@@ -21,7 +21,7 @@ export default async function AdminMerceklerPage() {
   if (!admin) {
     return (
       <div>
-        <Navbar me={me} />
+        <Navbar me={me} current="mercekler" />
         <div className="mx-auto max-w-5xl px-6 py-16 text-center text-sm text-ink-muted">
           Bu sayfa yalnız adminlere açık.
         </div>
@@ -33,7 +33,7 @@ export default async function AdminMerceklerPage() {
 
   return (
     <div>
-      <Navbar me={me} />
+      <Navbar me={me} current="mercekler" />
       <div className="mx-auto max-w-2xl px-6 py-10">
         <h1 className="font-display text-2xl font-bold">Mercekler</h1>
         <p className="mt-1 text-sm text-ink-secondary">
