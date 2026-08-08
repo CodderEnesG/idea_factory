@@ -19,6 +19,11 @@ export function Navbar({ me }: { me: SessionUser | null }) {
           <Link href="/queue" className="border-b-2 border-brand py-4 -my-4 text-ink">
             Kuyruk
           </Link>
+          {me?.is_admin && (
+            <Link href="/admin/tez" className="py-4 -my-4 text-ink-secondary hover:text-ink">
+              Tez
+            </Link>
+          )}
         </nav>
         {me && (
           <div className="ml-auto flex items-center gap-3">

@@ -16,6 +16,7 @@ import { db } from "./db.js";
 import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";
 import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
+import { loadActiveThesis } from "./lib/thesis-db.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
@@ -73,6 +74,7 @@ async function doneSetFor(lensId: string, signalIds: string[]): Promise<Set<stri
 
 async function main(): Promise<void> {
   const knowledge = supabaseKnowledgeLayer();
+  const thesis = await loadActiveThesis(); // /admin/tez'de kaydedilmiş aktif versiyon, yoksa thesis.config.ts
   const { shortlist, skipped } = await fetchShortlist(BATCH_LIMIT);
   let totalTodo = 0;
   let totalOk = 0;
@@ -91,7 +93,7 @@ async function main(): Promise<void> {
     let ok = 0;
     for (const signal of todo) {
       try {
-        const a = await analyzeSignal(signal, lens, { fewShot, knowledge }); // mercek-özel çapalar + ekip geçmişi + env provider/model
+        const a = await analyzeSignal(signal, lens, { fewShot, knowledge, thesis }); // mercek-özel çapalar + ekip geçmişi + env provider/model + aktif tez
         const { error } = await db.from("analyses").upsert(
           {
             signal_id: signal.id,

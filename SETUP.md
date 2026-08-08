@@ -50,7 +50,8 @@ cp .env.example .env      # key'leri doldur (.env.local da okunur, öncelikli)
 
 Supabase: proje aç → SQL Editor'de migration'ları sırayla çalıştır:
 `0001_init.sql` → `0002` → `0003` → `0004_rls.sql` → `0005_members_comments.sql` (ekip incelemesi:
-members + comments; per-user karar indeksi) → `0006_admin.sql` (admin rolü).
+members + comments; per-user karar indeksi) → `0006_admin.sql` (admin rolü) →
+`0007_thesis_versions.sql` (editable tez, `/admin/tez`).
 
 ### Ekip incelemesi (per-user auth + işbirlikçi kararlar + yorum)
 İki kişi fikirlere kovala/izle/ele atar (birbirini ezmez, aynı sinyalde ayrı satır) + yorum yazar.
