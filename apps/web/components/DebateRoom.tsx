@@ -68,31 +68,100 @@ function DebateTranscript({ debate }: { debate: DebateView }) {
   );
 }
 
+interface Progress {
+  index: number;
+  total: number;
+  speaker: string | null;
+  startedAt: number;
+}
+
+type StreamEvent =
+  | { type: "progress"; index: number; total: number; speaker: string | null }
+  | { type: "done"; debate: DebateView }
+  | { type: "error"; error: string };
+
+function ProgressBar({ progress }: { progress: Progress }) {
+  const pct = Math.round((progress.index / progress.total) * 100);
+  const elapsedMs = Date.now() - progress.startedAt;
+  const etaSec =
+    progress.index > 0
+      ? Math.max(0, Math.round(((elapsedMs / progress.index) * (progress.total - progress.index)) / 1000))
+      : null;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between text-[10px] text-ink-muted">
+        <span>
+          {progress.index}/{progress.total} tur {progress.speaker && `· ${progress.speaker} konuşuyor`}
+        </span>
+        <span>
+          %{pct}
+          {etaSec !== null && ` · ~${etaSec}sn kaldı`}
+        </span>
+      </div>
+      <div className="mt-1 h-1 overflow-hidden rounded-full bg-hair">
+        <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 /** Admin-only: AI Yorumcusu — çok-ajanlı tartışma odası. Geçmiş tartışmalar + yeni tetikleme. */
 export function DebateRoom({ signalId, initial }: { signalId: string; initial: DebateView[] }) {
   const [debates, setDebates] = useState(initial);
-  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const busy = progress !== null;
 
   async function start() {
-    setBusy(true);
     setError(null);
+    const startedAt = Date.now();
+    // 7 = DEBATE_TOTAL_TURNS (packages/core/debate.ts) — sabit tekrarlanmış, client bundle'ı
+    // @idea-factory/core'a bağlamamak için (core node:crypto zincirler, bkz. card-view.ts).
+    // İlk "progress" event'i (index:0) gelince zaten sunucudan gerçek total üzerine yazılır.
+    setProgress({ index: 0, total: 7, speaker: null, startedAt });
+
     try {
       const res = await fetch("/api/admin/debates", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ signal_id: signalId }),
       });
-      const json = (await res.json()) as { ok: boolean; debate?: DebateView; error?: string };
-      if (!res.ok || !json.ok || !json.debate) {
-        setError(json.error ?? "tartışma başarısız");
+      const reader = res.body?.getReader();
+      if (!res.ok || !reader) {
+        setError("tartışma başarısız");
         return;
       }
-      setDebates((ds) => [json.debate!, ...ds]);
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let doneEventReceived = false;
+      let errorReceived = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const evt = JSON.parse(line) as StreamEvent;
+          if (evt.type === "progress") {
+            setProgress({ index: evt.index, total: evt.total, speaker: evt.speaker, startedAt });
+          } else if (evt.type === "done") {
+            doneEventReceived = true;
+            setDebates((ds) => [evt.debate, ...ds]);
+          } else if (evt.type === "error") {
+            errorReceived = true;
+            setError(evt.error);
+          }
+        }
+      }
+      if (!doneEventReceived && !errorReceived) setError("tartışma yarıda kesildi");
     } catch {
       setError("tartışma başarısız");
     } finally {
-      setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -110,6 +179,7 @@ export function DebateRoom({ signalId, initial }: { signalId: string; initial: D
           {busy ? "tartışıyorlar…" : "AI Yorumcusu başlat"}
         </button>
       </div>
+      {progress && <ProgressBar progress={progress} />}
       {error && <p className="mt-1 text-xs text-kill">{error}</p>}
       {debates.length > 0 && (
         <div className="mt-2 space-y-2">

@@ -78,7 +78,12 @@ export interface DebateOptions {
   model?: string;
   apiKey?: string;
   thesis?: ThesisConfig;
+  /** Her tur bitince çağrılır — UI'da ilerleme göstergesi için (bkz. DebateRoom.tsx). */
+  onTurn?: (info: { index: number; total: number; speaker: string }) => void;
 }
+
+/** Sabit tur sayısı: 3 rol × (açılış + itiraz) + Moderatör × 1 sentez. */
+export const DEBATE_TOTAL_TURNS = DEBATE_ROSTER.length * 2 + 1;
 
 function pickProvider(opts: DebateOptions): AnalystProvider {
   if (opts.provider) return opts.provider;
@@ -185,12 +190,17 @@ export async function runDebate(
     return out;
   }
 
+  function reportTurn(speaker: string) {
+    opts.onTurn?.({ index: transcript.length, total: DEBATE_TOTAL_TURNS, speaker });
+  }
+
   // açılış turu — sırayla, önceki rolün turunu görmez (bağımsız ilk izlenim).
   for (const role of DEBATE_ROSTER) {
     const system = buildRoleSystemPrompt(role, thesis);
     const user = `${brief}\n\nAçılış turun. Kendi rolünden bu sinyali değerlendir.`;
     const out = await generateRoleTurn(system, user, false);
     transcript.push({ speaker: role.name, ...out, rebuts: out.rebuts ?? [] });
+    reportTurn(role.name);
   }
 
   // itiraz turu — o ana kadarki TAM transkripti görür, adıyla itiraz edebilir, pozisyon zorunlu.
@@ -199,6 +209,7 @@ export async function runDebate(
     const user = `${brief}\n\n## Şimdiye kadarki tartışma:\n${renderTranscript(transcript)}\n\nİtiraz turun. Diğer konuşmacılara adıyla atıfla itiraz et/katıl, ve kendi nihai kovala/izle/ele pozisyonunu netleştir.`;
     const out = await generateRoleTurn(system, user, true);
     transcript.push({ speaker: role.name, ...out, rebuts: out.rebuts ?? [] });
+    reportTurn(role.name);
   }
 
   // sentez turu — Moderatör, tam transkripti görür, nihai kararı verir.
@@ -212,6 +223,7 @@ export async function runDebate(
     rebuts: [],
     position: mod.final_verdict,
   });
+  reportTurn("Moderatör");
 
   return { transcript, final_verdict: mod.final_verdict, final_commentary: mod.final_commentary };
 }

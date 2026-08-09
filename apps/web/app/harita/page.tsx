@@ -6,7 +6,8 @@ import { BandBar, BandLegend } from "../../components/BandBar";
 
 export const dynamic = "force-dynamic";
 
-interface Cell {
+interface Bucket {
+  name: string;
   count: number;
   pursue: number;
   watch: number;
@@ -14,46 +15,67 @@ interface Cell {
   bench: number;
 }
 
-function emptyCell(): Cell {
-  return { count: 0, pursue: 0, watch: 0, kill: 0, bench: 0 };
+const TOP_N = 12;
+
+function bucketBy(items: RankedItem[], pick: (i: RankedItem) => string | null): Bucket[] {
+  const map = new Map<string, Bucket>();
+  for (const item of items) {
+    const name = pick(item) ?? "bilinmiyor";
+    const b = map.get(name) ?? { name, count: 0, pursue: 0, watch: 0, kill: 0, bench: 0 };
+    const comp = composite(item.analyses);
+    b.count++;
+    b[comp.band]++;
+    if (isBench(comp)) b.bench++;
+    map.set(name, b);
+  }
+  const sorted = [...map.values()].sort((a, b) => b.count - a.count);
+  if (sorted.length <= TOP_N) return sorted;
+  const top = sorted.slice(0, TOP_N);
+  const rest = sorted.slice(TOP_N);
+  const other: Bucket = rest.reduce(
+    (acc, b) => ({
+      name: `Diğer (${rest.length})`,
+      count: acc.count + b.count,
+      pursue: acc.pursue + b.pursue,
+      watch: acc.watch + b.watch,
+      kill: acc.kill + b.kill,
+      bench: acc.bench + b.bench,
+    }),
+    { name: "", count: 0, pursue: 0, watch: 0, kill: 0, bench: 0 },
+  );
+  return [...top, other];
 }
 
-function bucket(items: RankedItem[]): {
-  grid: Map<string, Map<string, Cell>>; // sector -> market -> cell
-  sectors: string[];
-  markets: string[];
-} {
-  const grid = new Map<string, Map<string, Cell>>();
-  const sectors = new Set<string>();
-  const markets = new Set<string>();
-
-  for (const item of items) {
-    const sector = item.signal.sector ?? "bilinmiyor";
-    const market = item.signal.market ?? "bilinmiyor";
-    sectors.add(sector);
-    markets.add(market);
-    const comp = composite(item.analyses);
-
-    if (!grid.has(sector)) grid.set(sector, new Map());
-    const row = grid.get(sector)!;
-    if (!row.has(market)) row.set(market, emptyCell());
-    const cell = row.get(market)!;
-
-    cell.count++;
-    cell[comp.band]++;
-    if (isBench(comp)) cell.bench++;
-  }
-
-  return {
-    grid,
-    sectors: [...sectors].sort((a, b) => a.localeCompare(b, "tr")),
-    markets: [...markets].sort((a, b) => a.localeCompare(b, "tr")),
-  };
+function BucketList({ title, buckets }: { title: string; buckets: Bucket[] }) {
+  const maxCount = Math.max(1, ...buckets.map((b) => b.count));
+  return (
+    <div className="glass p-4">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
+      <div className="space-y-3">
+        {buckets.map((b) => (
+          <div key={b.name}>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-ink">{b.name}</span>
+              <span className="flex items-center gap-2 text-ink-muted">
+                {b.bench > 0 && <span title="bench">🏅 {b.bench}</span>}
+                <span className="font-display font-semibold text-ink">{b.count}</span>
+              </span>
+            </div>
+            <div style={{ width: `${(b.count / maxCount) * 100}%` }}>
+              <BandBar pursue={b.pursue} watch={b.watch} kill={b.kill} />
+            </div>
+          </div>
+        ))}
+        {buckets.length === 0 && <p className="text-sm text-ink-muted">veri yok</p>}
+      </div>
+    </div>
+  );
 }
 
 export default async function HaritaPage() {
   const [{ items, demo }, me] = await Promise.all([loadItems(), getSession()]);
-  const { grid, sectors, markets } = bucket(items);
+  const sectors = bucketBy(items, (i) => i.signal.sector);
+  const markets = bucketBy(items, (i) => i.signal.market);
 
   return (
     <div>
@@ -63,7 +85,7 @@ export default async function HaritaPage() {
           <div>
             <h1 className="font-display text-3xl font-bold">Sektör Haritası</h1>
             <p className="mt-1 text-sm text-ink-secondary">
-              {items.length} sinyal · sektör × pazar · bant dağılımı + bench yoğunluğu
+              {items.length} sinyal · en yoğun {TOP_N} sektör/pazar · çubuk uzunluğu = hacim, renk = bant
             </p>
           </div>
           <BandLegend />
@@ -78,50 +100,9 @@ export default async function HaritaPage() {
         {items.length === 0 ? (
           <p className="text-sm text-ink-muted">Henüz analiz edilmiş sinyal yok.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-2">
-              <thead>
-                <tr>
-                  <th className="sticky left-0 bg-canvas p-2 text-left text-xs font-semibold text-ink-muted">
-                    Sektör \ Pazar
-                  </th>
-                  {markets.map((m) => (
-                    <th key={m} className="p-2 text-left text-xs font-semibold text-ink-muted">
-                      {m}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sectors.map((sector) => (
-                  <tr key={sector}>
-                    <th className="sticky left-0 bg-canvas p-2 text-left text-xs font-medium text-ink">
-                      {sector}
-                    </th>
-                    {markets.map((market) => {
-                      const cell = grid.get(sector)?.get(market);
-                      if (!cell) return <td key={market} className="min-w-[140px] p-2" />;
-                      return (
-                        <td key={market} className="glass min-w-[140px] p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="font-display text-sm font-bold">{cell.count}</span>
-                            {cell.bench > 0 && (
-                              <span className="chip text-[10px]">🏅 {cell.bench}</span>
-                            )}
-                          </div>
-                          <BandBar
-                            pursue={cell.pursue}
-                            watch={cell.watch}
-                            kill={cell.kill}
-                            className="mt-2"
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BucketList title="Sektörler" buckets={sectors} />
+            <BucketList title="Pazarlar" buckets={markets} />
           </div>
         )}
       </main>
