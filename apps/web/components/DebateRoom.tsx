@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DebateView, DebateTurnView } from "../lib/card-view";
 
 const VERDICT_LABEL: Record<string, string> = { pursue: "KOVALA", watch: "İZLE", kill: "ELE" };
@@ -80,8 +80,32 @@ type StreamEvent =
   | { type: "done"; debate: DebateView }
   | { type: "error"; error: string };
 
+// Gerçek "progress" event'i her turda bir gelir (~15-30sn arayla) — aralarda çubuk sabit
+// kalırsa donmuş gibi görünür. Bu yüzden gerçek checkpoint'ler arasını, o ana kadarki
+// ortalama tur süresine göre yumuşakça enterpole ediyoruz; her gerçek event gelince anında
+// doğru değere hizalanıp oradan devam eder — asla geri gitmez, bir sonraki adımı geçmez.
+const DEFAULT_TURN_MS = 20000; // ilk tur bitmeden önce ortalama yok, kaba bir tahmin
+
 function ProgressBar({ progress }: { progress: Progress }) {
-  const pct = Math.round((progress.index / progress.total) * 100);
+  const checkpointRef = useRef({ index: progress.index, at: Date.now() });
+  const [virtualIndex, setVirtualIndex] = useState(progress.index);
+
+  useEffect(() => {
+    checkpointRef.current = { index: progress.index, at: Date.now() };
+    setVirtualIndex(progress.index);
+  }, [progress.index]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const { index, at } = checkpointRef.current;
+      const avgTurnMs = index > 0 ? (Date.now() - progress.startedAt) / index : DEFAULT_TURN_MS;
+      const fraction = Math.min(0.92, (Date.now() - at) / avgTurnMs);
+      setVirtualIndex(Math.min(progress.total - 0.02, index + fraction));
+    }, 250);
+    return () => clearInterval(id);
+  }, [progress.startedAt, progress.total]);
+
+  const pct = Math.round((virtualIndex / progress.total) * 100);
   const elapsedMs = Date.now() - progress.startedAt;
   const etaSec =
     progress.index > 0
