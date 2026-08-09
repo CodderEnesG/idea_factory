@@ -87,30 +87,40 @@ type StreamEvent =
 const DEFAULT_TURN_MS = 20000; // ilk tur bitmeden önce ortalama yok, kaba bir tahmin
 
 function ProgressBar({ progress }: { progress: Progress }) {
-  const checkpointRef = useRef({ index: progress.index, at: Date.now() });
+  // avgTurnMs checkpoint anında DONDURULUR (canlı Date.now() ile yeniden hesaplanmaz) —
+  // aksi halde mevcut tur uzadıkça ortalama şişer, geri sayım yerine sürekli büyür.
+  const checkpointRef = useRef({
+    index: progress.index,
+    at: Date.now(),
+    avgTurnMs: DEFAULT_TURN_MS,
+  });
   const [virtualIndex, setVirtualIndex] = useState(progress.index);
+  const [etaSec, setEtaSec] = useState<number | null>(null);
 
   useEffect(() => {
-    checkpointRef.current = { index: progress.index, at: Date.now() };
+    const now = Date.now();
+    const avgTurnMs =
+      progress.index > 0 ? (now - progress.startedAt) / progress.index : DEFAULT_TURN_MS;
+    checkpointRef.current = { index: progress.index, at: now, avgTurnMs };
     setVirtualIndex(progress.index);
-  }, [progress.index]);
+  }, [progress.index, progress.startedAt]);
 
   useEffect(() => {
     const id = setInterval(() => {
-      const { index, at } = checkpointRef.current;
-      const avgTurnMs = index > 0 ? (Date.now() - progress.startedAt) / index : DEFAULT_TURN_MS;
-      const fraction = Math.min(0.92, (Date.now() - at) / avgTurnMs);
+      const { index, at, avgTurnMs } = checkpointRef.current;
+      const sinceCheckpoint = Date.now() - at;
+      const fraction = Math.min(0.92, sinceCheckpoint / avgTurnMs);
       setVirtualIndex(Math.min(progress.total - 0.02, index + fraction));
+      setEtaSec(
+        index > 0
+          ? Math.max(0, Math.round((avgTurnMs * (progress.total - index) - sinceCheckpoint) / 1000))
+          : null,
+      );
     }, 250);
     return () => clearInterval(id);
-  }, [progress.startedAt, progress.total]);
+  }, [progress.total]);
 
   const pct = Math.round((virtualIndex / progress.total) * 100);
-  const elapsedMs = Date.now() - progress.startedAt;
-  const etaSec =
-    progress.index > 0
-      ? Math.max(0, Math.round(((elapsedMs / progress.index) * (progress.total - progress.index)) / 1000))
-      : null;
   return (
     <div className="mt-2">
       <div className="flex items-center justify-between text-[10px] text-ink-muted">
