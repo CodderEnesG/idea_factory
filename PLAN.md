@@ -225,3 +225,121 @@ mevcut veriden agregasyon:
 - **X/LinkedIn**: yalnız faz 2; ücretli X API veya manuel — MVP'yi bunlara bağlama.
 - **Açık karar**: Supabase mi (öneri) yoksa lokal SQLite başlangıç mı? Figma linki ne zaman gelir (UI fazı onu bekler)?
 - **Açık karar (strateji, ilgili dokümanlarda izleniyor)**: beachhead segment kesinleştirme (`BUSINESS_MODEL.md §9`); varsayılan analist arketipi + debate tetik eşiği (`AI_ANALYST.md §9`). (Somut tez değerleri `THESIS_AND_LENS.md §1`'de v1 için **dolduruldu**.)
+
+---
+
+## 11. Faz 4 aday listesi — sonraki geliştirme yönleri (2026-08-09 taraması, henüz seçilmedi)
+
+Faz 3 (A–E) tamamlandıktan sonra kod tabanı + `BUSINESS_MODEL.md` taranarak çıkarılan somut aday
+adımlar. Hiçbiri henüz uygulanmadı — kullanıcı yönü seçtiğinde işaretlenip uygulanacak.
+
+1. **pgvector/RAG (Bilgi Katmanı gerçek semantik arama)** — §8'de "`decisions` 50-100 kayda çıkınca
+   yeniden değerlendir" denmişti (2026-08-07'de 32 kayıt). Eşiğe ulaşılıp ulaşılmadığı kontrol
+   edilmeden atlanmamalı.
+2. **Kademeli model + grounding** (madde 6, faz 2 notu) — şu an her sinyal tek modelle (Gemini/Opus)
+   puanlanıyor, gerçek web-arama grounding'i yok; hacim arttıkça maliyet/kalite dengesi için en
+   yüksek kaldıraçlı iş.
+3. ~~**Yeni mercekler**~~ — **TAMAM (2026-08-09), kapsam kullanıcı kararıyla daraltıldı: zorunlu
+   yeni built-in mercek EKLENMEDİ** (mevcut arbitraj+beyaz-alan korunuyor); kullanıcının kendi
+   mercek ekleme akışının uçtan uca sağlam olduğu doğrulandı/sağlamlaştırıldı. Bulgu: pipeline
+   zaten tamdı (`apps/worker/src/analyze.ts` `loadActiveCustomLenses()`'i çağırıp
+   `[...lenses, ...customLenses]` üzerinden dönüyordu, `analyzeSignal()` her mercek için jenerik
+   çalışıyordu — varsayım yanlış çıktı, gerçek "wiring" eksiği yoktu). Ama kod okurken GERÇEK bir
+   bug bulundu: `ranker.ts`'teki `composite()` custom mercek ağırlığını HİÇ kullanmıyordu — admin
+   `/admin/mercekler`de weight=5 girse bile kompozitte hep weight=1 sayılıyordu (statik
+   `WEIGHT_BY_LENS` yalnız builtin `lenses` dizisinden kuruluyordu). Düzeltildi:
+   `composite()`/`rank()`/`buildDigest()`/`benchItems()` artık opsiyonel `lensRegistry` alıyor;
+   `/queue`, `/harita`, `/trend`, `/admin/metrikler` (`apps/web/lib/load-lens-registry.ts` —
+   queue'daki yerel kopya oradan çıkarıldı, 4 sayfa paylaşıyor) ve worker'ın `digest.ts`'i
+   (`loadActiveCustomLenses()` eklendi) hepsi artık tam kayıt defterini geçiyor. Verilmezse
+   (`rank(items)`, `composite(analyses)`) davranış eskisiyle birebir aynı — geriye dönük uyum,
+   custom mercek şu ana kadar hiç oluşturulmadığı için bu bug hiç tetiklenmemişti. 5 yeni test
+   (`ranker.test.ts`, `digest.test.ts`).
+4. ~~**Admin/auth kodu hiç güvenlik taramasından geçmedi**~~ — **TAMAM (2026-08-09).** `/cso`
+   taraması yapıldı (rapor: `.gstack/security-reports/2026-08-09-163356.json`). RLS
+   (thesis_versions/lenses/debates) ve requireAdmin() kapıları temiz çıktı. 3 gerçek bulgu
+   bulunup düzeltildi: (1) `/api/auth/login`'de rate-limit/kilitleme yoktu → `lib/rate-limit.ts`
+   eklendi (5 deneme/5dk → 5dk kilit, tek-process in-memory — bu app'in `pnpm dev`/`next start`
+   tek-süreç modeliyle tutarlı); (2) kullanıcı adı yokken erken dönüş timing ile kullanıcı adı
+   keşfine izin veriyordu → `verifyPasswordConstantTime` (decoy hash) ile sabit maliyetli hale
+   getirildi; (3) `/api/decisions` + `/api/comments` yalnız middleware'in `authEnabled()`
+   kapısına güveniyordu (2026-08-04'teki okuma-sızıntısıyla aynı kök neden sınıfı, bu kez yazma
+   tarafında) → route seviyesinde ikinci bir kontrol eklendi. Session revocation eksikliği
+   bilinçli olarak DÜZELTİLMEDİ (mimari tradeoff, mevcut ölçekte kabul edilebilir — raporda not
+   düşüldü). 24 yeni test (`lib/rate-limit.test.ts`, `lib/password.test.ts`,
+   `app/api/auth/login/route.test.ts` + decisions/comments'e eklenen 401 testleri).
+5. ~~**`apps/web` (Next.js) için hiç test yok**~~ — **TAMAM (2026-08-09).** `/api/decisions`,
+   `/api/comments`, `/api/admin/thesis`, `/api/admin/lenses`, `/api/admin/lenses/[lensId]`,
+   `/api/admin/debates` için 6 test dosyası + 33 test (vitest, Supabase/auth mock'lanır).
+   `apps/web` de artık `pnpm -r test`'e dahil.
+6. ~~**Geri-besleme döngüsü PLAN'ın vaat ettiği kadar canlı değil**~~ — **TAMAM (2026-08-09).**
+   `ranker.ts`'teki `rank()` artık opsiyonel bir `bandOverride` alıyor: `/queue` sayfası, oturum
+   sahibinin kendi `decisions` kaydı varsa AI kompozit bandının yerine geçiriyor (ör. insan
+   "ele" demişse AI "kovala" dese bile sinyal en alta iner) — 4 yeni ranker testi. Kapsam bilinçli
+   dar tutuldu: `decisions` kullanıcı-bazlı olduğu için bu override yalnız `/queue`'da (oturum
+   sahibinin kendi görünümü) uygulanıyor, paylaşılan `digest.ts`'e (tüm ekip için tek çıktı,
+   kimin kararının kazanacağı belirsiz) BİLİNÇLİ olarak taşınmadı — `rank()` ikinci parametre
+   olmadan eskisiyle birebir aynı davranır (digest/worker regresyonsuz). Bilgi Katmanı tarafı
+   zaten Faz 5 öncesinde tamamlanmıştı (bkz. bileşen 8).
+7. ~~**Digest dağıtımı hâlâ manuel/lokal**~~ — **TAMAM (2026-08-09), lokal-öncelikli tarzla
+   tutarlı bir çözümle** (e-posta/SMTP gibi yeni ücretli/harici bağımlılık EKLENMEDİ). Kök sorun
+   dağıtım kanalının GitHub Actions artifact'i olmasıydı (30 gün sonra silinir, indirmek gerekir)
+   — asıl kayıt artık DB'de: `supabase/migrations/0010_digests.sql` (yeni `digests` tablosu, 0005
+   RLS deseni — **kullanıcı Supabase Dashboard'dan UYGULAMALI**, henüz yapılmadı). `apps/worker/
+   src/digest.ts` her koşuda hem lokale (`digests/*.md`, değişmedi) hem bu tabloya yazıyor. Yeni
+   `/digest` sayfası (tüm authenticated kullanıcılara açık, admin-only değil — queue/harita/trend
+   ile aynı görünürlük): geçmiş çalıştırmalar listesi + seçili digest'in markdown'ı düz metin
+   olarak render edilir (LLM çıktısı — `dangerouslySetInnerHTML` KULLANILMADI, XSS riski
+   yaratmamak için, bkz. `.gstack/security-reports` Phase 7 ilkesi). `apps/web/lib/load-lens-
+   registry.ts` çıkarıldı (queue'daki yerel kopya oradan taşındı, madde 3 sağlamlaştırmasının
+   parçası). Demo modda `DEMO_ITEMS`'tan gerçek `buildDigest()` ile üretilen tek örnek gösterilir
+   (queue/harita/trend'le aynı desen). Görsel doğrulama: izole port 3101, gerçek DB'ye
+   dokunulmadan, ekran görüntüsüyle konsol hatasız onaylandı.
+8. ~~**North Star / leading-indicator metrikleri hiç ölçülmüyor**~~ — **TAMAM (2026-08-09).**
+   `/admin/metrikler` sayfası eklendi (`apps/web/lib/metrics.ts`, 9 pure-function test):
+   haftalık nitelikli fırsat sayısı + son 8 hafta grafiği, karar/sinyal oranı, gürültü oranı
+   (karşı-metrik) gerçek veriden hesaplanıyor. **North Star'ın kendisi ("kovala" isabeti) ve
+   bilgi-tabanı sorgu kullanımı BİLİNÇLİ OLARAK "ölçülemiyor" gösteriliyor** — outcome/doğrulama
+   takibi ve sorgu loglaması henüz yok, sahte sayı üretmek yerine dürüstçe boş bırakıldı (bkz.
+   sayfadaki açıklama metni). Gerçek North Star ölçümü için ayrı bir outcome-tracking tablosu
+   gerekir — henüz kapsamda değil.
+9. **Ticari doğrulama planı — kod işi DEĞİL, kullanıcı yürütür.** `BUSINESS_MODEL.md §9`'da zaten
+   somut 4 adım var, PLAN pipeline'ına girmiyor, yalnız burada özetleniyor (netleştirme
+   2026-08-09):
+   1. **Sorun mülakatları (hafta 1-4):** `BUSINESS_MODEL.md §3`'teki ilk 2 segmentten 3-5 kişiyle
+      görüşme — tekrarlayan, ödemeye istekli "acı" var mı? Beachhead'i bu kesinleştirir.
+   2. **Design partner (2-3):** erken erişim ↔ geri bildirim + referans.
+   3. **Fiyat-duyarlılık:** `§6` kademelerini test et, LOI hedefle.
+   4. **Çıkış kriteri (Faz 2'ye geçiş):** ≥2 imzalı LOI/pilot **ve** North Star'ın (madde 8,
+      `/admin/metrikler`) anlamlı bir sinyal gösterdiği veri.
+   Madde 8'deki metrik sayfası artık (4)'teki North Star kanıtı için kullanılabilir durumda.
+   Henüz başlanmadı — kullanıcı ne zaman başladığını/sonucunu bildirdiğinde burası güncellenir.
+10. ~~**Kaynak sağlığı izlenmiyor**~~ — **TAMAM (2026-08-09).** Not: metinde "6 kaynak" deniyordu,
+    taramada düzeltildi — worker'da **5** kayıtlı kaynak var (`apps/worker/src/ingest.ts`
+    `SOURCES`: productHunt, tldr, webrazzi, techcrunch, ycombinator); "WP feed" ayrı bir kaynak
+    değil, webrazzi+techcrunch'ın kullandığı ortak RSS fabrikası (`wpfeed.ts`). `/admin/metrikler`
+    sayfasına "Kaynak sağlığı" tablosu eklendi (`apps/web/lib/source-health.ts`, 11 test): her
+    kaynak için son 7g/30g sinyal sayısı + son görülen tarih + durum (sağlıklı <2g, yavaşladı
+    2-7g, sessiz >7g, hiç veri yok). `tldr:kategori` alt-kaynakları tek "tldr" kovasında toplanır.
+
+**Öncelik notu (2026-08-09 taramasında verilen tavsiye):** en ucuz/en yüksek güven — madde 5 (admin
+API testleri) veya madde 8 (metrik sayfası, sıfır AI maliyeti). En stratejik ama daha büyük iş —
+madde 6 (gerçek geri-besleme döngüsü) veya madde 2 (kademeli model + grounding).
+
+**Kullanıcı kararı (2026-08-09): sıra 5 → 8 → 6.** Aynı oturumda otomatik pipeline olarak
+uygulandı (kullanıcı: "pipeline'a al, sürekli sorma, otomatik ilerle") — **üçü de TAMAM.**
+
+**İkinci tur kullanıcı kararı (aynı oturum, aynı gün): 4 + 10 → 3 → 7 → (2 sonra düşünülecek).**
+Madde 3 (yeni mercek) için açık kısıtlama: **zorunlu yeni built-in mercek eklenmeyecek** —
+mevcut mercekler (arbitraj + beyaz-alan) korunur, kapsam yalnız kullanıcının kendi mercek
+ekleme/değiştirme akışının (Faz 3-C admin-mercek UI) uçtan uca çalıştığını doğrulamak/
+sağlamlaştırmak. Madde 9 kod pipeline'ına girmiyor (yukarıda somutlaştırıldı, kullanıcı
+tarafından ayrıca yürütülecek).
+
+**Bu turun kapanışı (2026-08-09/10, aynı oturum): 4, 10, 3, 7 — DÖRDÜ DE TAMAM.** Kullanıcıda
+kalan tek elle-yapılacak iş: `supabase/migrations/0010_digests.sql`'i Supabase Dashboard → SQL
+Editor'den uygulamak (0003/0006/0007/0008/0009 ile aynı desen) — uygulanana kadar `/digest`
+sayfası gerçek ortamda boş liste gösterir (çökmez, `loadDigests()` hatayı yutup `[]` döner).
+Sıradaki: yalnız **madde 2** (kademeli model + grounding) kaldı, henüz başlanmadı — büyük/
+stratejik bir karar, kullanıcıyla kısa bir tasarım turu gerekir (bkz. [[feedback-explain-
+before-big-decisions]]).
