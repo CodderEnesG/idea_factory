@@ -233,9 +233,20 @@ mevcut veriden agregasyon:
 Faz 3 (A–E) tamamlandıktan sonra kod tabanı + `BUSINESS_MODEL.md` taranarak çıkarılan somut aday
 adımlar. Hiçbiri henüz uygulanmadı — kullanıcı yönü seçtiğinde işaretlenip uygulanacak.
 
-1. **pgvector/RAG (Bilgi Katmanı gerçek semantik arama)** — §8'de "`decisions` 50-100 kayda çıkınca
-   yeniden değerlendir" denmişti (2026-08-07'de 32 kayıt). Eşiğe ulaşılıp ulaşılmadığı kontrol
-   edilmeden atlanmamalı.
+1. ~~**pgvector/RAG eşik kontrolü**~~ — **KONTROL EDİLDİ (2026-08-10), pgvector yine ERTELENDİ.**
+   `decisions`+`comments` = 85 kayıt (2026-08-07'de 32'ydi) — eşik (50-100) teknik olarak
+   geçildi. Ama gerçek veri incelemesi (60 kararın sector/market dağılımı) gösterdi ki zayıflık
+   "paraphrase yakalanamıyor" değil: kararların %77'si tek sektör etiketinde ("B2B SaaS")
+   toplanıyor — bu bir eşleştirme hatası değil, **tezin kendi dar sektör listesinin**
+   (`thesis.config.ts`: B2B SaaS, fintech, e-ticaret altyapısı, vertical SaaS) doğal sonucu.
+   Kategorik eşleştirme çalışıyor, yalnız kova kalabalık. Çözüm pgvector değil, ucuz bir lexical
+   genişletme: `apps/worker/src/lib/knowledge.ts::relevance()` artık kategorik kapıdan (sector+
+   market) geçen çiftlerde başlık+özet kelime örtüşmesini de skora ekliyor (jenerik kelimeler
+   stopword'le filtrelenir, skor tavanlı) — aynı kovadaki kayıtları birbirinden ayırt eder.
+   Kategorik örtüşme yoksa içerik metnine hiç bakılmıyor (gürültü riski yok). pgvector'ı
+   gerektirecek gerçek senaryo (Türkçe not ↔ İngilizce başlık çapraz-dil eşleştirmesi) hâlâ teorik
+   — ölçülmedi. Yeniden değerlendirme: tez sektör listesi genişlerse veya çapraz-dil ihtiyacı
+   somutlaşırsa.
 2. **Kademeli model + grounding** (madde 6, faz 2 notu) — şu an her sinyal tek modelle (Gemini/Opus)
    puanlanıyor, gerçek web-arama grounding'i yok; hacim arttıkça maliyet/kalite dengesi için en
    yüksek kaldıraçlı iş.
