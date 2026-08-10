@@ -61,6 +61,70 @@ describe("rank", () => {
     ];
     expect(rank(items).map((r) => r.signal.id)).toEqual(["pursue-eski", "watch-yeni"]);
   });
+
+  it("opts boşsa davranış birebir eskisiyle aynıdır", () => {
+    const items: RankedItem[] = [
+      { signal: sig("kill", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(30) } },
+      { signal: sig("pursue", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(90) } },
+    ];
+    expect(rank(items).map((r) => r.signal.id)).toEqual(["pursue", "kill"]);
+    expect(rank(items, {}).map((r) => r.signal.id)).toEqual(["pursue", "kill"]);
+  });
+
+  it("insan 'ele' derse AI 'kovala' dese bile sinyal en alta iner (geri-besleme döngüsü)", () => {
+    const items: RankedItem[] = [
+      { signal: sig("ai-kovala-insan-ele", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(95) } },
+      { signal: sig("ai-izle", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(60) } },
+    ];
+    const out = rank(items, {
+      bandOverride: (item) => (item.signal.id === "ai-kovala-insan-ele" ? "kill" : null),
+    });
+    expect(out.map((r) => r.signal.id)).toEqual(["ai-izle", "ai-kovala-insan-ele"]);
+  });
+
+  it("insan 'kovala' derse AI 'ele' dese bile sinyal en üste çıkar", () => {
+    const items: RankedItem[] = [
+      { signal: sig("ai-ele-insan-kovala", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(20) } },
+      { signal: sig("ai-izle", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(60) } },
+    ];
+    const out = rank(items, {
+      bandOverride: (item) => (item.signal.id === "ai-ele-insan-kovala" ? "pursue" : null),
+    });
+    expect(out.map((r) => r.signal.id)).toEqual(["ai-ele-insan-kovala", "ai-izle"]);
+  });
+
+  it("override null/undefined dönerse AI bandı kullanılır (karışık — kısmi override)", () => {
+    const items: RankedItem[] = [
+      { signal: sig("kararsiz", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(30) } },
+      { signal: sig("kararli-kovala", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(30) } },
+    ];
+    const out = rank(items, {
+      bandOverride: (item) => (item.signal.id === "kararli-kovala" ? "pursue" : null),
+    });
+    expect(out.map((r) => r.signal.id)).toEqual(["kararli-kovala", "kararsiz"]);
+  });
+
+  it("lensRegistry verilirse custom mercek ağırlığı sıralamaya yansır", () => {
+    // custom mercek weight=5, arbitraj weight=1 (varsayılan) — kompozit custom'a çok yakın olmalı.
+    const customLens = { id: "timing", name: "Zamanlama", weight: 5, extraNoteLabel: "Not" };
+    const items: RankedItem[] = [
+      {
+        signal: sig("agirlikli", "2026-01-01T00:00:00Z"),
+        analyses: {
+          arbitrage: { ...ana(30), confidence: "high" }, // düşük, ama weight=1
+          timing: { ...ana(90), lens: "timing", confidence: "high" }, // yüksek, weight=5
+        },
+      },
+    ];
+    const registry = [
+      { id: "arbitrage", name: "Arbitraj", weight: 1 } as never,
+      customLens as never,
+    ];
+    const [only] = rank(items, { lensRegistry: registry });
+    // ağırlıksız (registry yok): (30+90)/2=60 → watch. Ağırlıklı: (30*1+90*5)/6=80 → pursue.
+    expect(composite(only!.analyses).band).toBe("watch");
+    expect(composite(only!.analyses, registry).band).toBe("pursue");
+  });
 });
 
 describe("composite", () => {

@@ -58,4 +58,36 @@ describe("buildDigest", () => {
     const count = (md.match(/## 🟢 KOVALA/g) ?? []).length;
     expect(count).toBe(2);
   });
+
+  it("lensRegistry verilmezse (varsayılan) custom mercek analizi kompozite girer ama paragrafı basılmaz — eski (bug'lı) davranış geriye dönük korunur", () => {
+    const it1 = item("x", 90);
+    it1.analyses["timing"] = { ...it1.analyses["arbitrage"]!, lens: "timing", fit: 90 };
+    const md = buildDigest([it1]);
+    expect(md).not.toContain("Zamanlama");
+  });
+
+  it("lensRegistry (builtin+custom) verilirse custom mercek hem ağırlığa hem paragrafa girer (/madde 3 sağlamlaştırma)", () => {
+    const it1 = item("x", 30); // arbitraj düşük (weight varsayılan 1)
+    it1.analyses["timing"] = {
+      ...it1.analyses["arbitrage"]!,
+      lens: "timing",
+      fit: 90,
+      rationale: "zamanlama gerekçesi",
+    };
+    const customLens = {
+      id: "timing",
+      name: "Zamanlama",
+      weight: 5,
+      extraNoteLabel: "Not",
+      schema: null as never,
+      buildSystemPrompt: () => "",
+      buildUserPrompt: () => "",
+      extraNote: () => "",
+    };
+    const md = buildDigest([it1], { lensRegistry: [customLens] });
+    // ağırlıksız kompozit (30+90)/2=60 → watch/izle olurdu; weight=5 ile (30+90*5)/6=80 → kovala.
+    expect(md).toContain("KOVALA");
+    expect(md).toContain("Zamanlama");
+    expect(md).toContain("zamanlama gerekçesi");
+  });
 });

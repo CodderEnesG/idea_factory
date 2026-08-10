@@ -1,6 +1,7 @@
-import { composite, type RankedItem } from "@idea-factory/core";
+import { composite, type Lens, type RankedItem } from "@idea-factory/core";
 import { getSession } from "../../lib/auth";
 import { loadItems } from "../../lib/load-items";
+import { loadLensRegistry } from "../../lib/load-lens-registry";
 import { Navbar } from "../../components/Navbar";
 import { BandLegend } from "../../components/BandBar";
 
@@ -30,7 +31,7 @@ function itemTs(item: RankedItem): Date | null {
   return Number.isNaN(t) ? null : new Date(t);
 }
 
-function bucketWeekly(items: RankedItem[]): WeekBucket[] {
+function bucketWeekly(items: RankedItem[], lensRegistry: Lens[]): WeekBucket[] {
   const thisWeek = weekStartOf(new Date());
   const buckets: WeekBucket[] = [];
   for (let i = WEEKS - 1; i >= 0; i--) {
@@ -53,7 +54,7 @@ function bucketWeekly(items: RankedItem[]): WeekBucket[] {
     const bucket = byStart.get(start);
     if (!bucket) continue;
     bucket.count++;
-    bucket[composite(item.analyses).band]++;
+    bucket[composite(item.analyses, lensRegistry).band]++;
   }
   return buckets;
 }
@@ -139,8 +140,12 @@ function ShiftTable({
 }
 
 export default async function TrendPage() {
-  const [{ items, demo }, me] = await Promise.all([loadItems(), getSession()]);
-  const weeks = bucketWeekly(items);
+  const [{ items, demo }, me, lensRegistry] = await Promise.all([
+    loadItems(),
+    getSession(),
+    loadLensRegistry(),
+  ]);
+  const weeks = bucketWeekly(items, lensRegistry);
   const maxCount = Math.max(1, ...weeks.map((w) => w.count));
   const sectorShift = distributionShift(items, (i) => i.signal.sector);
   const sourceShift = distributionShift(items, (i) => i.signal.source);

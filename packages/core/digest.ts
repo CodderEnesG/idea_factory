@@ -1,5 +1,5 @@
 import { composite, rank, type RankedItem } from "./ranker.js";
-import { lenses } from "./lenses.config.js";
+import { lenses, type Lens } from "./lenses.config.js";
 import { StoredEnrichmentSchema } from "./enrichment.js";
 import { isBench, BENCH_MIN_FIT } from "./bench.js";
 
@@ -8,6 +8,10 @@ const BAND_LABEL = { pursue: "🟢 KOVALA", watch: "🟡 İZLE", kill: "🔴 ELE
 export interface DigestOptions {
   topN?: number; // kaç fırsat listelensin (ele bandı digest'e girmez)
   title?: string;
+  /** builtin + `/admin/mercekler`de eklenmiş aktif admin-mercekleri (PLAN.md §11 madde 3
+   *  sağlamlaştırması) — verilmezse yalnız builtin mercekler kullanılır (eski davranış):
+   *  custom mercek ağırlığı kompozite girmez VE kendi paragrafı digest'te hiç basılmazdı. */
+  lensRegistry?: readonly Lens[];
 }
 
 /**
@@ -32,13 +36,16 @@ function buildKunye(enrichment: unknown): string | null {
 export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): string {
   const topN = opts.topN ?? 10;
   const title = opts.title ?? "IdeaFact — Fırsat Digest'i";
-  const ranked = rank(items);
-  const shortlist = ranked.filter((r) => composite(r.analyses).band !== "kill").slice(0, topN);
+  const lensRegistry = opts.lensRegistry ?? lenses;
+  const ranked = rank(items, { lensRegistry });
+  const shortlist = ranked
+    .filter((r) => composite(r.analyses, lensRegistry).band !== "kill")
+    .slice(0, topN);
 
   const lines: string[] = [`# ${title}`, ""];
 
   // Bench satırı — topN'e bakılmaksızın tüm çıtayı geçenler (BENCH.md havuz adayları).
-  const bench = ranked.filter((r) => isBench(composite(r.analyses)));
+  const bench = ranked.filter((r) => isBench(composite(r.analyses, lensRegistry)));
   if (bench.length > 0) {
     lines.push(
       `**🏅 Bench:** ${bench.length} fırsat çıtayı geçiyor (fit ≥ ${BENCH_MIN_FIT} · güven yüksek) — BENCH.md havuz adayı.`,
@@ -51,7 +58,7 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
   }
 
   for (const { signal, analyses } of shortlist) {
-    const comp = composite(analyses);
+    const comp = composite(analyses, lensRegistry);
     const band = BAND_LABEL[comp.band];
     lines.push(
       `## ${band} · fit ${comp.fit}${isBench(comp) ? " · 🏅 bench" : ""} · ${signal.title}`,
@@ -62,7 +69,7 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
     if (kunye) lines.push(`**Künye:** ${kunye}`, "");
 
     // Her aktif mercek kendi paragrafında — kompozit skor yalnız sıralar, gerekçe mercek-özeldir.
-    for (const lens of lenses) {
+    for (const lens of lensRegistry) {
       const a = analyses[lens.id];
       if (!a) continue;
       lines.push(`**${lens.name}** (fit ${a.fit} · güven ${a.confidence}): ${a.rationale}`, "");

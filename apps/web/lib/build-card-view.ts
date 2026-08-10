@@ -32,7 +32,7 @@ export function buildCardView(
   debates: DebateView[],
 ): CardView {
   const { signal, analyses } = item;
-  const comp = composite(analyses);
+  const comp = composite(analyses, lensRegistry);
   const enrParsed = StoredEnrichmentSchema.safeParse(
     (signal as { enrichment?: unknown }).enrichment,
   );

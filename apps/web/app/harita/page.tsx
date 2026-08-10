@@ -1,6 +1,7 @@
-import { composite, isBench, type RankedItem } from "@idea-factory/core";
+import { composite, isBench, type Lens, type RankedItem } from "@idea-factory/core";
 import { getSession } from "../../lib/auth";
 import { loadItems } from "../../lib/load-items";
+import { loadLensRegistry } from "../../lib/load-lens-registry";
 import { Navbar } from "../../components/Navbar";
 import { BandBar, BandLegend } from "../../components/BandBar";
 
@@ -17,12 +18,16 @@ interface Bucket {
 
 const TOP_N = 12;
 
-function bucketBy(items: RankedItem[], pick: (i: RankedItem) => string | null): Bucket[] {
+function bucketBy(
+  items: RankedItem[],
+  pick: (i: RankedItem) => string | null,
+  lensRegistry: Lens[],
+): Bucket[] {
   const map = new Map<string, Bucket>();
   for (const item of items) {
     const name = pick(item) ?? "bilinmiyor";
     const b = map.get(name) ?? { name, count: 0, pursue: 0, watch: 0, kill: 0, bench: 0 };
-    const comp = composite(item.analyses);
+    const comp = composite(item.analyses, lensRegistry);
     b.count++;
     b[comp.band]++;
     if (isBench(comp)) b.bench++;
@@ -73,9 +78,13 @@ function BucketList({ title, buckets }: { title: string; buckets: Bucket[] }) {
 }
 
 export default async function HaritaPage() {
-  const [{ items, demo }, me] = await Promise.all([loadItems(), getSession()]);
-  const sectors = bucketBy(items, (i) => i.signal.sector);
-  const markets = bucketBy(items, (i) => i.signal.market);
+  const [{ items, demo }, me, lensRegistry] = await Promise.all([
+    loadItems(),
+    getSession(),
+    loadLensRegistry(),
+  ]);
+  const sectors = bucketBy(items, (i) => i.signal.sector, lensRegistry);
+  const markets = bucketBy(items, (i) => i.signal.market, lensRegistry);
 
   return (
     <div>

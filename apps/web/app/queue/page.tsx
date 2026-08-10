@@ -1,13 +1,8 @@
-import {
-  buildCustomLens,
-  lenses,
-  rank,
-  type CustomLensDef,
-  type Lens,
-} from "@idea-factory/core";
+import { lenses, rank } from "@idea-factory/core";
 import { serverDb } from "../../lib/supabase";
 import { getSession } from "../../lib/auth";
 import { loadItems } from "../../lib/load-items";
+import { loadLensRegistry } from "../../lib/load-lens-registry";
 import { buildCardView } from "../../lib/build-card-view";
 import { Navbar } from "../../components/Navbar";
 import { QueueBoard } from "../../components/QueueBoard";
@@ -63,33 +58,6 @@ async function loadComments(): Promise<Map<string, Comment[]>> {
   return map;
 }
 
-/** Builtin mercekler + `/admin/mercekler`de eklenmiş aktif admin-mercekleri. */
-async function loadLensRegistry(): Promise<Lens[]> {
-  const db = serverDb();
-  if (!db) return lenses;
-  const { data, error } = await db
-    .from("lenses")
-    .select("lens_id, name, weight, extra_note_label, questions")
-    .eq("active", true);
-  if (error || !data) return lenses;
-  const custom = (
-    data as {
-      lens_id: string;
-      name: string;
-      weight: number;
-      extra_note_label: string;
-      questions: string[];
-    }[]
-  ).map((row): CustomLensDef => ({
-    id: row.lens_id,
-    name: row.name,
-    weight: row.weight,
-    extraNoteLabel: row.extra_note_label,
-    questions: row.questions,
-  }));
-  return [...lenses, ...custom.map(buildCustomLens)];
-}
-
 /** AI Yorumcusu transkriptleri — admin-only, `isAdmin` false ise boş harita döner (gereksiz sorgu yok). */
 async function loadDebates(isAdmin: boolean): Promise<Map<string, DebateView[]>> {
   const map = new Map<string, DebateView[]>();
@@ -121,7 +89,17 @@ export default async function Queue() {
   const isAdmin = me?.is_admin ?? false;
   const debates = await loadDebates(isAdmin);
   const meName = me?.username ?? "web";
-  const cards = rank(items).map((item) => {
+  // Geri-besleme döngüsü (PLAN.md §10): kendi kararım varsa AI bandının yerine geçer —
+  // zaten "ele" dediğim bir sinyali AI "kovala" dese bile tekrar üstte görmek istemem.
+  const myBand = new Map<string, Decision>();
+  for (const item of items) {
+    const mine = decisions.get(item.signal.id)?.find((d) => d.user === meName)?.decision;
+    if (mine) myBand.set(item.signal.id, mine);
+  }
+  const cards = rank(items, {
+    bandOverride: (item) => myBand.get(item.signal.id),
+    lensRegistry,
+  }).map((item) => {
     const dec = decisions.get(item.signal.id) ?? [];
     const mine = dec.find((d) => d.user === meName)?.decision ?? null;
     const others = dec.filter((d) => d.user !== meName);
