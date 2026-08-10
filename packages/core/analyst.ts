@@ -82,7 +82,14 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
     const user = feedback ? `${baseUser}\n\n${feedback}` : baseUser;
     const raw = await provider.generate({ system, user, jsonSchema });
 
-    const parsed = lens.schema.safeParse(raw);
+    // `lens` alanı çağıranın ZATEN bildiği metadata — modele sordurmak saf başarısızlık yüzeyi.
+    // Gemini "white_space" yerine "white-space" üretip zod literal'ını düşürüyordu; sinyal 4
+    // denemede de yazılamıyordu (2026-08-10 backfill teşhisi). Arbitraj tek kelime olduğu için
+    // bu tuzağa hiç düşmemişti — alt tire/tire içeren her mercek (custom admin-mercekleri dahil)
+    // düşüyordu. Şemaya vermeden önce doğru id'yi biz yazıyoruz; model kararı değil, bizim bilgimiz.
+    const normalized =
+      raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw, lens: lens.id } : raw;
+    const parsed = lens.schema.safeParse(normalized);
     if (!parsed.success) {
       feedback = `Önceki çıktı şema hatası verdi: ${parsed.error.message}. Şemaya uygun düzelt.`;
       continue;
@@ -102,7 +109,11 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
     return parsed.data;
   }
 
+  // Son geri bildirimi hataya iliştir: aksi halde "4 denemede olmadı" çıplak kalıyor ve
+  // ihlalin ŞEMA mı GUARD mı olduğu (hangi kural) log'dan hiç görünmüyordu — kalibrasyon
+  // gerektiren bir mercekte bu, teşhisi imkânsız kılıyor (bkz. beyaz-alan backfill'i 2026-08-10).
   throw new Error(
-    `analist (${provider.name}) ${maxRetries + 1} denemede geçerli analiz üretemedi (${signal.url})`,
+    `analist (${provider.name}) ${maxRetries + 1} denemede geçerli analiz üretemedi ` +
+      `(${signal.url})${feedback ? ` — son ihlal: ${feedback}` : ""}`,
   );
 }
