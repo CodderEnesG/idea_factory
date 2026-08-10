@@ -7,7 +7,7 @@ function initialsOf(name: string): string {
   return (parts[0]?.[0] ?? "?").toUpperCase() + (parts[1]?.[0]?.toUpperCase() ?? "");
 }
 
-type NavKey = "queue" | "harita" | "trend" | "tez" | "mercekler";
+type NavKey = "queue" | "harita" | "trend" | "digest" | "tez" | "mercekler" | "metrikler";
 
 const TAB_ACTIVE = "border-b-2 border-brand py-4 -my-4 text-ink";
 const TAB_INACTIVE = "py-4 -my-4 text-ink-secondary hover:text-ink";
@@ -31,6 +31,9 @@ export function Navbar({ me, current }: { me: SessionUser | null; current?: NavK
           <Link href="/trend" className={tab("trend")}>
             Trend
           </Link>
+          <Link href="/digest" className={tab("digest")}>
+            Digest
+          </Link>
           {me?.is_admin && (
             <>
               <Link href="/admin/tez" className={tab("tez")}>
@@ -38,6 +41,9 @@ export function Navbar({ me, current }: { me: SessionUser | null; current?: NavK
               </Link>
               <Link href="/admin/mercekler" className={tab("mercekler")}>
                 Mercekler
+              </Link>
+              <Link href="/admin/metrikler" className={tab("metrikler")}>
+                Metrikler
               </Link>
             </>
           )}
