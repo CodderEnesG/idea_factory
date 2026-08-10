@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../lib/supabase";
 import { getSession } from "../../../lib/auth";
+import { authEnabled } from "../../../lib/session";
 
 export async function POST(req: Request) {
   const session = await getSession();
-  const author = session?.username ?? "web"; // auth kapalıysa (lokal) anonim
+  // İkinci katman (/cso #3): bkz. decisions/route.ts — yalnız middleware'e güvenme.
+  if (authEnabled() && !session) {
+    return NextResponse.json({ ok: false, error: "kimlik doğrulama gerekli" }, { status: 401 });
+  }
+  const author = session?.username ?? "web"; // auth kapalıysa (lokal/demo) anonim
 
   const body = (await req.json().catch(() => null)) as
     | { signal_id?: string; body?: string }

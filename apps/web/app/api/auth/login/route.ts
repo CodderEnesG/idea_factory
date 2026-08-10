@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { serverDb } from "../../../../lib/supabase";
 import { signSession, SESSION_COOKIE, SESSION_MAX_AGE } from "../../../../lib/session";
-import { verifyPassword } from "../../../../lib/password";
+import { verifyPasswordConstantTime } from "../../../../lib/password";
+import { checkLocked, recordFailure, recordSuccess } from "../../../../lib/rate-limit";
 
 export const runtime = "nodejs"; // node:crypto (scrypt) gerekir
 
@@ -14,18 +15,34 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "kullanıcı adı ve parola gerekli" }, { status: 400 });
   }
 
+  const lockKey = body.username.toLowerCase();
+  const remainingMs = checkLocked(lockKey);
+  if (remainingMs !== null) {
+    return NextResponse.json(
+      { ok: false, error: `çok fazla başarısız deneme — ${Math.ceil(remainingMs / 60_000)} dakika sonra tekrar dene` },
+      { status: 429 },
+    );
+  }
+
   const db = serverDb();
   if (!db) return NextResponse.json({ ok: false, error: "backend yapılandırılmadı" }, { status: 503 });
 
+  // maybeSingle() + constant-time karşılaştırma: kullanıcı adı var/yok fark etmeksizin
+  // aynı scrypt maliyeti ödenir (/cso #2 — timing ile kullanıcı adı keşfi engellenir).
   const { data, error } = await db
     .from("members")
     .select("username, display_name, password_hash, is_admin")
     .eq("username", body.username)
     .maybeSingle();
 
-  if (error || !data || !verifyPassword(body.password, data.password_hash)) {
+  // `data?.password_hash` unconditionally: kullanıcı bulunamasa bile aynı scrypt maliyeti
+  // ödenir — `!data` kısayoluyla erken dönersek fonksiyon hiç çağrılmaz ve timing farkı geri gelir.
+  const passwordOk = verifyPasswordConstantTime(body.password, data?.password_hash);
+  if (error || !data || !passwordOk) {
+    recordFailure(lockKey);
     return NextResponse.json({ ok: false, error: "geçersiz kullanıcı adı veya parola" }, { status: 401 });
   }
+  recordSuccess(lockKey);
 
   const token = await signSession({
     username: data.username,
