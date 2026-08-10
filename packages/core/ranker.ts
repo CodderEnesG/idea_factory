@@ -38,7 +38,12 @@ export function composite(analyses: Record<string, BaseAnalysis>, lensRegistry?:
   const weights = lensRegistry ? weightMapFrom(lensRegistry) : DEFAULT_WEIGHTS;
   const items = Object.values(analyses);
   const totalWeight = items.reduce((sum, a) => sum + (weights[a.lens] ?? 1), 0);
-  const fit = Math.round(items.reduce((sum, a) => sum + a.fit * (weights[a.lens] ?? 1), 0) / totalWeight);
+  // Ağırlık 0 = "kompozit skora girme, yalnız kartta ikinci görüş ol" (bkz. beyaz-alan merceği).
+  // Elde YALNIZ sıfır-ağırlıklı analiz varsa bölme NaN üretirdi — o durumda düz ortalamaya düş,
+  // sinyali skorsuz bırakma (bir mercek kapatıldı diye kart sıralamadan düşmemeli).
+  const scored = totalWeight > 0 ? items.map((a) => [a.fit, weights[a.lens] ?? 1] as const) : items.map((a) => [a.fit, 1] as const);
+  const divisor = scored.reduce((sum, [, w]) => sum + w, 0);
+  const fit = Math.round(scored.reduce((sum, [f, w]) => sum + f * w, 0) / divisor);
   const confidence = items.reduce<Confidence>(
     (worst, a) => (CONF_RANK[a.confidence] < CONF_RANK[worst] ? a.confidence : worst),
     items[0]?.confidence ?? "low",

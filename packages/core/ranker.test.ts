@@ -133,13 +133,36 @@ describe("composite", () => {
     expect(composite({ arbitrage: a })).toEqual({ fit: 72, confidence: "med", band: "watch" });
   });
 
-  it("iki mercek ağırlıklı ortalanır (eşit ağırlık = düz ortalama)", () => {
+  it("sıfır ağırlıklı mercek kompozit skoru değiştirmez (beyaz-alan, grounding gelene kadar)", () => {
     const c = composite({
       arbitrage: { ...ana(90), confidence: "high" },
-      white_space: { ...ana(70), lens: "white_space", confidence: "high" },
+      white_space: { ...ana(20), lens: "white_space", confidence: "low" },
     });
+    expect(c.fit).toBe(90); // beyaz-alan ağırlığı 0 → skora karışmaz (bkz. lenses.config.ts)
+    expect(c.confidence).toBe("low"); // ama confidence'ta en temkinli hâlâ kazanır
+  });
+
+  it("iki mercek ağırlıklı ortalanır (açık registry ile)", () => {
+    const c = composite(
+      {
+        arbitrage: { ...ana(90), confidence: "high" },
+        white_space: { ...ana(70), lens: "white_space", confidence: "high" },
+      },
+      [
+        { id: "arbitrage", weight: 1 } as never,
+        { id: "white_space", weight: 1 } as never,
+      ],
+    );
     expect(c.fit).toBe(80); // (90+70)/2
     expect(c.confidence).toBe("high");
+  });
+
+  it("tüm ağırlıklar 0 ise NaN üretmez, düz ortalamaya düşer", () => {
+    const c = composite(
+      { white_space: { ...ana(40), lens: "white_space", confidence: "med" } },
+      [{ id: "white_space", weight: 0 } as never],
+    );
+    expect(c.fit).toBe(40);
   });
 
   it("confidence en temkinlisini alır (bir mercek low derse kompozit low'dur)", () => {

@@ -261,7 +261,15 @@ export const whiteSpaceLens: Lens<WhiteSpaceAnalysis> = {
   schema: WhiteSpaceAnalysisSchema,
   buildSystemPrompt: buildWhiteSpaceSystemPrompt,
   buildUserPrompt: buildWhiteSpaceUserPrompt,
-  weight: 1,
+  // 0 = kompozit SKORA girmez; kartta/haritada/trendde ikinci görüş olarak görünmeye devam eder
+  // (kullanıcı kararı 2026-08-10). Gerekçe: bu merceğin 80+ bandı `confidence: high` istiyor, ama
+  // kendi talimatı "yerli rekabet taraması v1'de zayıf (web_search kapsamı sınırlı) → confidence
+  // düşür" diyor — grounding kapalıyken fit yapısal olarak 79'a çakılı (84 çift-mercekli sinyalde
+  // 0 kovala; arbitrajda %5.8). Sıralamaya karıştırınca arbitrajın kovala bandını siliyordu —
+  // ölçülen kovala sayısı: ağırlık 0 → 12, 0.25 → 3, 0.5 → 2, 1 → 1. Muhalefetin ne kadarı gerçek
+  // sinyal, ne kadarı grounding körlüğü, bugün ayırt edilemiyor; körlüğü sıralamaya taşımıyoruz.
+  // **Grounding (PLAN.md §11 madde 2) devreye girince 1'e çıkarılmalı** — asıl tasarım o.
+  weight: 0,
   extraNote: (a) => a.competitive_landscape,
   extraNoteLabel: "Rekabet ortamı",
 };
