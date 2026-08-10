@@ -7,6 +7,7 @@ export interface RelatedSignal {
   title: string;
   sector: string | null;
   market: string | null;
+  summary_raw?: string;
 }
 
 export interface DecisionRow {
@@ -50,10 +51,48 @@ function fieldScore(a: string | null, b: string | null): number {
   return shared;
 }
 
-/** Sinyal ↔ ilgili-sinyal alaka puanı: sector + market alan skorlarının toplamı (0 = alakasız). */
+// Bu alanda neredeyse her başlıkta geçen jenerik kelimeler — filtrelenmezse "aynı sektördeki
+// her şey birbiriyle biraz alakalı" gibi görünüp asıl ayırt ediciliği boğar.
+const STOPWORDS = new Set([
+  "ve", "bir", "bu", "için", "ile", "de", "da", "ki", "mi", "yeni", "ürün", "şirket",
+  "the", "a", "an", "and", "or", "for", "with", "of", "to", "in", "on", "is", "are",
+  "new", "product", "startup", "company", "platform", "app", "launch", "launches",
+  "raises", "funding", "million", "billion",
+]);
+
+/** İçerik (başlık+özet) token'ları — jenerik kelimeler ve tek/iki harfli gürültü elenir. */
+function contentTokens(...parts: (string | null | undefined)[]): Set<string> {
+  const t = tokens(parts.filter(Boolean).join(" "));
+  for (const w of t) {
+    if (STOPWORDS.has(w) || w.length <= 2) t.delete(w);
+  }
+  return t;
+}
+
+/**
+ * Başlık/özet kelime örtüşmesi — yalnız zaten kategorik olarak alakalı (aynı sektör/pazar
+ * kovası) çiftler arasında AYIRT EDİCİLİK için (bkz. `relevance`). Tavanlı: uzun bir özet
+ * tek başına skoru domine etmesin.
+ */
+function contentOverlapScore(signal: Signal, related: RelatedSignal): number {
+  const a = contentTokens(signal.title, signal.summary_raw);
+  const b = contentTokens(related.title, related.summary_raw);
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared++;
+  return Math.min(shared, 5);
+}
+
+/**
+ * Sinyal ↔ ilgili-sinyal alaka puanı: önce sector+market (kategorik, kapı görevi görür —
+ * ikisi de örtüşmezse 0 ve içerik metnine HİÇ bakılmaz, gürültüden kaçınmak için). Kategorik
+ * örtüşme varsa başlık/özet kelime örtüşmesi eklenir — aynı geniş kovadaki (ör. "B2B SaaS")
+ * kayıtları birbirinden ayırt etmek için (tezin dar sektör listesi yüzünden kova zaten kalabalık).
+ */
 function relevance(signal: Signal, related: RelatedSignal | null): number {
   if (!related) return 0;
-  return fieldScore(signal.sector, related.sector) + fieldScore(signal.market, related.market);
+  const categorical = fieldScore(signal.sector, related.sector) + fieldScore(signal.market, related.market);
+  if (categorical === 0) return 0;
+  return categorical + contentOverlapScore(signal, related);
 }
 
 function byRelevanceThenRecency<T extends { created_at: string }>(

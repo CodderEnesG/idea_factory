@@ -17,13 +17,17 @@ export function supabaseKnowledgeLayer(): KnowledgeLayer {
       const [decisionsRes, commentsRes] = await Promise.all([
         db
           .from("decisions")
-          .select("decision, note, decided_by, created_at, signal:signals(id, title, sector, market)")
+          .select(
+            "decision, note, decided_by, created_at, signal:signals(id, title, summary_raw, sector, market)",
+          )
           .neq("signal_id", signal.id)
           .order("created_at", { ascending: false })
           .limit(RECENT_LIMIT),
         db
           .from("comments")
-          .select("body, author, created_at, signal:signals(id, title, sector, market)")
+          .select(
+            "body, author, created_at, signal:signals(id, title, summary_raw, sector, market)",
+          )
           .neq("signal_id", signal.id)
           .order("created_at", { ascending: false })
           .limit(RECENT_LIMIT),

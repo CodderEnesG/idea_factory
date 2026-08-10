@@ -168,6 +168,101 @@ describe("buildNotes", () => {
     expect(notes).toEqual([]);
   });
 
+  it("kategorik örtüşme yoksa içerik (başlık/özet) ne kadar benzer olursa olsun eşleşmez", () => {
+    const notes = buildNotes(
+      sig({ sector: "AI", market: null, title: "Fatura otomasyon platformu GİB entegrasyonu" }),
+      [
+        decision({
+          signal: {
+            id: "s2",
+            title: "Fatura otomasyon platformu GİB entegrasyonu klonu",
+            sector: "Retail",
+            market: null,
+          },
+        }),
+      ],
+      [],
+    );
+    expect(notes).toEqual([]);
+  });
+
+  it("aynı kovadaki (kategorik eşleşme) kayıtlar arasında başlık/özet örtüşmesi ayırt edicilik sağlar", () => {
+    const notes = buildNotes(
+      sig({
+        sector: "B2B SaaS",
+        market: null,
+        title: "Fatura otomasyon SaaS",
+        summary_raw: "KOBİ'ler için e-fatura ve GİB entegrasyonu",
+      }),
+      [
+        decision({
+          decided_by: "uzak",
+          signal: {
+            id: "uzak",
+            title: "Müşteri destek SaaS",
+            summary_raw: "canlı sohbet ve ticket yönetimi",
+            sector: "B2B SaaS",
+            market: null,
+          }, // yalnız kategorik: skor 3
+        }),
+        decision({
+          decided_by: "yakin",
+          signal: {
+            id: "yakin",
+            title: "Fatura otomasyon aracı",
+            summary_raw: "KOBİ'ler için GİB entegrasyonlu e-fatura çözümü",
+            sector: "B2B SaaS",
+            market: null,
+          }, // kategorik + içerik örtüşmesi: skor > 3
+        }),
+      ],
+      [],
+    );
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toContain("Fatura otomasyon aracı"); // daha yüksek skor önde
+    expect(notes[1]).toContain("Müşteri destek SaaS");
+  });
+
+  it("jenerik kelimeler (yeni, ürün, startup, launch...) ayırt edicilik skoruna girmez", () => {
+    const notes = buildNotes(
+      sig({
+        sector: "B2B SaaS",
+        market: null,
+        title: "Yeni ürün lansmanı muhasebe",
+        summary_raw: "startup launch",
+      }),
+      [
+        decision({
+          decided_by: "sadece-jenerik",
+          created_at: "2026-06-01T00:00:00Z", // daha yeni ama...
+          signal: {
+            id: "jenerik",
+            title: "Yeni ürün", // sig ile yalnız stopword'lerde örtüşüyor
+            summary_raw: "startup launch",
+            sector: "B2B SaaS",
+            market: null,
+          },
+        }),
+        decision({
+          decided_by: "gercek-ortusme",
+          created_at: "2020-01-01T00:00:00Z", // daha eski ama gerçek kelime örtüşmesi var
+          signal: {
+            id: "gercek",
+            title: "Muhasebe yazılımı",
+            summary_raw: "KOBİ muhasebe",
+            sector: "B2B SaaS",
+            market: null,
+          },
+        }),
+      ],
+      [],
+    );
+    // "muhasebe" gerçek ortak kelime > jenerik kelime örtüşmesi (skor 0 katkı) — eski ama
+    // gerçekten örtüşen kayıt, yeni ama yalnız stopword paylaşan kaydın önüne geçer.
+    expect(notes[0]).toContain("Muhasebe yazılımı");
+    expect(notes[1]).toContain("Yeni ürün");
+  });
+
   it("MAX_NOTES tavanını aşmaz", () => {
     const rows = Array.from({ length: 12 }, (_, i) =>
       decision({
