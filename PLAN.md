@@ -322,6 +322,63 @@ adımlar. Hiçbiri henüz uygulanmadı — kullanıcı yönü seçtiğinde işar
     kaynak için son 7g/30g sinyal sayısı + son görülen tarih + durum (sağlıklı <2g, yavaşladı
     2-7g, sessiz >7g, hiç veri yok). `tldr:kategori` alt-kaynakları tek "tldr" kovasında toplanır.
 
+11. **Mercek backfill — pencere tuzağı** (bulundu 2026-08-10; §11 aday listesinde YOKTU).
+    `analyze.ts:fetchShortlist` ve `triage.ts:fetchToTriage` yalnız **en yeni pencereyi** tarar
+    (`ANALYZE_LIMIT*20` / `TRIAGE_LIMIT*5` satır) — ucuz ve hızlı, ama bir mercek SONRADAN
+    eklendiğinde eski sinyaller o pencereye bir daha asla girmez. Beyaz-alan merceği
+    (2026-08-07) tam bu tuzağa düştü: `analyses` lens=arbitrage **873** vs lens=white_space
+    **74**; kovalanabilir 916 sinyalin **842'sinde** beyaz-alan analizi yoktu. Sonuç:
+    `composite()` tek mercek görünce o merceğin fit'ini aynen döndürdüğü için **kompozit
+    sıralama kartların %92'sinde fiilen tek-mercekliydi** — madde 3'ün ağırlık düzeltmesi ve
+    madde 6'nın band-override'ı da bu boş varsayımın üstünde duruyordu. Aynı tuzak triage'da
+    da vardı (1251 sinyalin yalnız ~156'sında `triage_score`).
+    Çözüm: `apps/worker/src/backfill-lens.ts` (tabloyu sayfa sayfa tarar, eksikleri
+    `triage_score` sırasına göre işler, `BACKFILL_MAX` ile kademeli harcar, resumable) +
+    `triage.ts`'e `TRIAGE_SCAN_ALL=true` sayfalı mod. Tek-sinyal analiz+upsert adımı
+    `lib/analyze-one.ts`'e çıkarıldı — `analyze.ts` ile backfill aynı yolu paylaşır (iki upsert
+    yolu = iki bug). İkisi de **tek seferlik bakım aracı**, cron `tick`'ine girmez; `analyze.ts`
+    ve `triage.ts`'in varsayılan davranışı değişmedi.
+    Ölçüm notu: analiz başına ~3 dk (ağır JSON şeması + uzun prompt) → 842 sinyal sıralı ≈ 42
+    saat, kullanılamaz. `BACKFILL_CONCURRENCY` (varsayılan 4) paralel havuz açar; 1 = eski
+    sıralı davranış (kota sorununda buna düş).
+
+    **Pilot bulgusu — beyaz-alan merceği kompozit skordan ÇIKARILDI (ağırlık 1 → 0).**
+    20'lik pilot koşusu (2026-08-10) merceğin arbitrajdan gerçekten ayrıştığını gösterdi
+    (84 çift-mercekli sinyalde aksiyonların %54'ü farklı, ortalama fit 14.5 puan düşük) — ama
+    **hiçbirinde "kovala" demiyor** (arbitrajda %5.8). Kök neden merceğin kendi prompt'unda:
+    80+ bandı `confidence: high` istiyor, ama talimat "yerli rekabet taraması v1'de zayıf
+    (web_search kapsamı sınırlı) → confidence düşür" diyor — yani **grounding kapalıyken fit
+    yapısal olarak 79'a çakılı.** Kompozite karışınca arbitrajın kovala bandını siliyordu;
+    ölçülen kovala sayısı (aynı 84 sinyal): ağırlık 0 → 12, 0.25 → 3, 0.5 → 2, 1 → 1.
+    Muhalefetin ne kadarı gerçek sinyal, ne kadarı grounding körlüğü — bugün ayırt edilemiyor,
+    o yüzden körlük sıralamaya taşınmıyor. Mercek kartta / `/harita` / `/trend`'de ikinci görüş
+    olarak görünmeye devam eder (`lensViews` ağırlıktan bağımsız). `composite()`'e sıfır-bölme
+    guard'ı eklendi (tüm ağırlıklar 0 ise düz ortalamaya düşer, NaN üretmez).
+    **Grounding (madde 2) devreye girince ağırlık 1'e çıkarılmalı — asıl tasarım o.**
+
+    Kota/kalite notu: Vertex 5 paralelde 429 RESOURCE_EXHAUSTED veriyor (varsayılan paralellik
+    3). Pilotta 20 sinyalin 8'i yazıldı, 5'i kota, 5'i "4 denemede geçerli analiz üretemedi" —
+    bu sonuncusu sinyal başına 4 LLM çağrısı yakıp hiçbir şey üretmiyordu ve hatanın ŞEMA mı
+    GUARD mı olduğu log'dan görünmüyordu; `analyst.ts` artık son ihlali hataya iliştiriyor.
+
+    **Sessiz üretim bug'ı — `lens` id'si (bulundu bu teşhisle).** Yukarıdaki "4 denemede
+    üretemedi" hatalarının nedeni kalibrasyon DEĞİLmiş: model `lens` alanını `"white-space"`
+    (tire) yazıyor, `z.literal("white_space")` reddediyor, 4 deneme de aynı şekilde düşüyordu.
+    Arbitraj tek kelime (`arbitrage`) olduğu için bu tuzağa hiç düşmemişti — **alt tire içeren
+    HER mercek, `/admin/mercekler`de eklenecek custom mercekler dahil, düşüyordu.** Yani
+    beyaz-alan merceğinin 2026-08-07'den beri düşük analiz sayısının bir kısmı da bu bug.
+    Düzeltme (`analyst.ts`): `lens` alanı çağıranın zaten bildiği metadata — şemaya vermeden
+    önce doğru id yazılıyor, modele sordurulmuyor (saf başarısızlık yüzeyi kaldırıldı).
+    3 yeni test (`analyst.test.ts` — yeni dosya). **Ölçülen etki** (12'lik partiler, aynı aday
+    havuzu): düzeltme öncesi 8/20 ve 7/12 başarı + 5 ve 4 şema hatası → düzeltme sonrası
+    **11/12 başarı, 0 şema hatası**; kalan tek hata kaynağı Vertex kotası (429). Yani sinyal
+    başına boşa yakılan 4-çağrılık döngü ortadan kalktı.
+
+    Durum (2026-08-10 kapanış): `analyses` lens=white_space **74 → 102**; 814 aday kaldı.
+    Backfill'in kalanı **aciliyetini yitirdi** — ağırlık 0 olduğu için sıralama doğruluğunu
+    etkilemiyor; değeri eski kartlarda ikinci görüş + `/harita`//`/trend` zenginliği. Parti
+    parti (`BACKFILL_MAX`) koşturulacak bir bakım işi.
+
 **Öncelik notu (2026-08-09 taramasında verilen tavsiye):** en ucuz/en yüksek güven — madde 5 (admin
 API testleri) veya madde 8 (metrik sayfası, sıfır AI maliyeti). En stratejik ama daha büyük iş —
 madde 6 (gerçek geri-besleme döngüsü) veya madde 2 (kademeli model + grounding).
