@@ -176,7 +176,10 @@ export default async function TrendPage() {
           </h2>
           <div className="flex h-40 items-end gap-1.5">
             {weeks.map((w) => (
-              <div key={w.weekStart.toISOString()} className="flex flex-1 flex-col items-center gap-1.5">
+              <div
+                key={w.weekStart.toISOString()}
+                className="flex h-full flex-1 flex-col items-center justify-end gap-1.5"
+              >
                 <div
                   className="flex w-full flex-col-reverse overflow-hidden rounded-t-sm"
                   style={{ height: `${(w.count / maxCount) * 100}%`, minHeight: w.count > 0 ? 4 : 0 }}
