@@ -1,5 +1,4 @@
 import {
-  analyzeSignal,
   arbitrageLens,
   golden,
   isActionableKind,
@@ -18,6 +17,7 @@ import { balanceBySource } from "./lib/balance.js";
 import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
+import { analyzeOne } from "./lib/analyze-one.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
@@ -98,31 +98,7 @@ async function main(): Promise<void> {
     totalTodo += todo.length;
     let ok = 0;
     for (const signal of todo) {
-      try {
-        const a = await analyzeSignal(signal, lens, { fewShot, knowledge, thesis }); // mercek-özel çapalar + ekip geçmişi + env provider/model + aktif tez
-        const { error } = await db.from("analyses").upsert(
-          {
-            signal_id: signal.id,
-            lens: a.lens,
-            fit: a.fit,
-            rationale: a.rationale,
-            evidence: a.evidence,
-            adaptation_notes: lens.extraNote(a),
-            risks: a.risks,
-            confidence: a.confidence,
-            validation_needed: a.validation_needed,
-            recommended_action: a.recommended_action,
-            tags: a.tags,
-            model: env.analysisModel(),
-          },
-          { onConflict: "signal_id,lens" },
-        );
-        if (error) throw new Error(error.message);
-        ok++;
-        console.log(`  ✓ ${a.recommended_action} fit=${a.fit} — ${signal.title.slice(0, 60)}`);
-      } catch (e) {
-        console.error(`  ✗ ${signal.url}:`, e instanceof Error ? e.message : e);
-      }
+      if (await analyzeOne(signal, lens, { fewShot, knowledge, thesis })) ok++;
     }
     console.log(`[${lens.id}] bitti: ${ok}/${todo.length} analiz yazıldı`);
     totalOk += ok;

@@ -11,6 +11,7 @@
     "enrich": "tsx src/enrich.ts",
     "triage": "tsx src/triage.ts",
     "analyze": "tsx src/analyze.ts",
+    "backfill": "tsx src/backfill-lens.ts",
     "digest": "tsx src/digest.ts",
     "tick": "tsx src/ingest.ts && tsx src/enrich.ts && tsx src/triage.ts && tsx src/analyze.ts && tsx src/digest.ts",
     "cron": "tsx src/cron.ts"

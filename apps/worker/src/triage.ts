@@ -13,18 +13,16 @@ const LIMIT = Number(process.env["TRIAGE_LIMIT"] ?? "40");
 // analyze.ts'in fetchUnanalyzed'ı gibi geniş bir pencere çekip istemci tarafında süzüyoruz.
 const WINDOW_MULT = 5;
 const FORCE = process.env["TRIAGE_FORCE"] === "true";
+// Varsayılan "en yeni pencere" eski sinyalleri hiç göremez — bir kere geçmişi kapatmak için
+// tabloyu sayfa sayfa tarayan mod (backfill-lens.ts ile aynı desen). LIMIT yine tavan.
+const SCAN_ALL = process.env["TRIAGE_SCAN_ALL"] === "true";
+const PAGE = 1000; // PostgREST satır tavanı
 
-async function fetchToTriage(limit: number): Promise<{ signal: Signal; enrichment: StoredEnrichment }[]> {
-  const { data, error } = await db
-    .from("signals")
-    .select("*")
-    .not("enriched_at", "is", null)
-    .order("fetched_at", { ascending: false })
-    .limit(limit * WINDOW_MULT);
-  if (error) throw new Error(`DB sorgu hatası: ${error.message}`);
+type Todo = { signal: Signal; enrichment: StoredEnrichment };
 
-  const out: { signal: Signal; enrichment: StoredEnrichment }[] = [];
-  for (const row of (data ?? []) as Signal[]) {
+/** Bir satır grubunu süz; `limit` dolduysa true döner (tarama durdurulabilir). */
+function collect(rows: Signal[], out: Todo[], limit: number): boolean {
+  for (const row of rows) {
     const parsed = StoredEnrichmentSchema.safeParse(row.enrichment);
     // Şema hiç geçmiyorsa dokunma — merge-patch ham jsonb'yi ezerdi (bkz. handle()). enrich.ts
     // zaten geçerli bir şekil yazar; buraya düşmesi enrich.ts/şema uyuşmazlığı demektir, ayrı sorun.
@@ -34,8 +32,37 @@ async function fetchToTriage(limit: number): Promise<{ signal: Signal; enrichmen
     // essay/research zaten analiz edilmeyecek — triage'a da harcanmasın.
     if (enrichment.signal_kind && !isActionableKind(enrichment.signal_kind)) continue;
     out.push({ signal: row, enrichment });
-    if (out.length >= limit) break;
+    if (out.length >= limit) return true;
   }
+  return false;
+}
+
+async function fetchToTriage(limit: number): Promise<Todo[]> {
+  const out: Todo[] = [];
+
+  if (SCAN_ALL) {
+    // Geçmişi kapatma modu: en yeni pencereyle sınırlı kalma, tabloyu sayfa sayfa tara.
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await db
+        .from("signals")
+        .select("*")
+        .not("enriched_at", "is", null)
+        .order("fetched_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(`DB sorgu hatası: ${error.message}`);
+      const rows = (data ?? []) as Signal[];
+      if (collect(rows, out, limit) || rows.length < PAGE) return out;
+    }
+  }
+
+  const { data, error } = await db
+    .from("signals")
+    .select("*")
+    .not("enriched_at", "is", null)
+    .order("fetched_at", { ascending: false })
+    .limit(limit * WINDOW_MULT);
+  if (error) throw new Error(`DB sorgu hatası: ${error.message}`);
+  collect((data ?? []) as Signal[], out, limit);
   return out;
 }
 
@@ -56,7 +83,10 @@ async function handle(signal: Signal, enrichment: StoredEnrichment): Promise<boo
 
 async function main(): Promise<void> {
   const todo = await fetchToTriage(LIMIT);
-  console.log(`${todo.length} sinyal ön-elenecek (model=${env.analysisModel()}${FORCE ? ", FORCE" : ""})`);
+  console.log(
+    `${todo.length} sinyal ön-elenecek (model=${env.analysisModel()}` +
+      `${FORCE ? ", FORCE" : ""}${SCAN_ALL ? ", SCAN_ALL" : ""})`,
+  );
 
   let ok = 0;
   for (const { signal, enrichment } of todo) {

@@ -80,11 +80,31 @@ pnpm analyze              # analiz edilmemiş sinyalleri analistten geçir
 pnpm --filter @idea-factory/worker digest   # markdown digest üret
 pnpm --filter @idea-factory/worker tick     # ingest → analyze → digest (cron için)
 
+# Geçmişe dönük doldurma (tek seferlik bakım — normal tick'i etkilemez):
+BACKFILL_DRY=true pnpm --filter @idea-factory/worker backfill   # kaç aday var, LLM çağırmadan
+BACKFILL_MAX=200 BACKFILL_CONCURRENCY=3 \
+  pnpm --filter @idea-factory/worker backfill                   # BACKFILL_LENS varsayılan white_space
+TRIAGE_SCAN_ALL=true TRIAGE_LIMIT=200 pnpm --filter @idea-factory/worker triage
+
 pnpm eval                 # golden few-shot + 20-vaka eval (ağırlıklı skor + confusion)
 pnpm web                  # kuyruk UI (localhost:3000; Supabase env yoksa demo modu)
 ```
 
 > Not: port 3000 doluysa `pnpm --filter @idea-factory/web exec next dev -p 3100`.
+
+### Neden backfill gerekiyor
+`analyze.ts` ve `triage.ts` yalnız **en yeni pencereyi** tarar (`fetchShortlist`: `ANALYZE_LIMIT*20`
+satır) — hızlı ve ucuz, ama bir mercek SONRADAN eklendiğinde eski sinyaller o pencereye bir daha
+girmez. Beyaz-alan merceği eklendiğinde tam bu oldu (arbitraj 873 analiz / beyaz-alan 74 →
+kompozit sıralama kartların %92'sinde tek-mercekliydi). `backfill-lens.ts` tabloyu sayfa sayfa
+tarar, eksikleri `triage_score` sırasına göre işler, `BACKFILL_MAX` ile kademeli harcar ve
+resumable'dır (tekrar çalıştır = kaldığı yerden). `TRIAGE_SCAN_ALL=true` triage için aynı şeyi
+yapar. İkisi de tek seferlik bakım aracı — cron `tick`'ine girmez.
+
+> Analiz başına dakikalar sürüyor (ağır JSON şeması + guard retry); `BACKFILL_CONCURRENCY`
+> (varsayılan 3) paralel havuz açar. Vertex kotası dar — 5 paralelde `429 RESOURCE_EXHAUSTED`
+> görülüyor; kota hatası alırsan 1-2'ye düşür. Başarısız sinyal satır yazmadığı için sonraki
+> koşuda otomatik yeniden denenir.
 
 ## v1 kapsam notları
 - Tek mercek (arbitraj), tek model (config `ANALYSIS_MODEL`, Opus). Kademeli model = faz 2.
