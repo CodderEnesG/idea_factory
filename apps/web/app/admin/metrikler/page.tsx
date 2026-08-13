@@ -4,7 +4,7 @@ import { loadItems } from "../../../lib/load-items";
 import { loadLensRegistry } from "../../../lib/load-lens-registry";
 import { weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal } from "../../../lib/metrics";
 import { computeSourceHealth, type SourceHealth, type SourceStatus } from "../../../lib/source-health";
-import { Navbar } from "../../../components/Navbar";
+import { AppSidebar } from "../../../components/AppSidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -123,9 +123,9 @@ export default async function AdminMetriklerPage() {
 
   if (!admin) {
     return (
-      <div>
-        <Navbar me={me} current="metrikler" />
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center text-sm text-ink-muted">
+      <div className="flex h-screen overflow-hidden">
+        <AppSidebar me={me} current="metrikler" />
+        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-ink-muted">
           Bu sayfa yalnız adminlere açık.
         </div>
       </div>
@@ -153,9 +153,10 @@ export default async function AdminMetriklerPage() {
   const noise = noiseRatio(items, lensRegistry);
 
   return (
-    <div>
-      <Navbar me={me} current="metrikler" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar me={me} current="metrikler" />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <header className="mb-6">
           <h1 className="font-display text-3xl font-bold">Metrikler</h1>
           <p className="mt-1 text-sm text-ink-secondary">
@@ -224,6 +225,7 @@ export default async function AdminMetriklerPage() {
         <div className="mt-4">
           <SourceHealthTable rows={sourceHealth} />
         </div>
+      </div>
       </main>
     </div>
   );

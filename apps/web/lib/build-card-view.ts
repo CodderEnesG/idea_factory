@@ -8,7 +8,8 @@ import {
 } from "@idea-factory/core";
 import type { Decision, UserDecision } from "../components/DecisionButtons";
 import type { Comment } from "../components/Comments";
-import type { CardView, DebateView } from "./card-view";
+import type { TaskItem } from "../components/TaskList";
+import type { CardView, DebateView, Fact } from "./card-view";
 
 const KIND_LABEL: Record<string, string> = {
   venture: "girişim",
@@ -27,6 +28,7 @@ export function buildCardView(
   mine: Decision | null,
   others: UserDecision[],
   comments: Comment[],
+  tasks: TaskItem[],
   lensRegistry: Lens[],
   isAdmin: boolean,
   debates: DebateView[],
@@ -40,14 +42,14 @@ export function buildCardView(
   const notActionable = enr?.signal_kind ? !isActionableKind(enr.signal_kind) : false;
   const noData = !enr;
 
-  const facts: string[] = [];
+  const facts: Fact[] = [];
   if (enr) {
-    if (enr.hq_country) facts.push(`🌍 ${enr.hq_country}`);
-    if (enr.markets.length) facts.push(enr.markets.join(", "));
+    if (enr.hq_country) facts.push({ kind: "geo", text: enr.hq_country });
+    if (enr.markets.length) facts.push({ kind: "markets", text: enr.markets.join(", ") });
     if (enr.funding.stage || enr.funding.amount)
-      facts.push(`💰 ${[enr.funding.stage, enr.funding.amount].filter(Boolean).join(" ")}`);
-    if (enr.target_users) facts.push(`👥 ${enr.target_users}`);
-    if (enr.traction) facts.push(`📈 ${enr.traction}`);
+      facts.push({ kind: "funding", text: [enr.funding.stage, enr.funding.amount].filter(Boolean).join(" ") });
+    if (enr.target_users) facts.push({ kind: "users", text: enr.target_users });
+    if (enr.traction) facts.push({ kind: "traction", text: enr.traction });
   }
 
   const lensViews = lensRegistry
@@ -91,6 +93,7 @@ export function buildCardView(
     mine,
     others,
     comments,
+    tasks,
     isAdmin,
     debates,
   };

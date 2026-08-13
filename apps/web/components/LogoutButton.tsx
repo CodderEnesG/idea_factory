@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { IconLogout } from "./icons";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -22,9 +23,11 @@ export function LogoutButton() {
     <button
       onClick={out}
       disabled={busy}
-      className="text-xs text-ink-muted transition hover:text-ink disabled:opacity-50"
+      title="Çıkış"
+      aria-label="Çıkış"
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-btn text-ink-muted transition hover:bg-white/[0.05] hover:text-kill disabled:opacity-50"
     >
-      Çıkış
+      <IconLogout className="h-4 w-4" />
     </button>
   );
 }

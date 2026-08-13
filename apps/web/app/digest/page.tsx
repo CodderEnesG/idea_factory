@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getSession } from "../../lib/auth";
 import { loadDigests } from "../../lib/load-digests";
-import { Navbar } from "../../components/Navbar";
+import { AppSidebar } from "../../components/AppSidebar";
+import { DigestMarkdown } from "../../components/DigestMarkdown";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,10 @@ export default async function DigestPage({
   const selected = digests.find((d) => d.id === searchParams.id) ?? digests[0] ?? null;
 
   return (
-    <div>
-      <Navbar me={me} current="digest" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar me={me} current="digest" />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <header className="mb-6">
           <h1 className="font-display text-3xl font-bold">Digest</h1>
           <p className="mt-1 text-sm text-ink-secondary">
@@ -66,11 +68,12 @@ export default async function DigestPage({
               </div>
             </div>
 
-            <div className="glass overflow-x-auto p-4">
-              <pre className="whitespace-pre-wrap text-sm text-ink">{selected?.markdown}</pre>
+            <div className="glass p-4">
+              <DigestMarkdown markdown={selected?.markdown ?? ""} />
             </div>
           </div>
         )}
+      </div>
       </main>
     </div>
   );

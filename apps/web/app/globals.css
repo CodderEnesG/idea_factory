@@ -19,6 +19,45 @@ body {
   background: rgba(124, 58, 237, 0.3);
 }
 
+/* OS varsayılan scrollbar (ok butonlu, gri track) koyu temayla çakışıyor — ince, oksuz,
+   şeffaf-track çubuk. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* Fırsat kuyruğu listesi gibi dar/yoğun sütunlarda 0.14 opasiteli çubuk fark edilmiyordu —
+   bu sınıfla daha belirgin bir varyant. */
+.scroll-emphasis {
+  scrollbar-color: rgba(255, 255, 255, 0.34) transparent;
+}
+.scroll-emphasis::-webkit-scrollbar {
+  width: 10px;
+}
+.scroll-emphasis::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.34);
+}
+.scroll-emphasis::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.48);
+}
+
 /* Landing menekşe radial glow + hafif yıldız-toz imzası — "operatör konsolu" (BRANDING.md §8.1) */
 .glow-backdrop {
   background:

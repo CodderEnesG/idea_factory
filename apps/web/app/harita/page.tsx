@@ -2,8 +2,9 @@ import { composite, isBench, type Lens, type RankedItem } from "@idea-factory/co
 import { getSession } from "../../lib/auth";
 import { loadItems } from "../../lib/load-items";
 import { loadLensRegistry } from "../../lib/load-lens-registry";
-import { Navbar } from "../../components/Navbar";
+import { AppSidebar } from "../../components/AppSidebar";
 import { BandBar, BandLegend } from "../../components/BandBar";
+import { IconAward } from "../../components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,11 @@ function BucketList({ title, buckets }: { title: string; buckets: Bucket[] }) {
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="text-ink">{b.name}</span>
               <span className="flex items-center gap-2 text-ink-muted">
-                {b.bench > 0 && <span title="bench">🏅 {b.bench}</span>}
+                {b.bench > 0 && (
+                  <span title="bench" className="inline-flex items-center gap-1">
+                    <IconAward className="h-3 w-3" /> {b.bench}
+                  </span>
+                )}
                 <span className="font-display font-semibold text-ink">{b.count}</span>
               </span>
             </div>
@@ -87,9 +92,10 @@ export default async function HaritaPage() {
   const markets = bucketBy(items, (i) => i.signal.market, lensRegistry);
 
   return (
-    <div>
-      <Navbar me={me} current="harita" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar me={me} current="harita" />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <header className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Sektör Haritası</h1>
@@ -114,6 +120,7 @@ export default async function HaritaPage() {
             <BucketList title="Pazarlar" buckets={markets} />
           </div>
         )}
+      </div>
       </main>
     </div>
   );

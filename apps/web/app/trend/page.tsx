@@ -2,7 +2,7 @@ import { composite, type Lens, type RankedItem } from "@idea-factory/core";
 import { getSession } from "../../lib/auth";
 import { loadItems } from "../../lib/load-items";
 import { loadLensRegistry } from "../../lib/load-lens-registry";
-import { Navbar } from "../../components/Navbar";
+import { AppSidebar } from "../../components/AppSidebar";
 import { BandLegend } from "../../components/BandBar";
 
 export const dynamic = "force-dynamic";
@@ -151,9 +151,10 @@ export default async function TrendPage() {
   const sourceShift = distributionShift(items, (i) => i.signal.source);
 
   return (
-    <div>
-      <Navbar me={me} current="trend" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar me={me} current="trend" />
+      <main className="min-w-0 flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <header className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Trend Raporu</h1>
@@ -205,6 +206,7 @@ export default async function TrendPage() {
           <ShiftTable title="Sektör dağılımı" rows={sectorShift} />
           <ShiftTable title="Kaynak dağılımı" rows={sourceShift} />
         </div>
+      </div>
       </main>
     </div>
   );

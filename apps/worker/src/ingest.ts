@@ -7,6 +7,8 @@ import { techcrunch } from "./sources/techcrunch.js";
 import { ycombinator } from "./sources/ycombinator.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
+import { loadActiveIngestionSettings } from "./lib/ingestion-settings-db.js";
+import { limitPerSource } from "./lib/limit-per-source.js";
 
 const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch, ycombinator];
 
@@ -39,17 +41,39 @@ async function filterExisting(signals: Signal[]): Promise<Signal[]> {
   return signals.filter((s) => !existingUrl.has(s.url) && !existingHash.has(s.content_hash));
 }
 
-async function main(): Promise<void> {
+/** Sabit boyutlu havuz (bkz. backfill-lens.ts): `concurrency` kadar kaynak aynı anda çeker.
+ *  concurrency=1 → eskisiyle birebir aynı, sıralı davranış. Bir kaynağın patlaması diğerlerini
+ *  düşürmez (try/catch korunuyor). */
+async function fetchAll(settings: { per_source_limit: number; concurrency: number }): Promise<Signal[]> {
   let collected: Signal[] = [];
-  for (const src of SOURCES) {
-    try {
-      const rows = await src.fetch();
-      console.log(`[${src.name}] ${rows.length} sinyal çekildi`);
-      collected = collected.concat(rows);
-    } catch (e) {
-      console.error(`[${src.name}] çekim hatası:`, e instanceof Error ? e.message : e);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      if (i >= SOURCES.length) return;
+      const src = SOURCES[i];
+      if (!src) return;
+      try {
+        const rows = limitPerSource(await src.fetch(), settings.per_source_limit);
+        console.log(`[${src.name}] ${rows.length} sinyal çekildi`);
+        collected = collected.concat(rows);
+      } catch (e) {
+        console.error(`[${src.name}] çekim hatası:`, e instanceof Error ? e.message : e);
+      }
     }
-  }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(settings.concurrency, SOURCES.length) }, worker),
+  );
+  return collected;
+}
+
+async function main(): Promise<void> {
+  const settings = await loadActiveIngestionSettings();
+  console.log(
+    `toplama ayarları: kaynak başı limit=${settings.per_source_limit || "sınırsız"}, paralellik=${settings.concurrency}`,
+  );
+  const collected = await fetchAll(settings);
 
   const deduped = dedupeBatch(collected);
   const fresh = await filterExisting(deduped);

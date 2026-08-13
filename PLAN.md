@@ -296,7 +296,8 @@ adımlar. Hiçbiri henüz uygulanmadı — kullanıcı yönü seçtiğinde işar
    tutarlı bir çözümle** (e-posta/SMTP gibi yeni ücretli/harici bağımlılık EKLENMEDİ). Kök sorun
    dağıtım kanalının GitHub Actions artifact'i olmasıydı (30 gün sonra silinir, indirmek gerekir)
    — asıl kayıt artık DB'de: `supabase/migrations/0010_digests.sql` (yeni `digests` tablosu, 0005
-   RLS deseni — **kullanıcı Supabase Dashboard'dan UYGULAMALI**, henüz yapılmadı). `apps/worker/
+   RLS deseni — **uygulandı** [2026-08-12'de REST API ile doğrulandı: `GET .../rest/v1/digests`
+   200 döndü, kayıt var]). `apps/worker/
    src/digest.ts` her koşuda hem lokale (`digests/*.md`, değişmedi) hem bu tabloya yazıyor. Yeni
    `/digest` sayfası (tüm authenticated kullanıcılara açık, admin-only değil — queue/harita/trend
    ile aynı görünürlük): geçmiş çalıştırmalar listesi + seçili digest'in markdown'ı düz metin
@@ -404,10 +405,508 @@ ekleme/değiştirme akışının (Faz 3-C admin-mercek UI) uçtan uca çalışt�
 sağlamlaştırmak. Madde 9 kod pipeline'ına girmiyor (yukarıda somutlaştırıldı, kullanıcı
 tarafından ayrıca yürütülecek).
 
-**Bu turun kapanışı (2026-08-09/10, aynı oturum): 4, 10, 3, 7 — DÖRDÜ DE TAMAM.** Kullanıcıda
-kalan tek elle-yapılacak iş: `supabase/migrations/0010_digests.sql`'i Supabase Dashboard → SQL
-Editor'den uygulamak (0003/0006/0007/0008/0009 ile aynı desen) — uygulanana kadar `/digest`
-sayfası gerçek ortamda boş liste gösterir (çökmez, `loadDigests()` hatayı yutup `[]` döner).
+**Bu turun kapanışı (2026-08-09/10, aynı oturum): 4, 10, 3, 7 — DÖRDÜ DE TAMAM.**
+`supabase/migrations/0010_digests.sql` de uygulandı (2026-08-12, Supabase REST API üzerinden
+doğrulandı — `digests` tablosu DB'de mevcut ve dolu). Elle yapılacak iş kalmadı.
 Sıradaki: yalnız **madde 2** (kademeli model + grounding) kaldı, henüz başlanmadı — büyük/
 stratejik bir karar, kullanıcıyla kısa bir tasarım turu gerekir (bkz. [[feedback-explain-
 before-big-decisions]]).
+
+## 12. Faz 5 — UI/UX ve çalışma alanı (başladı 2026-08-12)
+
+Faz 1-3 tamamlandı (pipeline + admin araçları). Kullanıcı bu kez ürünü "ham liste + filtre"
+seviyesinden çıkarmayı istedi — 4 somut madde: (1) sayfa/menü/UI-UX yapısı baştan
+tasarlanmalı, (2) yalnız adminler değil tüm ekip üyeleri rahat kullanabilmeli, (3) "kovala/
+izle/ele" gerçek bir klasör yapısına dönüşüp aktif adım atılabilmeli, (4) her şey tek uzun
+listede akmamalı (biçime karar verme kullanıcı tarafından bana bırakıldı).
+
+Netleştirme (kullanıcıyla, aynı oturum): kapsam mevcut davetli `members` — public/self-signup
+YOK; "aktif adım" = hafif görev/checklist katmanı, tam bir CRM/iş akışı motoru DEĞİL. Görsel
+sistem (`BRANDING.md` §8: koyu tema/glass/marka renkleri, kovala-izle-ele paleti) **kilitli**
+kalıyor — burada "baştan tasarım" IA/navigasyon/etkileşim seviyesinde.
+
+Üç dilime bölündü:
+
+1. ~~**Faz 5.1 — "Panom"**~~ — **TAMAM (2026-08-12).** Yeni `item_tasks` tablosu
+   (`supabase/migrations/0011_item_tasks.sql`, `0005`'teki RLS deseniyle) + `/api/tasks`
+   (POST) ve `/api/tasks/[taskId]` (PATCH, yalnız görevin sahibi veya admin işaretleyebilir).
+   Yeni `components/TaskList.tsx` (`Comments.tsx` ile aynı iskelet), `OpportunityCard`'a
+   `item.mine !== null` iken eklendi. Yeni `app/panom/page.tsx`: kararı verilmiş sinyaller
+   Kovala/İzle/Ele başlıkları altında gruplanır, kararsız sinyaller hiç görünmez — Kuyruk'un
+   arama/filtre/sonsuz-liste mantığı kasıtlı olarak yok (Kuyruk = keşif, Panom = zaten karar
+   verilmiş olanı yönetme). `queue/page.tsx`'teki `loadDecisions`/`loadComments`/`loadDebates`
+   yerel fonksiyonları `lib/load-decisions.ts` / `lib/load-comments.ts` / `lib/load-debates.ts`'e
+   çıkarıldı (Panom da aynısına ihtiyaç duyduğu için — iki sayfa artık paylaşıyor), + yeni
+   `lib/load-tasks.ts`. `Navbar`'a admin kapısı olmayan yeni "Panom" sekmesi eklendi (yalnız
+   giriş yapmış kullanıcıya görünür). Madde 3'ü doğrudan, madde 4'ü kısmen çözer.
+
+   **Navbar düzeltmesi (aynı gün, kullanıcı geri bildirimi: "menü çok karmaşıklaşmaya
+   başladı").** Panom eklenince admin için düz sekme sayısı 8'e çıkmıştı (Kuyruk/Panom/
+   Harita/Trend/Digest/Tez/Mercekler/Metrikler). Yeni `components/NavDropdown.tsx`
+   (client, dışarı tıklayınca kapanan açılır menü, `glass` token'ıyla tutarlı) —
+   Harita/Trend/Digest "Raporlar" altında, Tez/Mercekler/Metrikler (admin-only) "Admin"
+   altında toplandı. Düz sekme sayısı admin için 4'e (Kuyruk/Panom/Raporlar/Admin), üye
+   için 3'e (Kuyruk/Panom/Raporlar) indi. `browse` ile doğrulandı (gerçek `AUTH_SECRET`'le
+   imzalanmış geçici test JWT'siyle): her iki dropdown açılıyor, aktif grup alt-çizgiyle
+   vurgulanıyor, dışarı tıklayınca kapanıyor, iç linkler doğru sayfaya gidiyor, konsol
+   hatasız.
+2. ~~**Faz 5.2**~~ — **TAMAM (2026-08-13).** Kullanıcı: "pipeline'a al, soru sorma" —
+   iki alt madde otomatik/soru sormadan yürütüldü:
+   1. **Hızlı tarama.** Yeni `app/queue/tarama/page.tsx` + `components/TriageStack.tsx`:
+      yalnız `mine === null` sinyaller, tek kart, `1/2/3` tuşları (Kovala/İzle/Ele — DOM'da
+      `data-decision` özniteliğiyle `DecisionButtons`'ın gerçek butonuna tıklatılıyor, fetch
+      mantığı tekrarlanmadı) veya `→` (Atla, karara bağlanmadan sıradakine geç). Karar
+      verilince `DecisionButtons`'a eklenen `onDecided` callback'iyle otomatik ilerliyor.
+      `/queue` başlığına yalnız kararsız sinyal varsa görünen "⚡ Hızlı tarama (N)" girişi
+      eklendi — navbar'a YENİ bir sekme eklenmedi (madde 2'nin menü-sadeleştirme dersi
+      tazeydi). `FitRing`/`BAND` `OpportunityCard`'dan `components/card-visuals.tsx`'e
+      çıkarıldı (iki bileşen artık paylaşıyor). `browse` ile uçtan uca doğrulandı: `2`
+      tuşuna basınca gerçek DB'ye İzle kararı yazıldı, sayaç 0/885 → 1/885 ilerledi, yeni
+      kart geldi — test kaydı sonra temizlendi.
+
+      **SÜPERSEDE (2026-08-13, §13 Faz 5.4).** Ayrı `/queue/tarama` sayfası ve
+      `TriageStack.tsx` kaldırıldı — aynı deneyim (tek odak + oto-ilerleme) artık Kuyruk'un
+      kendi sağ paneline "Yalnız kararsızlar" anahtarıyla taşındı. Aşağıda §13'e bakınız.
+   2. **Harita/Trend/Digest görsel tutarlılığı — değerlendirildi, iş çıkmadı.** Üç sayfa da
+      okundu: ikisi de zaten aynı `Navbar` + `mx-auto max-w-5xl px-6 py-8` + `font-display
+      text-3xl font-bold` başlık + `glass` kart + demo-banner desenini kullanıyor
+      (BRANDING.md §8'de kilitlenen sistemin doğal sonucu). Ayrı bir "redesign" işi
+      icat etmek yerine bulgu olduğu gibi bırakıldı — gerçek bir tutarsızlık yoktu.
+3. ~~**Faz 5.3**~~ — **KISMEN TAMAM (2026-08-13, dar kapsamlı geçiş).** Üye-yüzü kopyada
+   somut, düşük riskli iki düzeltme: (1) ham İngilizce `low/med/high` enum'u artık
+   `components/card-visuals.tsx::CONFIDENCE_LABEL` ile "düşük/orta/yüksek" gösteriliyor
+   (OpportunityCard + TriageStack, 3 kullanım yeri). (2) fit halkasına `title="Uyum skoru:
+   N/100"` tooltip'i eklendi. "Fit" terimi ve "Panom"/"bench" gibi zaten yerleşik/tekrar
+   kullanılan terimler kanıt olmadan DEĞİŞTİRİLMEDİ (yüksek etki alanı, düşük kanıt —
+   gereksiz kırılma riski). Tam kapsamlı dil denetimi hâlâ açık, ileride somut bir
+   kafa karışıklığı sinyali gelirse ele alınır.
+
+## 13. Faz 5.4 — Kuyruk'un yeniden mimarisi: sol/sağ panel + Panom "e şimdi ne olacak?" (TAMAM, 2026-08-13)
+
+Kullanıcı tek mesajda yedi ayrı istek getirdi ve açıkça "pipeline'a al, hiç soru sorma, meta
+pipeline ile kontrol et" dedi — bu yüzden hiçbiri AskUserQuestion ile sorulmadı, hepsi burada
+gerekçesiyle birlikte kayıtlı (ileride "neden böyle karar verildi" sorusunun cevabı burası).
+
+1. **Kuyruk'un tam yeniden mimarisi — sol liste + sağ detay paneli.** `components/QueueBoard.tsx`
+   artık tek sütun tam-kart liste değil: sol tarafta taranabilir kompakt satırlar
+   (`components/QueueRow.tsx` — puan, bant rengi, başlık, kaynak), sağda tıklanan sinyalin tam
+   detayı (`components/DetailPanel.tsx` — her zaman açık, "detayları gör" toggle'ı yok, çünkü
+   zaten tek odak). Seçim tamamen client-side state (`selectedId`) — sayfa yenilenmeden anında
+   değişir. `/queue/tarama` sayfası ve `TriageStack.tsx` bununla birleşti: "Yalnız kararsızlar"
+   anahtarı + oturum-içi `localMine`/`skipped` state'i aynı tek-odak + oto-ilerleme deneyimini
+   sol/sağ panelin İÇİNDE veriyor — oto-ilerleme ekstra kod gerektirmedi: seçili öğe filtreden
+   düşünce (`selected = filtered.find(...) ?? filtered[0]`) otomatik olarak bir sonraki
+   kararsız sinyale düşüyor. Karar verilince tam sayfa yenilemeden liste/sayaçlar güncellensin
+   diye `localMine: Map<id, Decision>` ile sunucu verisinin üstüne oturum-içi override
+   bindiriliyor. `max-w-5xl` → Kuyruk özelinde `max-w-7xl` (iki panel yer istiyor), diğer
+   sayfalarda `max-w-6xl` (kullanıcı: "sol ve sağdan margin çok fazla").
+2. **Sürükle-bırak karar (Faz 5.4 madde 2).** Yeni `components/SwipeCard.tsx` — fare
+   sürükleme + dokunmatik kaydırma, sağa=Kovala, sola=Ele, yukarı=İzle (eşik 110px, sürüklenen
+   yöne göre renkli "damga" belirir). Buton/link/input üstünde başlayan sürüklemeler yok
+   sayılır (tıklamalar bozulmasın). `1/2/3` klavye kısayolları da korundu (Hızlı tarama'dan
+   miras). **Bulunan ve düzeltilen gerçek bug:** `DecisionButtons`'ın `chosen` state'i
+   `useState(mine)` ile yalnız ilk mount'ta kuruluyor — TriageStack'te kart değiştiğinde
+   (aynı ağaç konumu, yalnız prop değişimi) React state'i SIFIRLAMIYORDU, yani bir kart
+   "İzle" işaretlenip ilerlenince bir SONRAKİ kart da yanlışlıkla "İzle ✓" gösterebilirdi.
+   `DetailPanel`'de kök elemana `key={item.id}` eklenerek her sinyal geçişinde tam remount
+   garanti edildi — TriageStack zaten kaldırıldığı için orada düzeltilmedi, ama aynı desen
+   `PanomCard`/`QueueRow`'da zaten `.map()` içinde stabil `key`'e sahip oldukları için hiç
+   risk taşımıyordu (yalnız "değişen tekli kart" deseninde ortaya çıkan bir sınıf hata).
+3. **Panom'un "e şimdi ne olacak?" sorununa cevabı.** Kullanıcının tarif ettiği kopukluk (AI
+   seçti → sen karar verdin → yorum yapıldı → AI tartıştı → e şimdi?) için yeni
+   `components/PanomCard.tsx` — `OpportunityCard`'ın küçültülmüş kopyası değil, ayrı bir amaç:
+   üstte tek satır "karar izi" (AI: {bant} · Sen: {karar} · uyuşmuyorsa "AI'dan farklı karar"
+   rozeti · varsa AI Yorumcusu'nun nihai kararı), altında HER ZAMAN açık görev listesi (Kuyruk'un
+   aksine `mine !== null` şartına bağlı değil — Panom'da zaten hep var). Analiz/yorumlar
+   "Analiz ve yorumları gör" ile isteğe bağlı açılır — Panom tekrar okumak için değil, sonraki
+   adımı atmak için var. `browse` ile gerçek veriyle doğrulandı: AI "Kovala" derken kullanıcı
+   "İzle" dediği ve ekipten birinin ("muhammed") daha önce gerçek bir AI Yorumcusu tartışması
+   ("ELE" sonucuyla) kaydettiği canlı bir sinyalde üçü de doğru göründü.
+4. **Sayfa geçişleri artık "tıkla, donmuş gibi bekle" değil.** Yeni `components/PageSkeleton.tsx`
+   (Navbar'ın statik iskeleti + nabız atan satırlar) — Kuyruk/Panom/Harita/Trend/Digest/
+   admin/* rotalarının hepsine `loading.tsx` eklendi. Next App Router bunu RSC verisi
+   gelmeden ANINDA gösteriyor; kök nedeni tam çözmüyor (ağır sorgular hâlâ ağır — bkz. madde 6
+   altındaki not) ama "hiçbir şey olmuyor" hissini kırıyor.
+5. **Tez/Mercek/Toplama tek çatı altında: "Ayarlar".** Navbar'daki "Admin" açılır menüsü
+   "Ayarlar" oldu, yeni "Toplama" girişi eklendi (Metrikler raporlama olduğu için ayrılmadı —
+   yeni bir düz sekme daha eklemek madde 1'in menü-sadeleştirme dersini bozardı).
+6. **Toplama Ayarları — gerçek, ama dürüst kapsamla.** Yeni `admin/toplama` sayfası +
+   `ingestion_settings` tablosu (`0012_ingestion_settings.sql`, `thesis_versions` deseniyle
+   birebir: versiyonlu, tek aktif satır, rollback için eskiler durur). Araştırma (Explore ajanı)
+   ile çekimin gerçek mimarisi çıkarıldı: `apps/worker/src/ingest.ts`'te kaynak başına limit
+   HİÇ yoktu, sıklık iki ayrı statik yerde sabitti (`cron.ts`'in `CRON_SCHEDULE` env'i VE
+   `.github/workflows/cron-tick.yml`'in YAML cron'u — ikisi de DB'den okunmuyor). Bu yüzden
+   **yalnız gerçekten kontrol edilebilen iki kol** DB'ye bağlandı: kaynak başına üst sınır
+   (`limitPerSource`, en yeni `posted_at`'e göre kırpar — yeni `apps/worker/src/lib/
+   limit-per-source.ts`, 4 test) ve paralellik (`ingest.ts`'in sıralı for-loop'u
+   `backfill-lens.ts`'teki sabit-boyutlu havuz desenine çevrildi — `Promise.all` + worker
+   fonksiyonu). **Sıklık BİLİNÇLİ OLARAK DB'ye taşınmadı** — sahte bir "her X saatte" alanı
+   eklemek, hiçbir şeyi değiştirmeyeceği için yanıltıcı olurdu; admin sayfasında bunun neden
+   ve nerede sabit olduğu açıkça yazıyor. `/api/admin/ingestion-settings` `thesis`
+   route'uyla birebir aynı iskelet (8 test).
+7. **Ad bulma.** Kovala/İzle/Ele'nin ortak bir adı yoktu — artık **"Karar"** (`BandLegend`'a
+   "Karar:" öneki eklendi, zaten `decisions` şemasında/kod genelinde kullanılan kelime,
+   yeni bir jargon icat edilmedi). Çekim ayarları için "tarama" (artık UI özelliği) ve
+   "kaynaklar" (Metrikler'de kaynak sağlığı) ile çakışmayan **"Toplama Ayarları"** seçildi.
+
+**Temizlik:** `components/OpportunityCard.tsx` (artık hiçbir yerden import edilmiyor —
+`DetailPanel`/`PanomCard`'a bölündü) silindi; ölü kod bırakılmadı.
+
+**Doğrulama:** `pnpm typecheck` ve `pnpm -r test` (packages/core 61 + apps/worker 36 +
+apps/web 97 = 194 test) yeşil. `browse` ile gerçek DB'ye karşı uçtan uca: Kuyruk'ta satır
+tıklama → sağ panel anında değişiyor, karar verme → sayaçlar/liste tam sayfa yenilemeden
+güncelleniyor, `/panom`'da karar izi + AI Yorumcusu doğru gösteriliyor, `/admin/toplama` her
+iki alanı da kaydediyor (migration uygulanmadığı için "kaydedilemedi" — beklenen, aşağıya
+bakınız) — üretilen tüm test kararları sonrasında service-role ile silindi, DB'de iz kalmadı.
+
+**Bekleyen elle iş (değişmedi, yalnız listeye ikinci madde eklendi):**
+`supabase/migrations/0011_item_tasks.sql` VE `0012_ingestion_settings.sql`'in ikisi de
+Supabase Dashboard → SQL Editor'e elle uygulanması gerekiyor (önceki 11 migration'la aynı
+sebep: yalnız REST API erişimi var, doğrudan Postgres bağlantısı/DDL yetkisi yok). Uygulanana
+kadar görev ekleme ve toplama ayarı kaydetme temiz bir hata mesajıyla 500 döner, çökme olmaz.
+
+## 14. Faz 5.4 düzeltmesi — gerçek 100vh kabuk + "Bloomberg terminal" görsel yönü (TAMAM, 2026-08-13)
+
+Kullanıcı §13'ün sonucunu görünce "tasarım hâlâ istediğim gibi değil, sorular sor" dedi.
+Sorular şunu ortaya çıkardı: **§13'teki split-pane aslında spesifikasyonu tam karşılamıyordu.**
+Kullanıcının orijinal isteği ("sol alan, sağ alan olmalı, border line ile ayrılmalı, 100vh
+olmalı — navbar değil") hem sol HEM sağ panelin navbar hariç kalan tüm yüksekliği kaplayıp
+bağımsız kaymasıydı; §13'te yalnız SOL liste `sticky`/`max-h` ile sınırlanmıştı, sağ detay
+paneli hâlâ normal sayfa akışında kayıyordu — gerçek bir app-shell değil, sadece "sticky
+sidebar'lı bir sayfa"ydı. Kullanıcının "olmadı" demesi haklıydı.
+
+1. **/design-shotgun ile 3 görsel yön üretildi.** `$D generate` (design binary) hiç
+   yapılandırılmamış OpenAI anahtarı yüzünden anında başarısız oldu (3 paralel ajan da aynı
+   hatayı verdi) — API anahtarı kurulumunu beklemek yerine gerçek Tailwind token'larıyla
+   HTML/CSS mockup'lara geçildi (bu spesifik durumda AI-görsel üretiminden daha isabetli:
+   piksel-doğru). Sekmeli tek bir karşılaştırma sayfası → Artifact olarak yayınlandı
+   (`kuyruk-panom-shell-20260813`, gbrain taste-memory'ye `approved.json` ile kaydedildi):
+   **A) Terminal Konsolu** (bloomberg-terminal, monospace, gri-öncelikli), **B) Kart Stüdyosu**
+   (sıcak/editoryal, serif, gerçek gölge), **C) Sinyal Işıkları** (mevcut mor/eflatun markanın
+   evrimi, bölgeli sağ panel). Üçü de aynı zorunlu yapıyı paylaşıyordu: navbar altında tam
+   yükseklikte, dikey çizgiyle ayrılmış sol liste + sağ detay, her ikisi bağımsız kayan.
+2. **Kullanıcı kararı: "C olsun fakat bloomberg-terminal hissi verilsin."** İki yön birleştirildi
+   (aynı Artifact URL'sine yeniden yayınlandı, C sekmesi varsayılan): marka kimliği (gerçek
+   `#7c3aed`/`#d946ef` mor-eflatun, gerçek `pursue`/`watch`/`kill` hex'leri) korunurken veri
+   tipografisi monospace'e geçti, sıralar sıklaştırıldı, çizgi opaklığı artırıldı, parıltı
+   geri çekildi.
+3. **Gerçek uygulamaya işlendi — bu sefer spesifikasyona tam uyan app-shell:**
+   - `app/queue/page.tsx`: `<main>` artık `flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden`
+     — `mx-auto max-w-7xl px-6 py-8` kaldırıldı (kenardan kenara, ortalı-boşluklu DEĞİL).
+   - `components/QueueBoard.tsx`: baştan yazıldı. Eski başlık+3-kutu+filtre-çubuğu+pill-satırı
+     (~250px) tek, kaymayan bir üst şeride sıkıştırıldı (`shrink-0`, ~90px — kullanıcı: "sol ve
+     sağdan margin çok fazla"). Altında `flex min-h-0 flex-1`: sol `w-[340px] overflow-y-auto
+     border-r`, sağ `flex-1 overflow-y-auto` — ikisi de gerçekten bağımsız kayıyor (önceki
+     versiyonda sağ panel kaymıyordu, sayfayla birlikte akıyordu). `browse` ile doğrulandı: sol
+     listeyi sabit tutup sağ paneli 1900px kaydırdım, sol hiç kımıldamadı.
+   - Tipografi: `card-visuals.tsx::FitRing`, `DetailPanel`, `QueueRow`, `PanomCard`,
+     `TaskList`, `DecisionButtons`'taki veri metinleri (puan, bant etiketi, güven, meta,
+     görev satırları, karar butonları) `font-mono` oldu — yalnız BU bileşenlerde (paylaşılan
+     `border-hair`/`rounded-card` gibi global token'lar DEĞİŞMEDİ, etkisi yalnız Kuyruk/Panom'a
+     kapsandı; Harita/Trend/Digest/admin sayfaları kasıtlı olarak dokunulmadı — Faz 5.2'de
+     "zaten tutarlı" bulunmuştu, bu tur o değerlendirmeyi bozmuyor).
+   - `QueueRow`: seçili satırda artık bandın kendi rengiyle sol kenar çubuğu (önceki sabit
+     mor yerine — Kovala seçiliyse yeşil, İzle ise amber, doğru semantik).
+   - `DetailPanel`/`PanomCard` kartları: `rounded-card`(16px)/`border-hair` yerine yerel
+     `rounded-lg`/`border-white/[0.14]` — daha keskin, daha net çizgi (yalnız bu iki bileşende).
+   - `app/queue/loading.tsx`: jenerik `PageSkeleton` (ortalı/padli) yeni kenardan-kenara
+     kabukla uyuşmuyordu — kendi iskeleti yazıldı (aynı sabit yükseklik + sol liste taslağı).
+4. **Doğrulama:** `pnpm typecheck` + `pnpm -r test` (194 test) yeşil. `browse` ile gerçek
+   DB'ye karşı: sayfa yükleniyor, sol/sağ bağımsız kayıyor, satır tıklama anında panel
+   değiştiriyor, `1` tuşu/tıklamayla Kovala kararı gerçek DB'ye yazılıp temizlendi, Panom
+   kartında yeni karar izi + görev kutusu doğru görünüyor — konsol hatasız.
+
+**Bilinçli kapsam dışı:** mobil/dar ekran için Kuyruk'un iki-panel düzeni şu an ayrı bir
+responsive fallback'e sahip değil (önceki versiyonda `lg:` breakpoint'i vardı, bu tur
+kaldırıldı — düzeltme masaüstü app-shell hissini önceliklendirdi). Kullanıcının isteği
+tamamen masaüstü terimleriyle çerçevelenmişti ("email client/Linear-style"); mobil kullanım
+sinyali gelirse ayrı ele alınır.
+
+## 15. Faz 5.5 — Sohbet-uygulaması mimarisi (ChatGPT/Gemini/Claude deseni) (TAMAM, 2026-08-13)
+
+Kullanıcı: "chatgpt, gemini, claude gibi ai sitelerinde kullanılan mimariye geçiyoruz — sol
+navbar mesajlar yerine fırsatlar, sağ tarafta fırsat, input alanı yorum bırakma, input
+alanında AI yorumu seçeneği olacak, y-scroll sadece kısımlarda olacak ama şık olacak, ana
+navbar nasıl olur bilmiyoruz." §14'teki app-shell zaten doğru temeldi (sol liste + sağ panel,
+ikisi bağımsız kayan) — bu tur sağ paneli gerçek bir sohbet-akışı düzenine çevirdi.
+
+1. **Sağ panel artık üç sabit bölge:** (a) kaymayan bağlam başlığı — fit halkası + başlık +
+   meta, sağ üstte karar butonları, altta bant/güven/bench/durum etiketleri + "Atla" (varsa);
+   sürükleme YALNIZ bu başlığa bağlı (`SwipeCard` artık akışı değil başlığı sarıyor —
+   önceki tasarımda tüm kart sürüklenebilirdi, bu da metin seçimini/kaydırmayı sürükleme
+   sanardı; artık yalnız küçük sabit başlıkta risk var). (b) kayan mesaj akışı — AI analizi
+   tek "mesaj" kartı olarak (özet, gerekçe, riskler, doğrulama görevleri), altında görev
+   listesi kutusu, altında yorumlar `CommentFeed` ile gerçek sohbet balonu olarak (avatar
+   baş harfi + isim + tarih + balon), altında (admin) AI Yorumcusu turları `DebateFeed` ile.
+   (c) kaymayan alt composer — yorum girişi + "Gönder" + admin'e "✨ AI yorumu" tetikleyicisi
+   (eskiden akışın ortasında duran ayrı "AI Yorumcusu başlat" butonunun yerini aldı).
+2. **Hook ayrıştırması — mantık/görünüm ayrıldı, Panom bozulmadı.** `Comments.tsx`:
+   `useComments()` (veri+ekleme) + `CommentList` (sade liste, Panom kullanıyor) + `Comments`
+   (kendi kendine yeten sarmalayıcı, değişmedi — Panom hâlâ bunu kullanıyor) + yeni
+   `CommentFeed.tsx` (sohbet-balonu görünümü, yalnız `DetailPanel`). Aynı desen
+   `DebateRoom.tsx`'te: `useDebate()` (veri+tetikleme) + `DebateFeed` (akış görünümü,
+   tetikleyici yok) + `DebateRoom` (kendi kendine yeten, Panom değişmedi). İki bileşen de
+   composer'ın giriş/tetikleyicisini akıştaki sonuçtan ayırmayı GEREKTİRİYORDU — mantığı
+   iki kere yazmak yerine hook'a çıkarıldı.
+3. **`app/queue/page.tsx` / `QueueBoard.tsx`:** sağ panelin sarmalayıcısı `overflow-y-auto`
+   + `mx-auto max-w-2xl px-6 py-6` idi — `DetailPanel` artık kendi iç düzenini (sabit
+   başlık/kayan akış/sabit composer) yönettiği için sarmalayıcı `overflow-hidden`'a
+   düşürüldü, iç padding kaldırıldı (genişlik `DetailPanel` içinde bölge bölge yönetiliyor:
+   başlık/composer tam genişlik, akış içeriği `mx-auto max-w-2xl`).
+4. **Ana navbar bilinçli olarak DEĞİŞMEDİ.** Kullanıcı "bilmiyoruz" dedi, karar bana
+   bırakıldı: ChatGPT/Claude'un minimal üst çubuğu (yalnız oturum/model seçici) buradaki
+   üst navbar'ın taşıdığı Panom/Raporlar/Ayarlar gezinmesini kaldırıp sol kenar çubuğuna
+   taşımayı gerektirirdi — bu da her sayfada (Harita/Trend/Digest/admin) paylaşılan
+   `Navbar` desenini bozar. Kapsam yalnız Kuyruk'un kendi iç mimarisiydi, uygulama-geneli
+   gezinme modelini değiştirmek ayrı ve çok daha büyük bir karar — istenmedi, yapılmadı.
+5. **Doğrulama:** `pnpm typecheck` + `pnpm -r test` (194 test) yeşil. `browse` ile gerçek
+   DB'ye karşı uçtan uca: composer'dan yorum yazıldı → gerçek `POST /api/comments` → akışta
+   anında sohbet balonu olarak göründü (test yorumu sonra service-role ile silindi); sabit
+   akış bölgesi 300px kaydırıldı, başlık/composer/sol liste hiç kımıldamadı; Panom hâlâ
+   konsol hatasız (hook ayrıştırması geriye dönük kırmadı).
+
+**Ek düzeltme (aynı gün): üst şerit sadeleştirildi.** Kullanıcı: "filtreler karmaşa
+çıkarıyor ama lazımlar, header genele uymuyor, diğer yerler de sade olabilir." Eski üst
+şerit her zaman açık 13+ kontrol gösteriyordu (başlık+3 sayaç+metin+arama+4 seçici+sıralama+
+6 pill, iki satır ~90px). `QueueBoard.tsx`: varsayılan görünüm artık tek satır — başlık,
+sayaçlar, "⚡ Kararsızlar" (sık kullanılan asıl anahtar, açıkta kaldı), arama, sonuç sayısı,
+tek "⚙ Filtrele" düğmesi (aktif filtre sayısı rozetle: `Filtrele (2)`). Sektör/Pazar/Kaynak/
+Sıralama/Bench/aktivite pill'leri artık yalnız "Filtrele" açıldığında görünen ikinci satırda
+— aktif filtre varsa "Temizle" linki de orada çıkıyor. İşlevsellik hiç azalmadı (kullanıcı:
+"lazımlar"), yalnız varsayılan görünüm sadeleşti. `lensSummary` prop'u (statik "Arbitraj +
+Beyaz-alan" metni, gürültüye katkısı vardı) `QueueBoard`/`queue/page.tsx`'ten kaldırıldı.
+`browse` ile doğrulandı: kapalıyken tek satır, "Filtrele"ye tıklayınca ikinci satır açılıp
+tüm kontroller çalışıyor, konsol hatasız.
+
+**Hemen ardından ikinci düzeltme (aynı gün): paylaşılan üst şerit tamamen kaldırıldı.**
+Kullanıcı "header genele uymuyor" ile neyi kastettiğini netleştirdi: "Fırsat Kuyruğu
+alanını sol alanın içine al, header navbarı kaldır ama sola dahil et, sağ alanı tam
+yüksekliğe kavuştur." Yukarıdaki düzeltme hâlâ iki panelin ÜSTÜNDE paylaşılan tek bir şerit
+bırakıyordu (ChatGPT/Claude'da böyle bir şey yok — kenar çubuğunun kendi üstü var, ana alan
+baştan sona kendi). `QueueBoard.tsx` tekrar yazıldı: artık paylaşılan şerit yok, sol panel
+`flex flex-col` (kendi başlığı+arama+kararsızlar/filtrele+liste, hepsi 340px genişliğe göre
+dikey istiflendi — filtre `select`leri artık `grid grid-cols-2`), sağ panel (`DetailPanel`)
+doğrudan `h-full` — navbar hariç TÜM yüksekliği kendi başına kaplıyor, üstünde başka hiçbir
+şerit yok. `browse` ile doğrulandı: sol panelin kendi başlığı var, sağ panel navbar'ın hemen
+altından başlayıp tam yüksekliğe kadar iniyor, filtreler dar sütunda 2 sütunlu ızgarada
+düzgün sığıyor, konsol hatasız.
+
+**Üçüncü ve son düzeltme (aynı gün): üst yatay navbar TAMAMEN kaldırıldı, uygulama geneli.**
+Kullanıcı: "IDEAFACT / Kuyruk / Panom / Raporlar / Ayarlar / Muhammed / Çıkış bu alan ayrıca
+kalmasın sol alana dahil edilsin" — yani `components/Navbar.tsx` (tüm sayfaların üstünde,
+yatay) tamamen kaldırılıp içeriği sol kenar çubuğuna taşınacaktı. Bu, Kuyruk'un ötesinde
+UYGULAMA GENELİ bir değişiklik (Navbar 9 sayfada paylaşılıyordu) — kullanıcı bunu önceki
+turda "söylersen yaparım" notuyla zaten onaylamıştı, bu turda gerçekten söyledi.
+
+1. **Yeni `components/AppSidebar.tsx`** — `Navbar`'ın yerini alan, dikey/tam-yükseklik kenar
+   çubuğu: logo, Kuyruk/Panom düz linkler, "Raporlar" bölüm etiketi + Harita/Trend/Digest,
+   "Ayarlar" bölüm etiketi (admin-only) + Tez/Mercekler/Toplama/Metrikler, esnek `children`
+   yuvası (nav ile hesap-bilgisi arasında, varsayılan boş), sabit altta hesap satırı
+   (avatar+isim+Çıkış). Genişlik prop'la ayarlanabilir (varsayılan 200px).
+2. **Kullanıcının hemen ardından gelen ikinci düzeltmesi: "sol alan menü VE fırsatları
+   birlikte barındıracak."** İlk halde `AppSidebar` (nav, 200px) Kuyruk'un kendi liste
+   panelinin (340px) YANINDA ayrı bir sütundu — üç sütun (nav+liste+detay). Kullanıcı
+   ChatGPT/Claude/ Gemini referans görsellerini gösterip (fetch edilip incelendi — üçü de
+   aynı deseni doğruladı: TEK kenar çubuğu, nav+sohbet-listesi+hesap-bilgisi hepsi birlikte,
+   ana alanda paylaşılan şerit yok) bunun yanlış olduğunu netleştirdi. Düzeltme: `AppSidebar`
+   `children` alacak şekilde genişletildi; `QueueBoard.tsx` artık kendi başlık/arama/filtre/
+   liste bloğunu `<AppSidebar me={me} current="queue" width={300}>{...}</AppSidebar>`
+   içine `children` olarak veriyor — nav sabit üstte, Kuyruk'un listesi kendi kaydırmasıyla
+   ortada, hesap bilgisi sabit altta, HEPSİ TEK sütun. `QueueBoard` artık `me`/`demo` prop'u
+   da alıyor (demo banner artık sağ panelin üstünde, sol kenar çubuğunu etkilemiyor).
+3. **Diğer 8 sayfa** (`panom`, `harita`, `trend`, `digest`, `admin/tez`, `admin/mercekler`,
+   `admin/toplama`, `admin/metrikler`) — hepsi aynı dönüşüm: `<Navbar/>` + ayrı `<main>` →
+   `<div className="flex h-screen overflow-hidden"><AppSidebar .../><main className="min-w-0
+   flex-1 overflow-y-auto">...</main></div>`. `/login` DOKUNULMADI — zaten `Navbar`
+   kullanmıyordu, kenar çubuğu da almıyor (oturum yok, gezinecek bir şey yok).
+4. **Temizlik:** `components/Navbar.tsx` ve `components/NavDropdown.tsx` (artık hiçbir yerden
+   import edilmiyor — grep ile doğrulandı) silindi. `components/PageSkeleton.tsx`:
+   `NavbarSkeleton` → `SidebarSkeleton` (kenar çubuğu şeklinde iskelet), `queue/loading.tsx`
+   yeni kabuğa göre güncellendi.
+5. **Doğrulama:** `pnpm typecheck` + `pnpm -r test` (194 test) yeşil. Dev server tam temiz
+   restart edildi (`.next` silindi) — ara adımlardaki eski webpack/konsol hataları kalıcı
+   DEĞİLDİ, temiz restart + konsol temizleme sonrası tüm sayfalar (`/queue`, `/panom`,
+   `/harita`, `/admin/toplama`) `browse` ile hatasız yüklendi. Kuyruk'ta artık: sol TEK
+   kenar çubuğunda nav+arama+filtre+liste+hesap hepsi bir arada, sağ panel navbar'sız
+   baştan sona tam yükseklik — üç referans görselle (ChatGPT/Claude/Gemini) doğrudan
+   karşılaştırılıp yapısal olarak eşleştiği teyit edildi.
+
+## 16. Faz 5.10 — kenar çubuğu menüsü inline'a taşındı + Kuyruk liste sınırı + kaydırma solması (TAMAM, 2026-08-13)
+
+Not: §15'ten sonra kod tarafında (bu tur öncesi) zaten Faz 5.6-5.9 kadar ilerlemişti —
+tek-genişlik kenar çubuğu + küçült/büyüt anahtarı + Ayarlar dişlisiyle açılan yüzen
+Raporlar/Ayarlar paneli (`components/AppSidebar.tsx`'teki JSDoc'ta izleri var) — ama o
+aralık PLAN.md'ye hiç yazılmamış (dokümantasyon boşluğu, geriye dönük doldurulmadı, kapsam
+dışı). Bu madde yalnız BU turun değişikliğini kayıt altına alıyor.
+
+Kullanıcı: "kuyruk ve panom'un altında daha fazla ekle (ikonu vb olsun), açılır kapanır
+olmalı yeni menü eklersek buraya ekleriz, ayrıca buna göre kaç adet fırsat listelenecek
+düzenle." İki açık soru soruldu (AskUserQuestion — [[feedback-explain-before-big-decisions]]
+kapsamında, tasarım kararı): (1) yeni menü bölümü varsayılan açık mı kapalı mı — **kapalı**
+seçildi, (2) liste sınırlama yöntemi — **ilk 50 + "daha fazla yükle"** seçildi. Sonrasında
+kullanıcı: "pipeline'a al, ayrıca meta pipeline'a al sürekli bana sorma" — bu noktadan sonra
+(fade efekti dahil) soru sorulmadan yürütüldü.
+
+1. **Ayarlar dişlisiyle açılan yüzen panel kaldırıldı.** `AppSidebar.tsx`: Raporlar
+   (Harita/Trend/Digest) + Ayarlar (admin-only: Tez/Mercekler/Toplama/Metrikler) artık
+   Kuyruk/Panom'un hemen altında, kendi ikonlarıyla (`icons.tsx`'e eklendi:
+   `IconChevronDown`, `IconFileText`, `IconAperture`, `IconDownload`, `IconBarChart` —
+   Harita/Trend/Digest zaten var olan `IconGlobe`/`IconTrendingUp`/`IconMessage`'ı
+   kullanıyor), "Daha fazla" başlığıyla katlanır-açılır bir bölüm olarak nav akışının
+   içinde duruyor — ileride yeni bir menü eklenirse buraya eklenir. Varsayılan kapalı,
+   tercih `localStorage`'ta kalıcı (`idea-factory:sidebar-more-open`); yalnız o an bir
+   Raporlar/Ayarlar sayfasındaysak (aktif sekme görünür kalsın diye) açık başlıyor.
+   Eski dışa-tıklayınca-kapanan yüzen panel + gear butonu (`menuOpen`/`menuWrapRef`)
+   tamamen kaldırıldı.
+2. **Kuyruk listesi artık sayfalanıyor.** Kenar çubuğu kalıcı yer kapladığı için (menü +
+   liste aynı sütunda) `QueueBoard.tsx`: `filtered` (885'e kadar) yerine `visible =
+   filtered.slice(0, visibleCount)` render ediliyor, `visibleCount` `PAGE_SIZE=50`'den
+   başlıyor, filtre/arama/sıralama değişince ilk sayfaya dönüyor (`useEffect`). Liste
+   sonunda "Daha fazla yükle (N tane daha)" butonu `visibleCount`'u 50 artırıyor. `selected`
+   hâlâ tüm `filtered`e bakıyor (yalnız `visible`e değil) — sıralama zaten en üsttekini
+   önceliklendirdiği için oto-ilerleme/seçim davranışı bozulmadı.
+3. **Fırsat kartını incelerken üst/alt sabit barlara doğru yumuşak kaybolma.** Kullanıcı
+   isteği: "kovala izle ele (alt navbar'a doğru) yumuşuyarak kaybolma ekle, aynısını yukarı
+   navbar için de ekle." `DetailPanel.tsx`'in kayan mesaj akışına (üst bağlam başlığı ile
+   alt karar barı arasındaki `overflow-y-auto` bölge) `mask-image`/`-webkit-mask-image`
+   ile 20px'lik lineer gradyan fade eklendi — kaydırılan içerik üst başlığa/alt karar
+   barına sert bir çizgide kesilmek yerine her iki uçtan da yumuşak solarak kayboluyor.
+4. **Bant sayaçları tıklanabilir filtreye dönüştü.** Kullanıcı: "filtrelere kırmızı - sarı -
+   yeşil daire ekle (sadece bunlara basarak filtreleme yapılabilsin)." Eski davranış yalnız
+   hover'da açılan salt-okunur bir dökümdü (üç renkli nokta + sayı, tıklanamaz). `QueueBoard.tsx`:
+   `bandFilter: Set<Band>` state'i eklendi, üç nokta artık her zaman görünür ve tıklanabilir
+   buton (`toggleBand` — çoklu seçim: Kovala+İzle birlikte seçilebilir, boş küme = hepsi).
+   Aktif bant `card-visuals.tsx::BAND` paletinin hex'iyle (inline `boxShadow`) ve metin
+   rengiyle vurgulanıyor. `activeFilterCount`/`clearFilters` bant filtresini de kapsıyor
+   (Filtrele rozetinde sayılıyor, Temizle'de sıfırlanıyor). Ayrı bir "Yönetim" yeniden adı
+   yanlışlıkla §16 madde 1'e sızmıştı (kod zaten "Ayarlar" kullanıyordu — bu turun kendi
+   dokümantasyon hatası) — kullanıcı fark edip düzeltti, hem component hem PLAN.md metni
+   "Ayarlar"a geri alındı.
+5. **Doğrulama:** `tsc --noEmit` temiz, `pnpm -r test` (194 test) yeşil. `browse` ile gerçek
+   DB'ye karşı (geçici `AUTH_SECRET`-imzalı test JWT'siyle, iş bitince çerez temizlendi):
+   "Daha fazla" kapalı başlıyor, tıklanınca Raporlar/Ayarlar ikonlarıyla açılıyor; Kuyruk
+   listesi ilk 50'yi gösterip "Daha fazla yükle (835 tane daha)" ile kalanı katıyor;
+   `mask-image` computed CSS'te doğrulandı ve kırpılmış ekran görüntüsünde görünür fade
+   teyit edildi; yeşil (Kovala) noktaya tıklayınca liste 885'ten 52'ye düştü, "Filtrele (1)"
+   rozeti çıktı, tekrar tıklayınca tamamen geri açıldı; konsol hatasız. (Not: doğrulama
+   sırasında `browse` daemon'ı iki kez kendiliğinden yeniden başladı — dev sunucusunun Fast
+   Refresh'i ile ilgisiz, `browse`'un kendi tarayıcı süreci sorunuydu; yeniden bağlanınca
+   sorunsuz devam etti, uygulama tarafında bir etkisi yok.)
+6. **"Daha fazla" (Raporlar/Ayarlar) hesap satırının yanına taşındı.** Kullanıcı: "ayarları
+   tekrar çıkışın yanına taşı" — madde 1'de Kuyruk/Panom'un hemen altına konmuştu, kullanıcı
+   bunu istemedi. `AppSidebar.tsx`: toggle + genişleyen liste artık `{children}` (Kuyruk'un
+   listesi) alanının ALTINDA, hesap satırının/Çıkış'ın hemen üstünde — kendi `border-t`
+   ayracıyla. Hesap satırının kendi üst çizgisi yalnız `collapsed` (64px ikon rayı) modunda
+   kalıyor (o zaman "Daha fazla" hiç render edilmiyor, tek ayraç hesap satırınınki olmalı);
+   genişken çift çizgi görünmesin diye hesap satırının `border-t`'si kaldırılıp `mt-2 pt-1`
+   ile küçük bir boşluğa indirildi. İkonlar/varsayılan-kapalı/localStorage davranışı
+   değişmedi, yalnız konum taşındı.
+7. **AI Yorumcusu sonucu artık diğer yorumlarla aynı sohbet balonu.** Kullanıcı: "yapay
+   zekanın yorumu da diğer yorumlar gibi gözüksün istersen detay alınabilsin (genişletilebilir
+   olsun) ve transkript okunabilir olsun." `DebateRoom.tsx::DebateTranscript` baştan yazıldı:
+   eski `rounded-btn border bg-canvas/40` kutusu yerine `CommentFeed` ile birebir aynı iskelet
+   (avatar + isim + tarih + balon) — avatar kişi baş harfi yerine (yapay zeka olduğunu ayırt
+   etsin diye) mor-eflatun gradyanlı `IconSparkle` dairesi, isim "AI Yorumcusu", yanında renkli
+   karar rozeti (KOVALA/İZLE/ELE) ve tarih, altında küçük "{kullanıcı} başlattı" satırı, balon
+   içinde `final_commentary`. Tam transkript (tur tur gerekçe/kanıt, `TurnCard`) varsayılan
+   gizli — "Tartışmanın tamamını gör — N tur ▾" ile genişliyor (eski "transkript ▾" belirsiz
+   etiketinden daha açık). `TurnCard` içindeki mesaj/kanıt metinleri okunabilirlik için
+   `text-[10px]/text-xs` → `text-xs/text-sm`'e büyütüldü. `DebateFeed`'in balonlar arası
+   boşluğu `CommentFeed` ile tutarlı olsun diye `space-y-2` → `space-y-3`.
+8. **Doğrulama (madde 6-7):** `tsc --noEmit` temiz, `pnpm -r test` (194 test) yeşil. `browse`
+   ile gerçek DB'ye karşı: "Daha fazla" artık Test Admin hesap satırının hemen üstünde,
+   Kuyruk listesinin altında; AI Yorumcusu balonu "muhammed" yorumunun hemen altında aynı
+   görünümde, "Tartışmanın tamamını gör" tıklanınca "İyimser Kurucu" turu (KOVALA rozeti,
+   tam gerekçe metni) okunaklı biçimde açıldı; konsol hatasız.
+
+## 17. Faz 5.11 düzeltmesi — Ayarlar tekrar eski yerine + gerçek yorum/tartışma bug'ı (TAMAM, 2026-08-13)
+
+Kullanıcı §16 madde 6'yı beğenmedi: "ayarları tekrar çıkışın yanına taşı" derken kastı §13
+Faz 5.4'ün "Raporlar VE Ayarlar birlikte tek 'Daha fazla' bölümü, Kuyruk listesinin altında"
+kararı değil, çok daha eski Faz 5.8 deseniydi (gerçek gear-ikon → hesap satırının ÜSTÜNDE
+yüzen panel, hesap satırının İÇİNDE, Çıkış'ın hemen solunda). Aynı mesajda ikinci, tamamen
+ayrı bir gerçek bug da bildirdi: "yorumlar gözükmüyor her sayfada aynı yorum gözüküyor."
+Kullanıcı: "sürekli bana soru sorma, pipeline'a al" — ikisi de sormadan çözüldü.
+
+1. **Ayarlar/Raporlar ayrıştırıldı.** `AppSidebar.tsx`: **Raporlar** (Harita/Trend/Digest)
+   "Daha fazla" adıyla Kuyruk/Panom'un hemen altında kalmaya devam ediyor (§16'daki ikonlu/
+   katlanır tasarım korundu, yalnız artık Ayarlar'ı İÇERMİYOR). **Ayarlar** (admin-only:
+   Tez/Mercekler/Toplama/Metrikler) Faz 5.8'in orijinal deseniyle geri geldi: hesap
+   satırında `IconSliders` dişli ikonu — `me.display_name`/avatar ile `LogoutButton`
+   arasında, yani Çıkış'ın solunda — tıklanınca hesap satırının ÜSTÜNDE yüzen bir panel
+   açılıyor (`adminOpen` state + `adminWrapRef` ile dışına-tıklayınca-kapanma, §13'teki eski
+   `menuWrapRef` deseniyle birebir). Kenar çubuğu daraltılırken (`toggleCollapsed`) panel de
+   kapanıyor (eski davranış). `REPORT_KEYS`/`ADMIN_KEYS` artık birleşik `MENU_KEYS` olmadan
+   ayrı ayrı "aktif sekme" vurgusu için kullanılıyor.
+2. **Gerçek bug: yorumlar/AI Yorumcusu turları sinyaller arasında sızıyordu.**
+   `components/Comments.tsx::useComments` ve `components/DebateRoom.tsx::useDebate` ikisi de
+   `useState(initial)` kullanıyordu — bu yalnız İLK mount'ta state'e giriyor. `DetailPanel`
+   Kuyruk'ta başka bir sinyal seçilince YENİDEN MOUNT OLMUYOR (yalnız `item` prop'u değişiyor,
+   `QueueBoard` `<DetailPanel>`'e `key={item.id}` VERMİYOR — `DetailPanel`'in içindeki
+   `key={item.id}` yalnız kök `div`i etkiliyor, `useComments`/`useDebate` çağrıları
+   `DetailPanel`'in kendi gövdesinde, o `div`in DIŞINDA). Sonuç: kullanıcı Kuyruk'ta farklı
+   bir sinyale tıkladığında yorum/tartışma state'i SIFIRLANMIYOR, ilk açılan sinyalin
+   yorumları her yerde görünmeye devam ediyordu. Düzeltme: her iki hook'a da
+   `useEffect(() => setItems/setDebates(initial), [signalId])` eklendi — kasıtlı olarak
+   yalnız `signalId`'ye bağlı, `initial`'a DEĞİL (üst bileşen aynı sinyal için yeni bir array
+   referansı üretirse az önce eklenen lokal yorumu/tartışmayı silmesin diye).
+3. **Doğrulama:** `tsc --noEmit` temiz, `pnpm -r test` (194 test) yeşil. `browse` ile gerçek
+   DB'ye karşı: Ayarlar dişlisi Test Admin satırında Çıkış'ın solunda, tıklanınca panel hesap
+   satırının üstünde açılıyor (Tez/Mercekler/Toplama/Metrikler ikonlarıyla); "Daha fazla"
+   tekrar Kuyruk/Panom'un altında. Bug doğrulaması: ilk sinyalde "muhammed" yorumu + bir AI
+   Yorumcusu turu görünüyordu, ikinci bir sinyale (Replit'in CEO'su) geçilince tamamen farklı
+   bir AI Yorumcusu yorumu (13.08.2026 tarihli, ayrı gerekçeyle) göründü — ilk sinyale geri
+   dönülünce orijinal içerik doğru şekilde geri geldi; konsol hatasız.
+4. **AI Yorumcusu'nun sonucu "ekip" satırına da işleniyor.** Kullanıcı: "yapay zekadan çıkan
+   sonuçta ekip kısmına kaydedilsin." Karar butonlarının altındaki "ekip: {üye}: {karar}"
+   satırı (`DecisionButtons.tsx`, `others: UserDecision[]`) yalnız gerçek kullanıcı
+   kararlarını gösteriyordu. `DetailPanel.tsx`: en son AI Yorumcusu turunun (`debate.debates[0]`
+   — en yeni öne ekleniyor) `final_verdict`'i "AI Yorumcusu" adıyla senteze `others`'a
+   EKLENİYOR (`teamWithAi`) — yalnız görüntüleme amaçlı birleştirme, `item.others` (gerçek
+   veri) DEĞİŞMİYOR, başka hiçbir yerde (aktivite filtresi, Panom vb.) etkisi yok. Tartışma
+   hiç başlatılmamışsa veya kullanıcı admin değilse (`item.debates` zaten boş dizi geliyor)
+   hiçbir şey eklenmiyor — veri sızıntısı riski yok. `browse` ile doğrulandı: "ekip: muhammed:
+   İzle · AI Yorumcusu: Ele" iki farklı renkte (amber/kırmızı) doğru göründü, `tsc --noEmit`
+   temiz, konsol hatasız.
+5. **Daraltılmış rayda hizalama + Raporlar sayfaları görünür oldu.** Kullanıcı iki küçük
+   bulgu bildirdi: (1) "sol navbar küçültülünce ideafact mor dairesi hizalı durmuyor" —
+   logo satırı `justify-between` kullanıyordu, daraltılmışken tek çocuk (nokta, IDEAFACT
+   metni gizli) kaldığı için sola yaslanıyordu, alttaki ikonlar (`place-items-center`/
+   `self-center`) ise ortalıydı. Düzeltme: `collapsed` iken satır `justify-center`'a
+   geçiyor. (2) "navbarı küçültünce sol navbarda daha fazladaki sayfalar gözüksün" —
+   Raporlar (Harita/Trend/Digest) daraltılmış rayda tamamen gizliydi (`!collapsed &&
+   moreOpen` şartı). Daraltılmış rayda "katlanır/açılır" kavramının zaten anlamı yok
+   (metin hiç gösterilmiyor) — üç ikon artık Kuyruk/Panom gibi rayda HER ZAMAN görünüyor
+   (`(collapsed || moreOpen) &&` + `collapsed`/`label` prop'ları eklendi), yalnız genişkenki
+   açılır/kapanır davranış korunuyor. Ayrıca "daha fazla yükle" madde 16.1'in zaten +50/tık
+   yaptığı `browse` ile sayı sayılarak doğrulandı (50→100→150) — kod değişikliği gerekmedi,
+   yalnız teyit edildi. `tsc --noEmit` temiz, `pnpm -r test` (194 test) yeşil, konsol hatasız.
+6. **Kenar çubuğu ile üst/alt barlar arasında renk/saydamlık tutarlılığı.** Kullanıcı: "sol
+   navbar, üst navbar ve alt navbar arasında renk veya saydamlık eşitliği olsa çok güzel
+   olur." `AppSidebar.tsx`'in kök `div`inde arka plan sınıfı YOKTU — sayfanın `body`
+   arka planı (mor radyal glow'lu `#0a0a0f` gradyan) şeffaf olarak sızıyordu, oysa
+   `DetailPanel`'in üst bağlam başlığı ve alt karar barı ikisi de düz `bg-surface`
+   (`#151320`) kullanıyordu — üç şerit arasında görsel uyumsuzluk vardı. Tek satırlık
+   düzeltme: kenar çubuğunun kök `div`ine de `bg-surface` eklendi — artık üçü aynı düz
+   tonda, yalnız ortadaki kaydırılan içerik alanları (mesaj akışı, Kuyruk listesi) kasıtlı
+   olarak canvas/gradyan arka planı koruyor (BRANDING.md §8'deki "sabit kroma vs. kayan
+   içerik" ayrımı).
+7. **Filtreler paneli UI/UX'i geliştirildi.** Kullanıcı: "filtreler kısmı ui/ux açısından
+   geliştirilsin." Üç somut sorun tespit edilip düzeltildi: (1) panel kapalıyken hangi
+   filtrelerin aktif olduğu hiç görünmüyordu, tek bir filtreyi kaldırmak için paneli açıp
+   select'i "Tümü"ye geri almak gerekiyordu — panel kapalıyken de görünen, kaldırılabilir
+   "×" çipleri eklendi (`activeChips`, Sektör/Pazar/Kaynak/Aktivite/Kararsızlar/Bench için).
+   (2) panel içi 6 kontrol tek bir `grid-cols-2` yığınına sıkışmıştı, tarama zor — "Filtreler"
+   başlığı + "Tümünü temizle" satırı ve dört mikro-bölüm etiketiyle (KAPSAM/AKTİVİTE/HIZLI
+   FİLTRELER/SIRALA) gruplandı, Sırala ayrı bir bölüme (üstte çizgiyle ayrılmış) alındı —
+   sıralama bir filtre değil görünüm tercihi olduğu için kavramsal olarak ayrıştırıldı.
+   (3) filtre ikonunun yanındaki çıplak sayı, marka rengiyle dolgulu yuvarlak bir rozete
+   dönüştürüldü (daha tanıdık/okunur bir bildirim-sayacı deseni). Bant noktaları (kırmızı/
+   sarı/yeşil, önceki turda eklendi) kasıtlı olarak çip satırına eklenmedi — zaten kendi
+   halka vurgusuyla her zaman görünürler, tekrar göstermek gürültü olurdu.
+8. **Doğrulama (madde 6-7):** `tsc --noEmit` temiz, `pnpm -r test` (194 test) yeşil. `browse`
+   ile gerçek DB'ye karşı: kenar çubuğu artık üst/alt barlarla aynı düz tonda; filtre paneli
+   "KAPSAM/AKTİVİTE/HIZLI FİLTRELER/SIRALA" etiketleriyle net bölümlere ayrılmış görünüyor;
+   "Kararsızlar" açılınca hem panel içinde hem panel kapatıldığında altta "Kararsızlar ×"
+   çipi + "Temizle" linki + rozet "1" doğru göründü; çipteki "×"e tıklanınca yalnız o filtre
+   kalkıp liste 885'e geri döndü; konsol hatasız.

@@ -27,10 +27,14 @@ export function DecisionButtons({
   signalId,
   mine = null,
   others = [],
+  onDecided,
+  size = "sm",
 }: {
   signalId: string;
   mine?: Decision | null;
   others?: UserDecision[];
+  onDecided?: (d: Decision) => void;
+  size?: "sm" | "lg";
 }) {
   const [chosen, setChosen] = useState<Decision | null>(mine);
   const [busy, setBusy] = useState(false);
@@ -48,8 +52,11 @@ export function DecisionButtons({
       // demo modunda sessiz — backend gelince gerçek yazar
     } finally {
       setBusy(false);
+      onDecided?.(d);
     }
   }
+
+  const pad = size === "lg" ? "px-6 py-3 text-base" : "px-4 py-2 text-sm";
 
   return (
     <div className="space-y-2">
@@ -57,9 +64,10 @@ export function DecisionButtons({
         {OPTS.map((o) => (
           <button
             key={o.d}
+            data-decision={o.d}
             disabled={busy}
             onClick={() => decide(o.d)}
-            className={`rounded-full border bg-elevated px-4 py-2 text-sm text-ink transition disabled:opacity-50 ${
+            className={`rounded border bg-elevated font-mono font-medium text-ink transition disabled:opacity-50 ${pad} ${
               chosen === o.d ? CHOSEN[o.d] : `border-hair ${o.cls}`
             }`}
           >

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { DebateView, DebateTurnView } from "../lib/card-view";
+import { IconSparkle } from "./icons";
 
 const VERDICT_LABEL: Record<string, string> = { pursue: "KOVALA", watch: "İZLE", kill: "ELE" };
 const VERDICT_TEXT: Record<string, string> = {
@@ -10,6 +11,8 @@ const VERDICT_TEXT: Record<string, string> = {
   kill: "text-kill",
 };
 
+/** Bir tartışma turu — genişletilmiş transkriptte gösterilir. Konuşmacı/gerekçe/kanıt
+ *  okunaklı olsun diye yorum balonlarıyla aynı taban boyutu (text-sm) kullanıyor. */
 function TurnCard({ turn }: { turn: DebateTurnView }) {
   return (
     <div className="rounded-btn border border-hair bg-elevated p-3">
@@ -22,13 +25,13 @@ function TurnCard({ turn }: { turn: DebateTurnView }) {
         )}
       </div>
       {turn.rebuts.length > 0 && (
-        <div className="mt-1 text-[10px] text-ink-muted">↳ itiraz: {turn.rebuts.join(", ")}</div>
+        <div className="mt-1 text-xs text-ink-muted">↳ itiraz: {turn.rebuts.join(", ")}</div>
       )}
-      <p className="mt-1.5 text-xs leading-relaxed text-ink-secondary">{turn.message}</p>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-secondary">{turn.message}</p>
       {turn.evidence.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5">
+        <ul className="mt-1.5 space-y-1">
           {turn.evidence.map((e, i) => (
-            <li key={i} className="text-[10px] text-ink-muted">
+            <li key={i} className="text-xs text-ink-muted">
               · {e.fact} <span className="opacity-70">({e.source})</span>
             </li>
           ))}
@@ -38,32 +41,46 @@ function TurnCard({ turn }: { turn: DebateTurnView }) {
   );
 }
 
+/** AI Yorumcusu'nun sonucu — diğer yorumlarla aynı sohbet-balonu iskeleti (avatar + isim +
+ *  tarih + balon, bkz. `CommentFeed`), yalnız avatar kişi baş harfi yerine yapay zekayı
+ *  ayırt etsin diye ışıltı ikonu taşıyor. Tam transkript (tur tur gerekçe/kanıt) varsayılan
+ *  gizli — "detayları göster" ile genişliyor, tekrar okumak isteyene okunaklı kalsın diye
+ *  `TurnCard` metinleri sohbet balonlarıyla aynı `text-sm` taban boyutunu kullanıyor. */
 function DebateTranscript({ debate }: { debate: DebateView }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-btn border border-hair bg-canvas/40 p-3">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <span className="text-xs text-ink-secondary">
-          <span className={`font-semibold ${VERDICT_TEXT[debate.final_verdict] ?? ""}`}>
-            {VERDICT_LABEL[debate.final_verdict] ?? debate.final_verdict}
-          </span>{" "}
-          — {debate.final_commentary}
-        </span>
-        <span className="shrink-0 text-[10px] text-ink-muted">{open ? "kapat ▴" : "transkript ▾"}</span>
-      </button>
-      <div className="mt-1 text-[10px] text-ink-muted">
-        {debate.created_by} · {new Date(debate.created_at).toLocaleString("tr-TR")}
+    <div className="flex items-start gap-2.5">
+      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-white">
+        <IconSparkle className="h-3.5 w-3.5" />
       </div>
-      {open && (
-        <div className="mt-3 space-y-2">
-          {debate.transcript.map((t, i) => (
-            <TurnCard key={i} turn={t} />
-          ))}
+      <div className="min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-white/[0.03] px-3.5 py-2.5">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-xs font-semibold text-ink">AI Yorumcusu</span>
+          <span className={`text-[10px] font-semibold ${VERDICT_TEXT[debate.final_verdict] ?? ""}`}>
+            {VERDICT_LABEL[debate.final_verdict] ?? debate.final_verdict}
+          </span>
+          <span className="font-mono text-[10px] text-ink-muted">
+            {new Date(debate.created_at).toLocaleString("tr-TR")}
+          </span>
         </div>
-      )}
+        <div className="text-[10px] text-ink-muted">{debate.created_by} başlattı</div>
+        <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink-secondary">
+          {debate.final_commentary}
+        </p>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="mt-2 text-xs font-medium text-brand hover:underline"
+        >
+          {open ? "Tartışmanın tamamını gizle ▴" : `Tartışmanın tamamını gör — ${debate.transcript.length} tur ▾`}
+        </button>
+        {open && (
+          <div className="mt-3 space-y-2 border-t border-hair pt-3">
+            {debate.transcript.map((t, i) => (
+              <TurnCard key={i} turn={t} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -139,12 +156,22 @@ function ProgressBar({ progress }: { progress: Progress }) {
   );
 }
 
-/** Admin-only: AI Yorumcusu — çok-ajanlı tartışma odası. Geçmiş tartışmalar + yeni tetikleme. */
-export function DebateRoom({ signalId, initial }: { signalId: string; initial: DebateView[] }) {
+/** Tartışma verisi + tetikleme mantığı — hem tam `DebateRoom` bileşeni hem de Kuyruk'un
+ *  composer düzeni (`DetailPanel`, tetikleyici composer'da) bunu paylaşır. Admin-only
+ *  gating çağıran taraftan yapılır (`item.isAdmin`). */
+export function useDebate(signalId: string, initial: DebateView[]) {
   const [debates, setDebates] = useState(initial);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = progress !== null;
+
+  // Aynı bug `useComments`'te de vardı (bkz. Comments.tsx) — `DetailPanel` sinyal
+  // değişince yeniden mount olmuyor, `useState(initial)` yalnız ilk mount'ta geçerli.
+  // `signalId` değişince tazele; `initial`'ı KASITLI OLARAK dependency'e koyma.
+  useEffect(() => {
+    setDebates(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signalId]);
 
   async function start() {
     setError(null);
@@ -199,6 +226,39 @@ export function DebateRoom({ signalId, initial }: { signalId: string; initial: D
     }
   }
 
+  return { debates, progress, error, busy, start };
+}
+
+/** Sade akış görünümü (tetikleyici buton yok) — Kuyruk'un composer düzeni için. */
+export function DebateFeed({
+  debates,
+  progress,
+  error,
+}: {
+  debates: DebateView[];
+  progress: Progress | null;
+  error: string | null;
+}) {
+  if (debates.length === 0 && !progress && !error) return null;
+  return (
+    <div>
+      {progress && <ProgressBar progress={progress} />}
+      {error && <p className="mt-1 text-xs text-kill">{error}</p>}
+      {debates.length > 0 && (
+        <div className="mt-2 space-y-3">
+          {debates.map((d) => (
+            <DebateTranscript key={d.id} debate={d} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Admin-only: AI Yorumcusu — çok-ajanlı tartışma odası. Kendi kendine yeten (tetikleyici +
+ *  akış) — Panom kartlarında kullanılıyor. */
+export function DebateRoom({ signalId, initial }: { signalId: string; initial: DebateView[] }) {
+  const { debates, progress, error, busy, start } = useDebate(signalId, initial);
   return (
     <div className="mt-4 border-t border-hair pt-4">
       <div className="flex items-center justify-between">
@@ -213,15 +273,7 @@ export function DebateRoom({ signalId, initial }: { signalId: string; initial: D
           {busy ? "tartışıyorlar…" : "AI Yorumcusu başlat"}
         </button>
       </div>
-      {progress && <ProgressBar progress={progress} />}
-      {error && <p className="mt-1 text-xs text-kill">{error}</p>}
-      {debates.length > 0 && (
-        <div className="mt-2 space-y-2">
-          {debates.map((d) => (
-            <DebateTranscript key={d.id} debate={d} />
-          ))}
-        </div>
-      )}
+      <DebateFeed debates={debates} progress={progress} error={error} />
     </div>
   );
 }

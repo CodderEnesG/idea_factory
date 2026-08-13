@@ -1,12 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CardView } from "../lib/card-view";
-import { OpportunityCard } from "./OpportunityCard";
+import type { Decision } from "./DecisionButtons";
+import type { SessionUser } from "../lib/session";
+import { QueueRow } from "./QueueRow";
+import { DetailPanel } from "./DetailPanel";
+import { AppSidebar } from "./AppSidebar";
+import { BAND } from "./card-visuals";
+import { IconAward, IconSearch, IconSliders, IconZap } from "./icons";
 
-type SortMode = "fit" | "recent";
+type SortMode = "fit" | "recent" | "band" | "confidence" | "comments";
 type ActivityFilter = "all" | "mine" | "friend" | "both";
-const PAGE_SIZE = 24;
+
+const ACTIVITY_LABEL: Record<Exclude<ActivityFilter, "all">, string> = {
+  mine: "Aktivite: Benim",
+  friend: "Aktivite: Arkadaş",
+  both: "Aktivite: İkisi de",
+};
+
+const PAGE_SIZE = 50;
+const BANDS: CardView["band"][] = ["pursue", "watch", "kill"];
+
+const BAND_RANK: Record<CardView["band"], number> = { pursue: 0, watch: 1, kill: 2 };
+const CONFIDENCE_RANK: Record<CardView["confidence"], number> = { high: 0, med: 1, low: 2 };
 
 function freshness(item: CardView): number {
   const t = Date.parse(item.postedAt ?? item.fetchedAt);
@@ -19,23 +36,55 @@ function activityOf(item: CardView, meName: string): { mine: boolean; friend: bo
   return { mine, friend };
 }
 
-function distinct(items: CardView[], pick: (i: CardView) => string | null): string[] {
-  const set = new Set<string>();
-  for (const i of items) {
-    const v = pick(i);
-    if (v) set.add(v);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, "tr"));
+// Sektör/pazar alanları serbest metin AI çıktısı — "Fintech"/"fintech", "US"/"USA"/"United
+// States"/"ABD" gibi aynı şeyi anlatan varyantlar ayrı filtre satırı olarak görünmesin diye
+// büyük/küçük harf + boşluk normalize edilir, bilinen eş anlamlılar tek etikette birleşir.
+const TAG_ALIASES: Record<string, string> = {
+  us: "US",
+  usa: "US",
+  "united states": "US",
+  abd: "US",
+  global: "Global",
+};
+
+function normalizeTag(raw: string): { key: string; label: string } {
+  const trimmed = raw.trim().replace(/\s+/g, " ");
+  const lower = trimmed.toLowerCase();
+  const alias = TAG_ALIASES[lower];
+  if (alias) return { key: alias.toLowerCase(), label: alias };
+  return { key: lower, label: trimmed };
 }
 
+function distinct(items: CardView[], pick: (i: CardView) => string | null): { key: string; label: string }[] {
+  const byKey = new Map<string, string>();
+  for (const i of items) {
+    const v = pick(i);
+    if (!v) continue;
+    const { key, label } = normalizeTag(v);
+    if (!byKey.has(key)) byKey.set(key, label);
+  }
+  return [...byKey.entries()]
+    .map(([key, label]) => ({ key, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "tr"));
+}
+
+/**
+ * Kuyruk (Faz 5.5): kenar çubuğu (nav + arama/filtre + fırsat listesi, hepsi TEK sütun —
+ * kullanıcı: "sol alan menü ve fırsatları birlikte barındıracak") + sağ detay paneli, tam
+ * yükseklikte. Kuyruk = keşif/tarama (bu bileşen), Panom = zaten karar verilmiş olanı
+ * yönetme — ayrım korunuyor. "Yalnız kararsızlar" anahtarı eski ayrı `/queue/tarama`
+ * sayfasının (tek odak + oto-ilerleme) yerini bu ekranın içinde alıyor.
+ */
 export function QueueBoard({
   items,
   meName,
-  lensSummary,
+  me,
+  demo,
 }: {
   items: CardView[];
   meName: string;
-  lensSummary: string;
+  me: SessionUser | null;
+  demo?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
@@ -44,31 +93,75 @@ export function QueueBoard({
   const [sort, setSort] = useState<SortMode>("fit");
   const [activity, setActivity] = useState<ActivityFilter>("all");
   const [benchOnly, setBenchOnly] = useState(false);
+  const [undecidedOnly, setUndecidedOnly] = useState(false);
+  const [bandFilter, setBandFilter] = useState<Set<CardView["band"]>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localMine, setLocalMine] = useState<Map<string, Decision>>(new Map());
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const filtersWrapRef = useRef<HTMLDivElement>(null);
 
-  const sectors = useMemo(() => distinct(items, (i) => i.sector), [items]);
-  const markets = useMemo(() => distinct(items, (i) => i.market), [items]);
-  const sources = useMemo(() => distinct(items, (i) => i.source), [items]);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (filtersWrapRef.current && !filtersWrapRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [filtersOpen]);
+
+  // Filtre/arama/sıralama değişince ilk sayfaya dön — kenar çubuğu artık kalıcı bir "Daha
+  // fazla" menü bölümü taşıdığı için liste alanı küçüldü, yeni filtrede eskisinden kalan
+  // yüzlerce satırı tek seferde DOM'a basmak yerine ilk PAGE_SIZE ile başlanıyor.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, sector, market, source, sort, activity, benchOnly, undecidedOnly, bandFilter]);
+
+  function toggleBand(b: CardView["band"]) {
+    setBandFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(b)) next.delete(b);
+      else next.add(b);
+      return next;
+    });
+  }
+
+  // Karar verilince tam sayfa yenilemeden panel/liste/sayaçlar güncellensin diye — sunucudan
+  // gelen `items` sabit kalır, üstüne bu oturumdaki taze kararları bindiriyoruz.
+  const resolved = useMemo(
+    () => (localMine.size === 0 ? items : items.map((i) => (localMine.has(i.id) ? { ...i, mine: localMine.get(i.id)! } : i))),
+    [items, localMine],
+  );
+
+  const sectors = useMemo(() => distinct(resolved, (i) => i.sector), [resolved]);
+  const markets = useMemo(() => distinct(resolved, (i) => i.market), [resolved]);
+  const sources = useMemo(() => distinct(resolved, (i) => i.source), [resolved]);
 
   const counts = useMemo(() => {
-    let pursue = 0, watch = 0, kill = 0, bench = 0;
-    for (const i of items) {
+    let pursue = 0, watch = 0, kill = 0, bench = 0, undecided = 0;
+    for (const i of resolved) {
       if (i.band === "pursue") pursue++;
       else if (i.band === "watch") watch++;
       else kill++;
       if (i.bench) bench++;
+      if (i.mine === null) undecided++;
     }
-    return { pursue, watch, kill, bench };
-  }, [items]);
+    return { pursue, watch, kill, bench, undecided };
+  }, [resolved]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = items.filter((i) => {
+    let list = resolved.filter((i) => {
       if (q && !i.title.toLowerCase().includes(q)) return false;
-      if (sector && i.sector !== sector) return false;
-      if (market && i.market !== market) return false;
-      if (source && i.source !== source) return false;
+      if (sector && (!i.sector || normalizeTag(i.sector).key !== sector)) return false;
+      if (market && (!i.market || normalizeTag(i.market).key !== market)) return false;
+      if (source && normalizeTag(i.source).key !== source) return false;
       if (benchOnly && !i.bench) return false;
+      if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
+      if (bandFilter.size > 0 && !bandFilter.has(i.band)) return false;
       if (activity !== "all") {
         const a = activityOf(i, meName);
         if (activity === "mine" && !a.mine) return false;
@@ -78,133 +171,271 @@ export function QueueBoard({
       return true;
     });
     if (sort === "recent") list = [...list].sort((a, b) => freshness(b) - freshness(a));
+    else if (sort === "band") list = [...list].sort((a, b) => BAND_RANK[a.band] - BAND_RANK[b.band] || b.fit - a.fit);
+    else if (sort === "confidence")
+      list = [...list].sort((a, b) => CONFIDENCE_RANK[a.confidence] - CONFIDENCE_RANK[b.confidence] || b.fit - a.fit);
+    else if (sort === "comments") list = [...list].sort((a, b) => b.comments.length - a.comments.length || b.fit - a.fit);
     return list;
-  }, [items, search, sector, market, source, benchOnly, activity, sort, meName]);
+  }, [resolved, search, sector, market, source, benchOnly, undecidedOnly, bandFilter, skipped, activity, sort, meName]);
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [search, sector, market, source, benchOnly, activity, sort]);
+  // Seçili öğe filtrelerin dışına düşerse (ör. "yalnız kararsızlar"da karar verilince)
+  // listedeki ilk öğeye düş — bu aynı zamanda oto-ilerlemenin tamamı: ekstra state gerekmez.
+  const selected = filtered.find((i) => i.id === selectedId) ?? filtered[0] ?? null;
 
+  // Kenar çubuğu artık "Daha fazla" menüsüyle kalıcı yer kapladığı için liste alanı küçüldü
+  // — 900'e yakın satırı tek seferde DOM'a basmak yerine ilk PAGE_SIZE gösterilir, geri kalanı
+  // "daha fazla yükle" ile katılır. `selected` her zaman `filtered`in tamamına bakar (yukarıda)
+  // — seçili öğe sıralamada üstte olduğu için görünür sayfanın dışına düşmez.
   const visible = filtered.slice(0, visibleCount);
 
+  const activeFilterCount =
+    (sector ? 1 : 0) +
+    (market ? 1 : 0) +
+    (source ? 1 : 0) +
+    (benchOnly ? 1 : 0) +
+    (activity !== "all" ? 1 : 0) +
+    (undecidedOnly ? 1 : 0) +
+    bandFilter.size;
+
+  function clearFilters() {
+    setSector("");
+    setMarket("");
+    setSource("");
+    setBenchOnly(false);
+    setActivity("all");
+    setUndecidedOnly(false);
+    setBandFilter(new Set());
+  }
+
+  // Panel kapalıyken de hangi filtrelerin aktif olduğu görünsün + tek tek kaldırılabilsin
+  // diye — eskiden yalnız panel içindeki "Temizle" hepsini birden sıfırlıyordu, tek bir
+  // filtreyi kapatmak için paneli açıp select'i "Tümü"ye geri almak gerekiyordu.
+  const activeChips: { key: string; label: string; onClear: () => void }[] = [
+    ...(sector ? [{ key: "sector", label: sectors.find((s) => s.key === sector)?.label ?? sector, onClear: () => setSector("") }] : []),
+    ...(market ? [{ key: "market", label: markets.find((m) => m.key === market)?.label ?? market, onClear: () => setMarket("") }] : []),
+    ...(source ? [{ key: "source", label: sources.find((s) => s.key === source)?.label ?? source, onClear: () => setSource("") }] : []),
+    ...(activity !== "all" ? [{ key: "activity", label: ACTIVITY_LABEL[activity], onClear: () => setActivity("all" as ActivityFilter) }] : []),
+    ...(undecidedOnly ? [{ key: "undecided", label: "Kararsızlar", onClear: () => setUndecidedOnly(false) }] : []),
+    ...(benchOnly ? [{ key: "bench", label: "Bench", onClear: () => setBenchOnly(false) }] : []),
+  ];
+
   const pillBtn = (active: boolean) =>
-    `chip transition ${active ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`;
+    `chip gap-1.5 transition ${active ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`;
 
   return (
-    <div>
-      <header className="mb-6">
-        <h1 className="font-display text-3xl font-bold">Fırsat Kuyruğu</h1>
-        <p className="mt-1 text-sm text-ink-secondary">
-          {filtered.length} fırsat · {lensSummary} · Türkiye tezi
-        </p>
-      </header>
+    // Tek kenar çubuğu: nav (AppSidebar) + Kuyruk'un kendi başlığı/filtreleri/listesi hepsi
+    // aynı sütunda (kullanıcı: "sol alan menü ve fırsatları birlikte barındıracak") — ayrı
+    // bir ikinci kenar çubuğu YOK. Sağ panel navbar'sız, baştan sona tam yükseklik.
+    <div className="flex h-screen overflow-hidden">
+      <AppSidebar me={me} current="queue">
+        <div className="shrink-0 space-y-2 border-t border-white/[0.12] pt-3">
+          <div ref={filtersWrapRef} className="relative">
+            <div className="flex items-center rounded-btn border border-hair bg-elevated text-xs">
+              <span className={`shrink-0 pl-2.5 ${search ? "text-ink" : "text-ink-muted"}`}>
+                <IconSearch className="h-3.5 w-3.5" />
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearch("");
+                }}
+                placeholder="Ara…"
+                className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-ink placeholder:text-ink-muted focus:outline-none"
+              />
+              <div className="h-4 w-px shrink-0 bg-white/[0.12]" />
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                title="Filtreler"
+                aria-label="Filtreler"
+                aria-expanded={filtersOpen}
+                className={`flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 transition ${
+                  filtersOpen || activeFilterCount > 0 ? "text-ink" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                <IconSliders className="h-3.5 w-3.5" />
+                {activeFilterCount > 0 && (
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 font-mono text-[10px] font-bold leading-none text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="glass flex items-center justify-between px-4 py-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-pursue">
-            <span className="h-1.5 w-1.5 rounded-full bg-pursue" />
-            KOVALA
-          </span>
-          <span className="font-display text-xl font-bold">{counts.pursue}</span>
+            {filtersOpen && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 space-y-3 rounded-card border border-hair bg-elevated p-3 text-xs shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-ink">Filtreler</span>
+                  {activeFilterCount > 0 && (
+                    <button onClick={clearFilters} className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+                      Tümünü temizle
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Kapsam</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <select value={sector} onChange={(e) => setSector(e.target.value)} className="chip w-full bg-surface">
+                      <option value="">Sektör: Tümü</option>
+                      {sectors.map((s) => (
+                        <option key={s.key} value={s.key}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select value={market} onChange={(e) => setMarket(e.target.value)} className="chip w-full bg-surface">
+                      <option value="">Pazar: Tümü</option>
+                      {markets.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <select value={source} onChange={(e) => setSource(e.target.value)} className="chip w-full bg-surface">
+                    <option value="">Kaynak: Tümü</option>
+                    {sources.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Aktivite</div>
+                  <select
+                    value={activity}
+                    onChange={(e) => setActivity(e.target.value as ActivityFilter)}
+                    className="chip w-full bg-surface"
+                  >
+                    <option value="all">Aktivite: Hepsi</option>
+                    <option value="mine">Aktivite: Benim</option>
+                    <option value="friend">Aktivite: Arkadaş</option>
+                    <option value="both">Aktivite: İkisi de</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Hızlı filtreler</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => setUndecidedOnly((v) => !v)} className={`${pillBtn(undecidedOnly)} w-full justify-center`}>
+                      <IconZap className="h-3.5 w-3.5" /> Kararsızlar ({counts.undecided})
+                    </button>
+                    <button onClick={() => setBenchOnly((v) => !v)} className={`${pillBtn(benchOnly)} w-full justify-center`}>
+                      <IconAward className="h-3.5 w-3.5" /> Bench ({counts.bench})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 border-t border-hair pt-3">
+                  <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Sırala</div>
+                  <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)} className="chip w-full bg-surface">
+                    <option value="fit">Fit</option>
+                    <option value="recent">En yeni</option>
+                    <option value="band">Bant</option>
+                    <option value="confidence">Güven</option>
+                    <option value="comments">En çok yorum</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {activeChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {activeChips.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={c.onClear}
+                  title={`${c.label} filtresini kaldır`}
+                  className="chip gap-1 bg-elevated text-[11px] hover:border-strong hover:text-ink"
+                >
+                  {c.label}
+                  <span className="text-ink-muted">×</span>
+                </button>
+              ))}
+              <button onClick={clearFilters} className="text-[11px] text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+                Temizle
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[11px] text-ink-muted">{filtered.length}</span>
+            <div className="flex items-center gap-1">
+              {BANDS.map((b) => {
+                const active = bandFilter.has(b);
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => toggleBand(b)}
+                    aria-pressed={active}
+                    title={`${BAND[b].label} ile filtrele (${counts[b]})`}
+                    style={active ? { boxShadow: `inset 0 0 0 1px ${BAND[b].hex}` } : undefined}
+                    className={`flex items-center gap-1 rounded-btn px-1.5 py-0.5 font-mono text-[11px] transition ${
+                      active ? `bg-white/[0.06] ${BAND[b].text}` : "text-ink-muted hover:bg-white/[0.03] hover:text-ink"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${BAND[b].dot}`} />
+                    {counts[b]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        <div className="glass flex items-center justify-between px-4 py-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-watch">
-            <span className="h-1.5 w-1.5 rounded-full bg-watch" />
-            İZLE
-          </span>
-          <span className="font-display text-xl font-bold">{counts.watch}</span>
+
+        <div className="scroll-emphasis min-h-0 flex-1 overflow-y-auto py-1">
+          {filtered.length === 0 && (
+            <p className="px-3 py-4 text-sm text-ink-muted">Bu filtrelerle eşleşen fırsat yok.</p>
+          )}
+          {visible.map((item) => (
+            <QueueRow
+              key={item.id}
+              item={item}
+              selected={item.id === selected?.id}
+              onSelect={() => setSelectedId(item.id)}
+            />
+          ))}
+          {filtered.length > visible.length && (
+            <button
+              onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+              className="mx-2 my-2 w-[calc(100%-1rem)] rounded-btn border border-hair py-2 text-xs text-ink-muted transition hover:border-strong hover:text-ink"
+            >
+              Daha fazla yükle ({filtered.length - visible.length} tane daha)
+            </button>
+          )}
         </div>
-        <div className="glass flex items-center justify-between px-4 py-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-kill">
-            <span className="h-1.5 w-1.5 rounded-full bg-kill" />
-            ELE
-          </span>
-          <span className="font-display text-xl font-bold">{counts.kill}</span>
-        </div>
-      </div>
+      </AppSidebar>
 
-      <div className="glass mt-4 flex flex-wrap items-center gap-2 p-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 Ara — başlık"
-          className="min-w-[160px] flex-1 rounded-btn bg-transparent px-2 py-1.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none"
-        />
-        <select
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          className="chip bg-elevated"
-        >
-          <option value="">Sektör: Tümü</option>
-          {sectors.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select value={market} onChange={(e) => setMarket(e.target.value)} className="chip bg-elevated">
-          <option value="">Pazar: Tümü</option>
-          {markets.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <select value={source} onChange={(e) => setSource(e.target.value)} className="chip bg-elevated">
-          <option value="">Kaynak: Tümü</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortMode)}
-          className="chip bg-elevated"
-        >
-          <option value="fit">Sırala: Fit</option>
-          <option value="recent">Sırala: En yeni</option>
-        </select>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <button onClick={() => setBenchOnly((v) => !v)} className={pillBtn(benchOnly)}>
-          🏅 Bench ({counts.bench})
-        </button>
-        <button onClick={() => setActivity("all")} className={pillBtn(activity === "all")}>
-          Hepsi
-        </button>
-        <button onClick={() => setActivity("mine")} className={pillBtn(activity === "mine")}>
-          Benim
-        </button>
-        <button onClick={() => setActivity("friend")} className={pillBtn(activity === "friend")}>
-          Arkadaş
-        </button>
-        <button onClick={() => setActivity("both")} className={pillBtn(activity === "both")}>
-          İkisi de
-        </button>
-      </div>
-
-      <div className="mt-6 space-y-4">
-        {filtered.length === 0 && (
-          <p className="text-sm text-ink-muted">Bu filtrelerle eşleşen fırsat yok.</p>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {demo && (
+          <div className="shrink-0 border-b border-strong bg-elevated px-5 py-2 text-sm text-brand">
+            Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
+          </div>
         )}
-        {visible.map((item) => (
-          <OpportunityCard key={item.id} item={item} />
-        ))}
-      </div>
-
-      {visibleCount < filtered.length && (
-        <div className="mt-6 flex justify-center">
-          <button
-            onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-            className="btn-ghost rounded-full"
-          >
-            Daha fazla göster ({filtered.length - visibleCount})
-          </button>
+        <div className="min-h-0 flex-1">
+          {selected ? (
+            <DetailPanel
+              item={selected}
+              onDecided={(d) => setLocalMine((prev) => new Map(prev).set(selected.id, d))}
+              onSkip={
+                undecidedOnly
+                  ? () => setSkipped((prev) => new Set(prev).add(selected.id))
+                  : undefined
+              }
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+              Soldan bir fırsat seç.
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

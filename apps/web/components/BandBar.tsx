@@ -42,10 +42,12 @@ export function BandBar({
   );
 }
 
-/** Kovala/izle/ele için paylaşılan renk lejandı — birden fazla seri olduğunda daima görünür. */
+/** Kovala/izle/ele için paylaşılan renk lejandı — birden fazla seri olduğunda daima görünür.
+ *  "Karar" — üçlünün ortak adı (Faz 5.4, kullanıcı: "genel adı yok, ad bulalım"). */
 export function BandLegend({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-3 text-xs text-ink-muted ${className}`}>
+      <span className="font-semibold text-ink-muted">Karar:</span>
       <span className="flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-pursue" /> Kovala
       </span>

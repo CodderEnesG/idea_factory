@@ -1,11 +1,12 @@
 import type { Decision, UserDecision } from "../components/DecisionButtons";
 import type { Comment } from "../components/Comments";
+import type { TaskItem } from "../components/TaskList";
 
 /**
  * Kuyruk kartının UI'a hazır, tamamen serileştirilebilir görünümü. `@idea-factory/core`
  * (enrichment.ts üzerinden @google/genai + @anthropic-ai/sdk'yi zincirler) yalnız
  * `build-card-view.ts`'te (server-only) içe aktarılır — bu şekil, istemci bileşenlerinin
- * (QueueBoard/OpportunityCard) core paketine hiç dokunmadan çalışmasını sağlar, aksi halde
+ * (QueueBoard/DetailPanel/PanomCard) core paketine hiç dokunmadan çalışmasını sağlar, aksi halde
  * webpack client bundle'ında `node:crypto` (hash.ts) hatası verir.
  */
 export type Band = "pursue" | "watch" | "kill";
@@ -37,6 +38,13 @@ export interface DebateTurnView {
   position?: Band;
 }
 
+export type FactKind = "geo" | "markets" | "funding" | "users" | "traction";
+
+export interface Fact {
+  kind: FactKind;
+  text: string;
+}
+
 export interface DebateView {
   id: string;
   transcript: DebateTurnView[];
@@ -64,12 +72,13 @@ export interface CardView {
   noData: boolean;
   fetchOk: boolean;
   summary: string | null;
-  facts: string[];
+  facts: Fact[];
   pending: boolean;
   lensViews: LensView[];
   mine: Decision | null;
   others: UserDecision[];
   comments: Comment[];
+  tasks: TaskItem[];
   isAdmin: boolean;
   debates: DebateView[];
 }
