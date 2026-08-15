@@ -3,7 +3,13 @@
 import { useState } from "react";
 import type { IngestionSettings } from "../lib/active-ingestion-settings";
 
-export function IngestionSettingsForm({ initial }: { initial: IngestionSettings }) {
+export function IngestionSettingsForm({
+  initial,
+  onSaved,
+}: {
+  initial: IngestionSettings;
+  onSaved?: (settings: IngestionSettings) => void;
+}) {
   const [perSourceLimit, setPerSourceLimit] = useState(initial.per_source_limit);
   const [concurrency, setConcurrency] = useState(initial.concurrency);
   const [busy, setBusy] = useState(false);
@@ -19,6 +25,10 @@ export function IngestionSettingsForm({ initial }: { initial: IngestionSettings 
         body: JSON.stringify({ per_source_limit: perSourceLimit, concurrency }),
       });
       setResult(res.ok ? "ok" : "err");
+      if (res.ok) {
+        const j = (await res.json().catch(() => null)) as { version?: string } | null;
+        onSaved?.({ version: j?.version ?? initial.version, per_source_limit: perSourceLimit, concurrency });
+      }
     } catch {
       setResult("err");
     } finally {

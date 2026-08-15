@@ -38,21 +38,29 @@ export function DecisionButtons({
 }) {
   const [chosen, setChosen] = useState<Decision | null>(mine);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   async function decide(d: Decision) {
     setBusy(true);
+    setFailed(false);
+    const previous = chosen;
     setChosen(d);
     try {
-      await fetch("/api/decisions", {
+      const res = await fetch("/api/decisions", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ signal_id: signalId, decision: d }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      onDecided?.(d);
     } catch {
-      // demo modunda sessiz — backend gelince gerçek yazar
+      // Yazma gerçekten başarısız oldu (demo modu farklı — fetch orada da atılır ama
+      // backend yoksa zaten çağıran bileşen demo veriyle çalışır) — optimistic işareti geri al,
+      // kullanıcı kararının kaydedilmediğini görsün.
+      setChosen(previous);
+      setFailed(true);
     } finally {
       setBusy(false);
-      onDecided?.(d);
     }
   }
 
@@ -76,6 +84,9 @@ export function DecisionButtons({
           </button>
         ))}
       </div>
+      {failed && (
+        <p className="text-xs text-kill">Karar kaydedilemedi, bağlantını kontrol edip tekrar dene.</p>
+      )}
       {others.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
           <span>ekip:</span>

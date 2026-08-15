@@ -9,6 +9,8 @@ import { CommentFeed } from "./CommentFeed";
 import { useDebate, DebateFeed } from "./DebateRoom";
 import { TaskList } from "./TaskList";
 import { BAND, FitRing, CONFIDENCE_LABEL } from "./card-visuals";
+import { formatSource } from "../lib/source-labels";
+import { OpportunityMenu } from "./OpportunityMenu";
 import {
   IconAlertTriangle,
   IconAward,
@@ -113,7 +115,7 @@ export function DetailPanel({
                   i
                 </button>
                 <span className="pointer-events-none absolute right-0 top-full z-10 mt-1 hidden whitespace-nowrap rounded-btn border border-hair bg-elevated px-2.5 py-1.5 text-xs text-ink-secondary shadow-lg group-hover:block">
-                  {item.source}
+                  {formatSource(item.source)}
                   {item.kindLabel && <> · {item.kindLabel}</>}
                   {item.market && <> · {item.market}</>}
                   {item.sector && <> · {item.sector}</>}
@@ -138,11 +140,7 @@ export function DetailPanel({
               {!item.noData && !item.fetchOk && <span className="opacity-70">· sayfa çekilemedi</span>}
             </div>
           </div>
-          {onSkip && (
-            <button onClick={onSkip} className="shrink-0 text-xs text-ink-muted hover:text-ink">
-              Atla →
-            </button>
-          )}
+          <OpportunityMenu url={item.url} onSkip={onSkip} />
         </div>
       </div>
 

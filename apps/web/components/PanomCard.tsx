@@ -7,6 +7,8 @@ import { TaskList } from "./TaskList";
 import { Comments } from "./Comments";
 import { DebateRoom } from "./DebateRoom";
 import { BAND } from "./card-visuals";
+import { formatSource } from "../lib/source-labels";
+import { OpportunityMenu } from "./OpportunityMenu";
 
 /**
  * Panom'un kartı (Faz 5.4) — OpportunityCard'ın küçültülmüş kopyası DEĞİL, ayrı bir amaç:
@@ -38,11 +40,14 @@ export function PanomCard({ item }: { item: CardView & { mine: Decision } }) {
             {item.title}
           </a>
           <div className="mt-1 text-xs text-ink-muted">
-            {item.source}
+            {formatSource(item.source)}
             {item.sector && ` · ${item.sector}`}
           </div>
         </div>
-        <span className="shrink-0 font-mono text-xs text-ink-secondary">fit {item.fit}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="font-mono text-xs text-ink-secondary">fit {item.fit}</span>
+          <OpportunityMenu url={item.url} />
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-xs">

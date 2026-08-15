@@ -7,6 +7,7 @@ import { loadComments } from "../../lib/load-comments";
 import { loadTasks } from "../../lib/load-tasks";
 import { loadDebates } from "../../lib/load-debates";
 import { buildCardView } from "../../lib/build-card-view";
+import { loadActiveIngestionSettings } from "../../lib/active-ingestion-settings";
 import { QueueBoard } from "../../components/QueueBoard";
 import type { Decision } from "../../components/DecisionButtons";
 
@@ -23,7 +24,10 @@ export default async function Queue() {
     loadLensRegistry(),
   ]);
   const isAdmin = me?.is_admin ?? false;
-  const debates = await loadDebates(isAdmin);
+  const [debates, ingestionSettings] = await Promise.all([
+    loadDebates(isAdmin),
+    isAdmin ? loadActiveIngestionSettings() : Promise.resolve(null),
+  ]);
   // Geri-besleme döngüsü (PLAN.md §10): kendi kararım varsa AI bandının yerine geçer —
   // zaten "ele" dediğim bir sinyali AI "kovala" dese bile tekrar üstte görmek istemem.
   const myBand = new Map<string, Decision>();
@@ -50,5 +54,7 @@ export default async function Queue() {
     );
   });
 
-  return <QueueBoard items={cards} meName={meName} me={me} demo={demo} />;
+  return (
+    <QueueBoard items={cards} meName={meName} me={me} demo={demo} ingestionSettings={ingestionSettings} />
+  );
 }

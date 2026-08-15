@@ -4,11 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
+import type { IngestionSettings } from "../lib/active-ingestion-settings";
 import { QueueRow } from "./QueueRow";
 import { DetailPanel } from "./DetailPanel";
 import { AppSidebar } from "./AppSidebar";
+import { IngestionSettingsForm } from "./IngestionSettingsForm";
 import { BAND } from "./card-visuals";
-import { IconAward, IconSearch, IconSliders, IconZap } from "./icons";
+import { canonicalSourceName } from "../lib/source-health";
+import { formatSource } from "../lib/source-labels";
+import { IconAward, IconDownload, IconSearch, IconSliders, IconZap } from "./icons";
 
 type SortMode = "fit" | "recent" | "band" | "confidence" | "comments";
 type ActivityFilter = "all" | "mine" | "friend" | "both";
@@ -21,6 +25,22 @@ const ACTIVITY_LABEL: Record<Exclude<ActivityFilter, "all">, string> = {
 
 const PAGE_SIZE = 50;
 const BANDS: CardView["band"][] = ["pursue", "watch", "kill"];
+
+// Filtre/sıralama tercihleri kalıcı — sidebar'ın daralt/genişlet tercihiyle aynı desen
+// (AppSidebar'daki COLLAPSE_KEY). Serbest metin arama kasıtlı hariç: sayfa açılışında sessizce
+// dolu bir arama kutusuyla boş liste görmek kafa karıştırır.
+const FILTERS_KEY = "idea-factory:queue-filters";
+
+interface StoredFilters {
+  sector: string;
+  market: string;
+  source: string;
+  sort: SortMode;
+  activity: ActivityFilter;
+  benchOnly: boolean;
+  undecidedOnly: boolean;
+  bandFilter: CardView["band"][];
+}
 
 const BAND_RANK: Record<CardView["band"], number> = { pursue: 0, watch: 1, kill: 2 };
 const CONFIDENCE_RANK: Record<CardView["confidence"], number> = { high: 0, med: 1, low: 2 };
@@ -68,6 +88,20 @@ function distinct(items: CardView[], pick: (i: CardView) => string | null): { ke
     .sort((a, b) => a.label.localeCompare(b.label, "tr"));
 }
 
+// Kaynak filtresi ayrı: "tldr:founders"/"tldr:ai" gibi alt-kategoriler tek "TLDR" seçeneğinde
+// birleşmeli (source-health.ts'teki kanonikleştirmeyle aynı mantık), sektör/pazar gibi serbest
+// metin değil.
+function distinctSources(items: CardView[]): { key: string; label: string }[] {
+  const byKey = new Map<string, string>();
+  for (const i of items) {
+    const key = canonicalSourceName(i.source);
+    if (!byKey.has(key)) byKey.set(key, formatSource(i.source));
+  }
+  return [...byKey.entries()]
+    .map(([key, label]) => ({ key, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "tr"));
+}
+
 /**
  * Kuyruk (Faz 5.5): kenar çubuğu (nav + arama/filtre + fırsat listesi, hepsi TEK sütun —
  * kullanıcı: "sol alan menü ve fırsatları birlikte barındıracak") + sağ detay paneli, tam
@@ -80,11 +114,13 @@ export function QueueBoard({
   meName,
   me,
   demo,
+  ingestionSettings,
 }: {
   items: CardView[];
   meName: string;
   me: SessionUser | null;
   demo?: boolean;
+  ingestionSettings?: IngestionSettings | null;
 }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
@@ -96,11 +132,47 @@ export function QueueBoard({
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   const [bandFilter, setBandFilter] = useState<Set<CardView["band"]>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [ingestionOpen, setIngestionOpen] = useState(false);
+  const [localIngestion, setLocalIngestion] = useState<IngestionSettings | null>(null);
+  const ingestionWrapRef = useRef<HTMLDivElement>(null);
+  const effectiveIngestion = localIngestion ?? ingestionSettings ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localMine, setLocalMine] = useState<Map<string, Decision>>(new Map());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const filtersWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(FILTERS_KEY);
+    if (!raw) return;
+    try {
+      const stored = JSON.parse(raw) as Partial<StoredFilters>;
+      if (stored.sector) setSector(stored.sector);
+      if (stored.market) setMarket(stored.market);
+      if (stored.source) setSource(stored.source);
+      if (stored.sort) setSort(stored.sort);
+      if (stored.activity) setActivity(stored.activity);
+      if (stored.benchOnly) setBenchOnly(true);
+      if (stored.undecidedOnly) setUndecidedOnly(true);
+      if (stored.bandFilter?.length) setBandFilter(new Set(stored.bandFilter));
+    } catch {
+      // bozuk kayıt — yok say, varsayılanlarla devam
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored: StoredFilters = {
+      sector,
+      market,
+      source,
+      sort,
+      activity,
+      benchOnly,
+      undecidedOnly,
+      bandFilter: [...bandFilter],
+    };
+    window.localStorage.setItem(FILTERS_KEY, JSON.stringify(stored));
+  }, [sector, market, source, sort, activity, benchOnly, undecidedOnly, bandFilter]);
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -112,6 +184,17 @@ export function QueueBoard({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [filtersOpen]);
+
+  useEffect(() => {
+    if (!ingestionOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (ingestionWrapRef.current && !ingestionWrapRef.current.contains(e.target as Node)) {
+        setIngestionOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [ingestionOpen]);
 
   // Filtre/arama/sıralama değişince ilk sayfaya dön — kenar çubuğu artık kalıcı bir "Daha
   // fazla" menü bölümü taşıdığı için liste alanı küçüldü, yeni filtrede eskisinden kalan
@@ -138,7 +221,7 @@ export function QueueBoard({
 
   const sectors = useMemo(() => distinct(resolved, (i) => i.sector), [resolved]);
   const markets = useMemo(() => distinct(resolved, (i) => i.market), [resolved]);
-  const sources = useMemo(() => distinct(resolved, (i) => i.source), [resolved]);
+  const sources = useMemo(() => distinctSources(resolved), [resolved]);
 
   const counts = useMemo(() => {
     let pursue = 0, watch = 0, kill = 0, bench = 0, undecided = 0;
@@ -158,7 +241,7 @@ export function QueueBoard({
       if (q && !i.title.toLowerCase().includes(q)) return false;
       if (sector && (!i.sector || normalizeTag(i.sector).key !== sector)) return false;
       if (market && (!i.market || normalizeTag(i.market).key !== market)) return false;
-      if (source && normalizeTag(i.source).key !== source) return false;
+      if (source && canonicalSourceName(i.source) !== source) return false;
       if (benchOnly && !i.bench) return false;
       if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
       if (bandFilter.size > 0 && !bandFilter.has(i.band)) return false;
@@ -387,6 +470,35 @@ export function QueueBoard({
               })}
             </div>
           </div>
+
+          {effectiveIngestion && (
+            <div ref={ingestionWrapRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIngestionOpen((v) => !v)}
+                title="Çekim ayarları"
+                className={`flex w-full items-center gap-1.5 rounded-btn px-2 py-1 font-mono text-[11px] transition ${
+                  ingestionOpen ? "text-ink" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                <IconDownload className="h-3 w-3 shrink-0" />
+                <span>
+                  kaynak başına: {effectiveIngestion.per_source_limit || "∞"}
+                </span>
+              </button>
+
+              {ingestionOpen && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-card border border-hair bg-elevated p-3 text-xs shadow-lg">
+                  <div className="mb-2 text-[11px] font-semibold text-ink">Toplama ayarları</div>
+                  <IngestionSettingsForm
+                    key={effectiveIngestion.version}
+                    initial={effectiveIngestion}
+                    onSaved={setLocalIngestion}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="scroll-emphasis min-h-0 flex-1 overflow-y-auto py-1">

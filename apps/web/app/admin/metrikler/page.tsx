@@ -4,6 +4,7 @@ import { loadItems } from "../../../lib/load-items";
 import { loadLensRegistry } from "../../../lib/load-lens-registry";
 import { weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal } from "../../../lib/metrics";
 import { computeSourceHealth, type SourceHealth, type SourceStatus } from "../../../lib/source-health";
+import { formatSource } from "../../../lib/source-labels";
 import { AppSidebar } from "../../../components/AppSidebar";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +101,7 @@ function SourceHealthTable({ rows }: { rows: SourceHealth[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.name} className="border-t border-hair">
-              <td className="py-1.5 text-ink">{r.name}</td>
+              <td className="py-1.5 text-ink">{formatSource(r.name)}</td>
               <td className="py-1.5 text-right text-ink-secondary">{r.last7d}</td>
               <td className="py-1.5 text-right text-ink-muted">{r.last30d}</td>
               <td className="py-1.5 text-right text-ink-muted">{fmtLastSeen(r.lastSeen)}</td>
