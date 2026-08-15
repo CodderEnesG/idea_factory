@@ -84,7 +84,7 @@ export function buildDigest(items: RankedItem[], opts: DigestOptions = {}): stri
     lines.push("---", "", "## 🔎 Doğrulama Bekleyenler", "");
     for (const { signal, analyses } of pending) {
       lines.push(`### ${signal.title}`);
-      for (const lens of lenses) {
+      for (const lens of lensRegistry) {
         const a = analyses[lens.id];
         if (!a || a.validation_needed.length === 0) continue;
         for (const v of a.validation_needed) {

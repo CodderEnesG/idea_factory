@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { analyzeSignal } from "./analyst.js";
-import { whiteSpaceLens, type WhiteSpaceAnalysis } from "./lenses.config.js";
+import { WHITE_SPACE_SEED_LENS, buildCustomLens, type CustomAnalysis } from "./lenses.config.js";
 import type { AnalystProvider } from "./providers/types.js";
 import type { Signal } from "./signal.js";
+
+const whiteSpaceLens = buildCustomLens(WHITE_SPACE_SEED_LENS);
+type WhiteSpaceAnalysis = CustomAnalysis;
 
 const signal: Signal = {
   id: "abc123",
@@ -31,7 +34,7 @@ function validBody(): Omit<WhiteSpaceAnalysis, "lens"> {
     ],
     recommended_action: "watch",
     tags: ["saas"],
-    competitive_landscape: "iki erken oyuncu, hakim oyuncu yok",
+    extra_note: "iki erken oyuncu, hakim oyuncu yok",
   };
 }
 

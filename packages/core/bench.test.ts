@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { isBench, benchItems } from "./bench.js";
 import type { RankedItem } from "./ranker.js";
-import type { ArbitrageAnalysis } from "./lenses.config.js";
+import type { CustomAnalysis } from "./lenses.config.js";
 import type { Signal } from "./signal.js";
 
-function mkItem(fit: number, confidence: ArbitrageAnalysis["confidence"]): RankedItem {
+function mkItem(fit: number, confidence: CustomAnalysis["confidence"]): RankedItem {
   const signal: Signal = {
     id: `s${fit}${confidence}`,
     source: "test",
@@ -18,12 +18,12 @@ function mkItem(fit: number, confidence: ArbitrageAnalysis["confidence"]): Ranke
     fetched_at: new Date().toISOString(),
     content_hash: "h",
   };
-  const analysis: ArbitrageAnalysis = {
+  const analysis: CustomAnalysis = {
     lens: "arbitrage",
     fit,
     rationale: "r",
     evidence: [],
-    adaptation_notes: "",
+    extra_note: "",
     risks: [],
     confidence,
     validation_needed: [],

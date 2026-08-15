@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { composite, rank, type RankedItem } from "./ranker.js";
-import type { ArbitrageAnalysis } from "./lenses.config.js";
+import type { CustomAnalysis } from "./lenses.config.js";
 import type { Signal } from "./signal.js";
 
 function sig(id: string, fetched: string): Signal {
@@ -19,14 +19,14 @@ function sig(id: string, fetched: string): Signal {
   };
 }
 
-function ana(fit: number): ArbitrageAnalysis {
+function ana(fit: number): CustomAnalysis {
   const action = fit >= 80 ? "pursue" : fit >= 50 ? "watch" : "kill";
   return {
     lens: "arbitrage",
     fit,
     rationale: "r",
     evidence: fit >= 80 ? [{ fact: "f", source: "s" }] : [],
-    adaptation_notes: "",
+    extra_note: "",
     risks: [],
     confidence: fit >= 80 ? "high" : "med",
     validation_needed: action === "pursue" ? [] : [{ data: "d", why: "w", how_to_verify: "h" }],
@@ -134,10 +134,18 @@ describe("composite", () => {
   });
 
   it("sıfır ağırlıklı mercek kompozit skoru değiştirmez (beyaz-alan, grounding gelene kadar)", () => {
-    const c = composite({
-      arbitrage: { ...ana(90), confidence: "high" },
-      white_space: { ...ana(20), lens: "white_space", confidence: "low" },
-    });
+    // Artık builtin varsayılan ağırlık yok (arbitraj/beyaz-alan da admin-merceği) — gerçek
+    // çağıranlar gibi (build-card-view.ts vb.) registry açıkça verilir.
+    const c = composite(
+      {
+        arbitrage: { ...ana(90), confidence: "high" },
+        white_space: { ...ana(20), lens: "white_space", confidence: "low" },
+      },
+      [
+        { id: "arbitrage", weight: 1 } as never,
+        { id: "white_space", weight: 0 } as never,
+      ],
+    );
     expect(c.fit).toBe(90); // beyaz-alan ağırlığı 0 → skora karışmaz (bkz. lenses.config.ts)
     expect(c.confidence).toBe("low"); // ama confidence'ta en temkinli hâlâ kazanır
   });

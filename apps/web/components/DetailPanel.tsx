@@ -26,6 +26,11 @@ import type { FactKind } from "../lib/card-view";
 
 const KEY_TO_DECISION: Record<string, Decision> = { "1": "pursue", "2": "watch", "3": "kill" };
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "?").toUpperCase() + (parts[1]?.[0]?.toUpperCase() ?? "");
+}
+
 const FACT_ICON: Partial<Record<FactKind, (props: { className?: string }) => JSX.Element>> = {
   geo: IconGlobe,
   funding: IconBanknote,
@@ -138,6 +143,22 @@ export function DetailPanel({
                 </span>
               )}
               {!item.noData && !item.fetchOk && <span className="opacity-70">· sayfa çekilemedi</span>}
+              {teamWithAi.length > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  ·
+                  <span className="inline-flex -space-x-1">
+                    {teamWithAi.map((o) => (
+                      <span
+                        key={o.user}
+                        title={`${o.user}: ${BAND[o.decision].label}`}
+                        className={`grid h-4 w-4 place-items-center rounded-full text-[8px] font-bold text-white ring-1 ring-surface ${BAND[o.decision].dot}`}
+                      >
+                        {initialsOf(o.user)}
+                      </span>
+                    ))}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
           <OpportunityMenu url={item.url} onSkip={onSkip} />
@@ -266,7 +287,7 @@ export function DetailPanel({
       <div className="shrink-0 border-t border-white/[0.14] bg-surface px-5 py-3">
         <div className="mx-auto max-w-3xl">
           <div className="flex items-center gap-2">
-            <DecisionButtons signalId={item.id} mine={item.mine} others={teamWithAi} onDecided={onDecided} />
+            <DecisionButtons signalId={item.id} mine={item.mine} onDecided={onDecided} />
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {item.isAdmin && (
                 <button

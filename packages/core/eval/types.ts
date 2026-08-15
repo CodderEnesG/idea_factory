@@ -1,5 +1,5 @@
 import type { Signal } from "../signal.js";
-import type { RecommendedAction, ArbitrageAnalysis } from "../lenses.config.js";
+import type { RecommendedAction, CustomAnalysis } from "../lenses.config.js";
 import { shortHash } from "../hash.js";
 
 /** Eval vakası: sinyal + insan onaylı beklenen aksiyon. */
@@ -14,7 +14,7 @@ export interface EvalCase {
 /** Golden few-shot çapası (prompt'a girer) = FewShotExample ile aynı şekil. */
 export interface GoldenCase {
   signal: Signal;
-  analysis: ArbitrageAnalysis;
+  analysis: CustomAnalysis;
 }
 
 /** Kısa yol: eval/golden vakası için tam Signal üret. */

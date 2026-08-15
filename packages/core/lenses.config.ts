@@ -40,12 +40,6 @@ export const BaseAnalysisSchema = z.object({
 });
 export type BaseAnalysis = z.infer<typeof BaseAnalysisSchema>;
 
-export const ArbitrageAnalysisSchema = BaseAnalysisSchema.extend({
-  lens: z.literal("arbitrage"),
-  adaptation_notes: z.string(), // neyi uyarla, ne kırılır
-});
-export type ArbitrageAnalysis = z.infer<typeof ArbitrageAnalysisSchema>;
-
 /* ── Fit bantları ───────────────────────────────────────────────────────── */
 
 export type FitBand = "pursue" | "watch" | "kill";
@@ -55,65 +49,6 @@ export function fitBand(fit: number): FitBand {
   if (fit >= 80) return "pursue";
   if (fit >= 50) return "watch";
   return "kill";
-}
-
-/* ── Arbitraj merceği — prompt şablonu ──────────────────────────────────── */
-
-export const ARBITRAGE_LENS_ID = "arbitrage" as const;
-
-/** Sabit prefix (prompt caching için önde tutulur): base karakter + tez + soru çerçevesi. */
-export function buildArbitrageSystemPrompt(t: ThesisConfig): string {
-  return `Sen şüpheci bir operatör-yatırımcı analistsin. Görevin bir mandanın (tez) emrinde
-çalışmak: her sinyali "bu, bizim mandamıza göre kovalanmaya değer mi, neden, ne kadar eminim?"
-sorusuyla değerlendirmek. Varsayılan tutumun "bu neden çöker?" — bir fırsatı yükseltmeden önce
-öldürmeyi denersin. Olgu ile çıkarımı ayır; bilmediğini uydurma, bilinmeyeni işaretle.
-
-## Tez (mandate) — v${t.version}
-- Sermaye aralığı: ${t.capital_range}
-- Hedef pazarlar: ${t.target_markets.join(", ")}
-- Sektörler: ${t.sectors.join(", ")}
-- Yetkinlikler: ${t.capabilities.join(", ")}
-- Risk iştahı: ${t.risk_appetite}
-- Anti-pattern'ler (baştan bastır): ${t.anti_patterns.join("; ")}
-
-## Anti-pattern okuma kuralı (kritik)
-Sinyaldeki şirketin aldığı fonlama sermaye-yoğunluk anti-pattern'ı DEĞİLDİR — tam tersi,
-başka pazarda kanıtlanmış tur/traksiyon OLUMLU kanıttır (aşağıdaki 1. sorunun cevabı).
-Sermaye-yoğunluk anti-pattern'ı BİZİM Türkiye'de kovalayacağımız versiyonun sermaye
-ihtiyacıyla ölçülür: uyarlama düşük sermayeyle kurulabiliyorsa, kaynak şirketin büyük
-fonlaması fit'i DÜŞÜRMEZ, yükseltir.
-
-## Arbitraj merceği — sırayla sor
-1. Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon.
-2. Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?
-3. Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame.
-4. Zamanlama: neden şimdi? Yeni yetenek/maliyet eğrisi/regülasyon mümkün mü kıldı?
-5. Kim deniyor: Türkiye'de zaten kovalayan var mı?
-6. Önerilen aksiyon: kovala / izle / ele — ve neden, bu teze göre.
-
-## Ön kapı: bu sinyal kovalanabilir mi?
-fit, "BU TEŞEBBÜSÜ kovalamalı mıyız" sorusunun cevabıdır — "bu içerik faydalı mı"nın değil.
-Ortada somut bir şirket/ürün/yatırım turu YOKSA (görüş yazısı, deneme, ilke anlatımı,
-araştırma, "şu dersi çıkarın" içeriği) kovalanacak bir şey de yoktur:
-- fit EN FAZLA 20, recommended_action: kill.
-- "Meta-öğrenme değeri var", "çerçevemizi güçlendirir", "değerlendirme merceğimizi keskinleştirir"
-  gibi gerekçeler fit'i YÜKSELTMEZ. Bir fikri faydalı bulman onu fırsat yapmaz.
-- rationale'da neden kovalanamaz olduğunu tek cümlede söyle, uzun özet yazma.
-Zenginleştirme bloğunda signal_kind verilmişse ona uy: essay/research/other → yukarıdaki kural.
-
-## Fit bant kuralı (0-100, katı)
-- 80-100: teze birebir uyum (kovala-adayı) — YALNIZ confidence:high ile.
-- 50-79: uyum var ama kritik belirsizlik (izle bandı) — confidence low/med tavanı 79.
-- 0-49: uyumsuz / anti-pattern / kovalanamaz (ele bandı).
-
-## Kurallar
-- recommended_action bantla çelişemez (fit 85 + kill yasak).
-- Her olgu KAYNAK atfıyla (evidence[].source); atıfsız olgu yazma.
-- validation_needed: "kanıt zayıf" deyip kaçma yok — hangi spesifik veri eksik, neden karar
-  değiştirir, nasıl doğrulanır (en fazla 3, en kritik). confidence:high değilse boş bırakma.
-- Yerel-talep kanıtı v1'de zayıf olabilir; bu durumda confidence düşür ve validation_needed doldur.
-
-Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
 
 /** Sinyal + zenginleştirme bloğu — tüm merceklerin (ve triage'ın) user prompt'u bunun üstüne kurulur. */
@@ -150,12 +85,6 @@ Bilinmeyen alanları validation_needed adayı olarak değerlendir.`;
   return `${head}${enr}`;
 }
 
-export function buildArbitrageUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
-  return `${buildSignalBrief(s, enrichment)}
-
-Bu sinyali arbitraj merceğiyle analiz et ve JSON döndür.`;
-}
-
 export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   id: string;
   name: string;
@@ -170,119 +99,18 @@ export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   extraNoteLabel: string;
 }
 
-export const arbitrageLens: Lens<ArbitrageAnalysis> = {
-  id: ARBITRAGE_LENS_ID,
-  name: "Arbitraj",
-  schema: ArbitrageAnalysisSchema,
-  buildSystemPrompt: buildArbitrageSystemPrompt,
-  buildUserPrompt: buildArbitrageUserPrompt,
-  weight: 1,
-  extraNote: (a) => a.adaptation_notes,
-  extraNoteLabel: "Uyarlama",
-};
-
-/* ── Beyaz-alan merceği — prompt şablonu ────────────────────────────────── */
-
-export const WHITE_SPACE_LENS_ID = "white_space" as const;
-
-/**
- * Arbitraj merceğini tamamlar: arbitraj "başka pazarda kanıtlı mı" sorar, beyaz-alan
- * "burada zaten dolu mu" sorar. İkisi çelişebilir (kanıtlı ama doymuş, ya da kanıtsız
- * ama boş) — kasıtlı, kompozit skor faz 2'de bunu ele alır.
- */
-export function buildWhiteSpaceSystemPrompt(t: ThesisConfig): string {
-  return `Sen TR/MENA'daki rekabet yoğunluğunu değerlendiren şüpheci bir pazar analistisin.
-Görevin bir sinyali "bu problemi TR/MENA'da zaten iyi çözen biri var mı, yoksa gerçek bir
-boşluk mu var?" sorusuyla değerlendirmek. Olgu ile çıkarımı ayır; bilmediğini uydurma,
-bilinmeyeni işaretle.
-
-## Tez (mandate) — v${t.version}
-- Sermaye aralığı: ${t.capital_range}
-- Hedef pazarlar: ${t.target_markets.join(", ")}
-- Sektörler: ${t.sectors.join(", ")}
-- Yetkinlikler: ${t.capabilities.join(", ")}
-- Risk iştahı: ${t.risk_appetite}
-- Anti-pattern'ler (baştan bastır): ${t.anti_patterns.join("; ")}
-
-## Boşluk okuma kuralı (kritik)
-Boşluk = rakip yokluğu DEĞİL, savunulabilir rakip yokluğudur. Kimsenin çözmediği bir
-problem genelde iki nedenden biriyle boştur:
-(a) gerçek talep/WTP yok → KÖTÜ boşluk, fit düşük.
-(b) fark edilmedi / geç kalındı / dağıtım-sermaye engeli aşılmadı → İYİ boşluk, fit yüksek.
-"Kimse yapmıyor" tek başına olumlu kanıt DEĞİLDİR — nedeni ayırt et.
-
-## Beyaz-alan merceği — sırayla sor
-1. Yerli/bölgesel tarama: TR/MENA'da bu problemi çözen kaç oyuncu var, ne kadar olgunlar
-   (erken / büyümüş / hakim)?
-2. Boşluğun nedeni: talep yokluğu mu (kötü boşluk) yoksa fark edilmemiş fırsat mı (iyi
-   boşluk)? Kanıt neye dayanıyor?
-3. Boşluğun genişliği: segment kaç oyuncuyu doyurabilir, yoksa kazanan-hepsini-alır mı?
-4. Rekabet momentumu: son 12 ayda benzer girişim/fonlama var mı — boşluk kapanıyor mu?
-5. Giriş bariyeri: bir oyuncu bu boşluğu hızlı kapatabilir mi (network etkisi/veri/dağıtım
-   moat'ı olmayan boşluklar kırılgandır)?
-6. Önerilen aksiyon: kovala / izle / ele — ve neden, bu teze göre.
-
-## Ön kapı: bu sinyal değerlendirilebilir mi?
-Arbitraj merceğiyle aynı kural: ortada somut bir şirket/ürün/yatırım turu YOKSA (görüş
-yazısı, deneme, araştırma) fit EN FAZLA 20, recommended_action: kill. Zenginleştirme
-bloğunda signal_kind verilmişse ona uy.
-
-## Fit bant kuralı (0-100, katı) — arbitrajla aynı bantlar, farklı soru
-- 80-100: net, savunulabilir boşluk (rakip yok/zayıf VE gerçek talep kanıtı var) — YALNIZ
-  confidence:high.
-- 50-79: boşluk var ama belirsiz (oyuncu sayısı net değil ya da talep kanıtı zayıf).
-- 0-49: doymuş pazar VEYA boşluğun nedeni "gerçek talep yok" (kötü boşluk, anti-pattern).
-
-## Kurallar
-- recommended_action bantla çelişemez (fit 85 + kill yasak).
-- Her olgu KAYNAK atfıyla (evidence[].source); atıfsız olgu yazma.
-- validation_needed: en fazla 3, en kritik; confidence:high değilse boş bırakma.
-- Yerli rekabet taraması v1'de zayıf olabilir (web_search kapsamı sınırlı) — bu durumda
-  confidence düşür ve validation_needed doldur.
-
-Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
-}
-
-export function buildWhiteSpaceUserPrompt(s: Signal, enrichment?: StoredEnrichment | null): string {
-  return `${buildSignalBrief(s, enrichment)}
-
-Bu sinyali beyaz-alan merceğiyle analiz et ve JSON döndür.`;
-}
-
-export const WhiteSpaceAnalysisSchema = BaseAnalysisSchema.extend({
-  lens: z.literal("white_space"),
-  competitive_landscape: z.string(), // kim var, ne durumda, boşluğun nedeni
-});
-export type WhiteSpaceAnalysis = z.infer<typeof WhiteSpaceAnalysisSchema>;
-
-export const whiteSpaceLens: Lens<WhiteSpaceAnalysis> = {
-  id: WHITE_SPACE_LENS_ID,
-  name: "Beyaz-alan",
-  schema: WhiteSpaceAnalysisSchema,
-  buildSystemPrompt: buildWhiteSpaceSystemPrompt,
-  buildUserPrompt: buildWhiteSpaceUserPrompt,
-  // 0 = kompozit SKORA girmez; kartta/haritada/trendde ikinci görüş olarak görünmeye devam eder
-  // (kullanıcı kararı 2026-08-10). Gerekçe: bu merceğin 80+ bandı `confidence: high` istiyor, ama
-  // kendi talimatı "yerli rekabet taraması v1'de zayıf (web_search kapsamı sınırlı) → confidence
-  // düşür" diyor — grounding kapalıyken fit yapısal olarak 79'a çakılı (84 çift-mercekli sinyalde
-  // 0 kovala; arbitrajda %5.8). Sıralamaya karıştırınca arbitrajın kovala bandını siliyordu —
-  // ölçülen kovala sayısı: ağırlık 0 → 12, 0.25 → 3, 0.5 → 2, 1 → 1. Muhalefetin ne kadarı gerçek
-  // sinyal, ne kadarı grounding körlüğü, bugün ayırt edilemiyor; körlüğü sıralamaya taşımıyoruz.
-  // **Grounding (PLAN.md §11 madde 2) devreye girince 1'e çıkarılmalı** — asıl tasarım o.
-  weight: 0,
-  extraNote: (a) => a.competitive_landscape,
-  extraNoteLabel: "Rekabet ortamı",
-};
-
-/** Aktif mercek registry'si — yeni mercek = tek giriş (analyst/worker döngüyle işler). */
-export const lenses: Lens[] = [arbitrageLens, whiteSpaceLens];
+/** Hiç mercek tanımlanmamışsa (ilk kurulum / DB yok) düşülecek boş kayıt — tüm mercekler artık
+ *  admin-merceği (aşağıdaki `ARBITRAGE_SEED_LENS`/`WHITE_SPACE_SEED_LENS` dahil, bkz. o bölüm). */
+export const lenses: Lens[] = [];
 
 /* ── Admin-mercekleri — iskeletli soru editörü (PLAN.md §10-C) ─────────────
- * Admin panelinden (`/admin/mercekler`) DB'ye eklenen mercekler. Admin YALNIZ ad + ağırlık +
+ * Admin panelinden (`/admin` → Mercekler) DB'ye eklenen mercekler. Admin ad + ağırlık +
  * "extra_note" etiketi + domain soru listesi girer — ön kapı / fit-bant / atıf / güven-kapısı
- * kuralları burada SABİT kalır (arbitraj/beyaz-alan ile birebir aynı), admin bunları bozamaz.
- * Bu yüzden builtin mercekler (arbitraj/beyaz-alan) kendi Zod şeması + kalibre golden setiyle
- * kalır, admin-mercekleri ortak genel şemayı (BaseAnalysisSchema + extra_note) kullanır. */
+ * kuralları burada SABİT kalır, admin bunları bozamaz. Eskiden "arbitraj"/"beyaz-alan" ayrı
+ * hardcoded Zod şemalarıyla (builtin) yaşardı; 2026-08-15'te bu ayrım kaldırıldı — artık ikisi
+ * de sıradan admin-merceği (aynı genel şema, aynı düzenleme arayüzü). lens_id'leri ("arbitrage",
+ * "white_space") DB'de ve golden few-shot setinde (eval/golden.ts) sabit kalmalı — değiştirilirse
+ * hem geçmiş `analyses` satırları hem few-shot kalibrasyonu kopar. */
 
 export interface CustomLensDef {
   id: string; // slug, DB `lenses.lens_id`
@@ -352,3 +180,50 @@ export function buildCustomLens(def: CustomLensDef): Lens<CustomAnalysis> {
     extraNoteLabel: def.extraNoteLabel,
   };
 }
+
+/* ── Arbitraj / Beyaz-alan tohum tanımları ──────────────────────────────────
+ * Eskiden bu iki mercek kendi hardcoded prompt'u + Zod şemasıyla "builtin" yaşardı
+ * (bkz. git geçmişi). 2026-08-15'te sıradan admin-merceğine taşındı: `lenses` tablosunda
+ * bu id'lerle bir satır yoksa `apps/worker/scripts/migrate-builtin-lenses.ts` bu sabitlerden
+ * seed eder. Özgün prompt'taki "okuma kuralları" (fonlama ≠ anti-pattern, boşluk ≠ rakip
+ * yokluğu) admin-mercek şablonunun tek mekanizmasına (sıralı soru listesi) uysun diye 1.
+ * soru olarak gömülü — biçim değişti, içerik aynı. `id` DEĞİŞTİRİLEMEZ (yukarıdaki not). */
+export const ARBITRAGE_SEED_LENS: CustomLensDef = {
+  id: "arbitrage",
+  name: "Arbitraj",
+  weight: 1,
+  extraNoteLabel: "Uyarlama",
+  questions: [
+    "Anti-pattern okuma kuralı: sinyaldeki şirketin aldığı fonlama sermaye-yoğunluk " +
+      "anti-pattern'ı DEĞİLDİR — başka pazarda kanıtlanmış tur/traksiyon OLUMLU kanıttır. " +
+      "Sermaye-yoğunluk anti-pattern'ı BİZİM Türkiye'de kovalayacağımız versiyonun sermaye " +
+      "ihtiyacıyla ölçülür: uyarlama düşük sermayeyle kurulabiliyorsa, kaynak şirketin büyük " +
+      "fonlaması fit'i DÜŞÜRMEZ, yükseltir.",
+    "Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon.",
+    "Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?",
+    "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame.",
+    "Zamanlama: neden şimdi? Yeni yetenek/maliyet eğrisi/regülasyon mümkün mü kıldı?",
+    "Kim deniyor: Türkiye'de zaten kovalayan var mı?",
+  ],
+};
+
+export const WHITE_SPACE_SEED_LENS: CustomLensDef = {
+  id: "white_space",
+  name: "Beyaz-alan",
+  // 0 = kompozit SKORA girmez; kartta/haritada/trendde ikinci görüş olarak görünmeye devam
+  // eder (kullanıcı kararı 2026-08-10, THESIS_AND_LENS.md §3a'da detay). Grounding (PLAN.md
+  // §11 madde 2) devreye girince 1'e çıkarılmalı — asıl tasarım o.
+  weight: 0,
+  extraNoteLabel: "Rekabet ortamı",
+  questions: [
+    "Boşluk okuma kuralı: boşluk = rakip yokluğu DEĞİL, savunulabilir rakip yokluğudur. " +
+      "Gerçek talep/WTP yoksa KÖTÜ boşluk (fit düşük); fark edilmedi/geç kalındı/dağıtım-sermaye " +
+      "engeli aşılmadıysa İYİ boşluk (fit yüksek). 'Kimse yapmıyor' tek başına olumlu kanıt " +
+      "DEĞİLDİR — nedeni ayırt et.",
+    "Yerli/bölgesel tarama: TR/MENA'da bu problemi çözen kaç oyuncu var, ne kadar olgunlar (erken / büyümüş / hakim)?",
+    "Boşluğun nedeni: talep yokluğu mu (kötü boşluk) yoksa fark edilmemiş fırsat mı (iyi boşluk)? Kanıt neye dayanıyor?",
+    "Boşluğun genişliği: segment kaç oyuncuyu doyurabilir, yoksa kazanan-hepsini-alır mı?",
+    "Rekabet momentumu: son 12 ayda benzer girişim/fonlama var mı — boşluk kapanıyor mu?",
+    "Giriş bariyeri: bir oyuncu bu boşluğu hızlı kapatabilir mi (network etkisi/veri/dağıtım moat'ı olmayan boşluklar kırılgandır)?",
+  ],
+};

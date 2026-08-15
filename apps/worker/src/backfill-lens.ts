@@ -1,5 +1,5 @@
 import {
-  arbitrageLens,
+  ARBITRAGE_SEED_LENS,
   golden,
   lenses,
   type FewShotExample,
@@ -34,7 +34,7 @@ const DRY = process.env["BACKFILL_DRY"] === "true";
 const CONCURRENCY = Math.max(1, Number(process.env["BACKFILL_CONCURRENCY"] ?? "3"));
 const PAGE = 1000; // PostgREST satır tavanı
 
-const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [arbitrageLens.id]: golden };
+const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [ARBITRAGE_SEED_LENS.id]: golden };
 
 async function resolveLens(id: string): Promise<Lens> {
   const all = [...lenses, ...(await loadActiveCustomLenses())];

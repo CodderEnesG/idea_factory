@@ -5,7 +5,7 @@ import {
   StoredEnrichmentSchema,
   type SignalEnrichment,
 } from "./enrichment.js";
-import { buildArbitrageUserPrompt } from "./lenses.config.js";
+import { buildSignalBrief } from "./lenses.config.js";
 import type { AnalystProvider, GenerateArgs } from "./providers/types.js";
 import type { Signal } from "./signal.js";
 
@@ -81,13 +81,15 @@ describe("enrichSignal", () => {
   });
 });
 
-describe("buildArbitrageUserPrompt + enrichment", () => {
+describe("buildSignalBrief + enrichment", () => {
   it("zenginleştirme bloğunu ekler, fetch_ok=false uyarısıyla", () => {
-    const p = buildArbitrageUserPrompt(signal, {
+    const p = buildSignalBrief(signal, {
       ...validExtraction,
       fetch_ok: false,
       model: "test",
       page_chars: null,
+      triage_score: null,
+      triage_reason: null,
     });
     expect(p).toContain("Zenginleştirme");
     expect(p).toContain("US");
@@ -95,7 +97,7 @@ describe("buildArbitrageUserPrompt + enrichment", () => {
   });
 
   it("enrichment yokken bugünkü prompt'la aynı kalır", () => {
-    const p = buildArbitrageUserPrompt(signal);
+    const p = buildSignalBrief(signal);
     expect(p).not.toContain("Zenginleştirme");
   });
 });
@@ -103,12 +105,14 @@ describe("buildArbitrageUserPrompt + enrichment", () => {
 describe("signal_kind ön kapısı", () => {
   it("kovalanamaz tiplerde prompt'a uyarı düşer", () => {
     for (const kind of ["essay", "research", "other"] as const) {
-      const p = buildArbitrageUserPrompt(signal, {
+      const p = buildSignalBrief(signal, {
         ...validExtraction,
         signal_kind: kind,
         fetch_ok: true,
         model: "test",
         page_chars: 100,
+        triage_score: null,
+        triage_reason: null,
       });
       expect(p).toContain(`Sinyal tipi: ${kind}`);
       expect(p).toContain("kovalanabilir teşebbüs YOK");
@@ -116,12 +120,14 @@ describe("signal_kind ön kapısı", () => {
   });
 
   it("kovalanabilir tiplerde uyarı düşmez", () => {
-    const p = buildArbitrageUserPrompt(signal, {
+    const p = buildSignalBrief(signal, {
       ...validExtraction,
       signal_kind: "venture",
       fetch_ok: true,
       model: "test",
       page_chars: 100,
+      triage_score: null,
+      triage_reason: null,
     });
     expect(p).toContain("Sinyal tipi: venture");
     expect(p).not.toContain("kovalanabilir teşebbüs YOK");
@@ -140,12 +146,14 @@ describe("signal_kind ön kapısı", () => {
   });
 
   it("signal_kind null (legacy) prompt'ta 'bilinmiyor' olur, ön kapı uyarısı düşmez", () => {
-    const p = buildArbitrageUserPrompt(signal, {
+    const p = buildSignalBrief(signal, {
       ...validExtraction,
       signal_kind: null,
       fetch_ok: true,
       model: "test",
       page_chars: 100,
+      triage_score: null,
+      triage_reason: null,
     });
     expect(p).toContain("Sinyal tipi: bilinmiyor");
     expect(p).not.toContain("kovalanabilir teşebbüs YOK");

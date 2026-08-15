@@ -38,7 +38,7 @@ export const golden: GoldenCase[] = [
           source: "web taraması 2026-07-18",
         },
       ],
-      adaptation_notes:
+      extra_note:
         "e-fatura/GİB entegrasyonu şart — kırılma noktası ama aşılabilir; regülasyon burada engel değil tetikleyici.",
       risks: ["Yerleşik muhasebe yazılımı oyuncuları (Logo, Mikro, Paraşüt)", "Mükellef'in ekosistem/dağıtım avantajı"],
       confidence: "high",
@@ -77,7 +77,7 @@ export const golden: GoldenCase[] = [
           source: "https://webrazzi.com/2026/02/16/yerli-yapay-zeka-gorunurluk-platformu-visby-ai/",
         },
       ],
-      adaptation_notes:
+      extra_note:
         "TR pazarında Türkçe LLM cevapları + yerel marka verisi avantaj; kategori LLM sağlayıcıların arayüz/API değişimlerine bağımlı.",
       risks: ["Yerli alan kalabalıklaşıyor (Opttab da aynı işte)", "Kategori genç — LLM tarafındaki değişimlere bağımlılık"],
       confidence: "high",
@@ -114,7 +114,7 @@ export const golden: GoldenCase[] = [
         },
         { fact: "Küresel emsal SponsorUnited ~$35M fonlama ile kanıtlı", source: "web taraması 2026-07-18" },
       ],
-      adaptation_notes: "TR sponsorluk ölçüm bütçeleri belirsiz; kurumsal satış döngüsü 2 kişilik ekibi zorlayabilir.",
+      extra_note: "TR sponsorluk ölçüm bütçeleri belirsiz; kurumsal satış döngüsü 2 kişilik ekibi zorlayabilir.",
       risks: ["Kullanım var ama ödeme kanıtı yok", "TR'de sponsorluk-ölçüm bütçesi küçük olabilir"],
       confidence: "med",
       validation_needed: [
@@ -163,7 +163,7 @@ export const golden: GoldenCase[] = [
           source: "https://webrazzi.com/2026/05/05/cagri-merkezi-gorusmelerini-yapay-zeka-ile-analiz-eden-arac-callmetric-ai/",
         },
       ],
-      adaptation_notes: "TR çağrı merkezi pazarında yerleşikler (AloTech vb.) özellik olarak ekleyebilir — dağıtım kritik.",
+      extra_note: "TR çağrı merkezi pazarında yerleşikler (AloTech vb.) özellik olarak ekleyebilir — dağıtım kritik.",
       risks: ["Ödeyen müşteri kanıtı yok", "Yerleşik çağrı merkezi yazılımları aynı özelliği ekleyebilir"],
       confidence: "med",
       validation_needed: [
@@ -204,7 +204,7 @@ export const golden: GoldenCase[] = [
           source: "https://webrazzi.com/2026/04/02/fiziksel-yapay-zekanin-veri-sorununa-cozum-arayan-girisim-microagi/",
         },
       ],
-      adaptation_notes: "Uyarlanacak bir şey yok — iş modelinin kendisi sermaye-ağır.",
+      extra_note: "Uyarlanacak bir şey yok — iş modelinin kendisi sermaye-ağır.",
       risks: ["sermaye-ağır", "derin Ar-Ge — risk iştahı dışı"],
       confidence: "high",
       validation_needed: [],
@@ -238,7 +238,7 @@ export const golden: GoldenCase[] = [
           source: "https://webrazzi.com/2026/03/11/menopoz-surecini-yonetmeyi-kolaylastiran-yerli-uygulama-midrise/",
         },
       ],
-      adaptation_notes: "TR'de B2C sağlık aboneliğinde ödeme isteği kanıtsız; hassas veri yükümlülükleri ek maliyet.",
+      extra_note: "TR'de B2C sağlık aboneliğinde ödeme isteği kanıtsız; hassas veri yükümlülükleri ek maliyet.",
       risks: ["WTP belirsiz (fiyat/model açıklanmamış)", "sektör dışı B2C", "hassas sağlık verisi yükümlülükleri"],
       confidence: "high",
       validation_needed: [],

@@ -1,5 +1,5 @@
 import {
-  arbitrageLens,
+  ARBITRAGE_SEED_LENS,
   golden,
   isActionableKind,
   lenses,
@@ -10,7 +10,9 @@ import {
 
 // golden yalnız arbitraj için kalibre edilmiş (THESIS_AND_LENS.md §3a) — başka mercek yanlış
 // hizalanır. Yeni merceğin kendi golden seti yoksa boş few-shot ile başlar.
-const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [arbitrageLens.id]: golden };
+// `arbitrage` artık DB'deki admin-merceği (bkz. lenses.config.ts alt notu) — id sabit kalmalı,
+// few-shot'u ona bu sabit id üzerinden bağlıyoruz (hangi Lens örneğinin kullanıldığından bağımsız).
+const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [ARBITRAGE_SEED_LENS.id]: golden };
 import { db } from "./db.js";
 import { env } from "./env.js";
 import { balanceBySource } from "./lib/balance.js";

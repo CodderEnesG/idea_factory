@@ -1,15 +1,33 @@
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../../lib/supabase";
 import { requireAdmin } from "../../../../lib/auth";
+import { KNOWN_SOURCES } from "../../../../lib/source-health";
 
-function parseConfig(body: unknown): { per_source_limit: number; concurrency: number } | null {
+interface Config {
+  per_source_limit: number;
+  concurrency: number;
+  enabled_sources: string[];
+  min_interval_hours: number;
+}
+
+function parseConfig(body: unknown): Config | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const perSourceLimit = Number(b["per_source_limit"]);
   const concurrency = Number(b["concurrency"]);
+  const minIntervalHours = Number(b["min_interval_hours"] ?? 0);
   if (!Number.isInteger(perSourceLimit) || perSourceLimit < 0) return null;
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) return null;
-  return { per_source_limit: perSourceLimit, concurrency };
+  if (!Number.isInteger(minIntervalHours) || minIntervalHours < 0) return null;
+
+  // Eski istemciler (veya testler) bu alanı hiç göndermeyebilir — o zaman "hepsi açık" varsayılır,
+  // per_source_limit/concurrency'nin aksine burada eksik alan reddedilmez.
+  const rawSources = b["enabled_sources"];
+  const enabledSources = Array.isArray(rawSources)
+    ? rawSources.filter((s): s is string => typeof s === "string" && (KNOWN_SOURCES as readonly string[]).includes(s))
+    : [...KNOWN_SOURCES];
+
+  return { per_source_limit: perSourceLimit, concurrency, enabled_sources: enabledSources, min_interval_hours: minIntervalHours };
 }
 
 /** Admin-only: yeni toplama-ayarı versiyonu kaydeder, aktif olarak işaretler (eski versiyonlar durur — rollback için). */

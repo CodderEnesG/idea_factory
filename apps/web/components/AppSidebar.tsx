@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
 import {
@@ -12,10 +12,6 @@ import {
   IconGlobe,
   IconTrendingUp,
   IconMessage,
-  IconFileText,
-  IconAperture,
-  IconDownload,
-  IconBarChart,
 } from "./icons";
 import type { SessionUser } from "../lib/session";
 
@@ -89,10 +85,11 @@ function NavItem({
  *
  * Faz 5.10/5.11: Raporlar (Harita/Trend/Digest) Kuyruk/Panom'un hemen altında, kendi
  * ikonlarıyla, katlanır-açılır ("Daha fazla") bir bölüm — varsayılan kapalı, tercih
- * localStorage'ta kalıcı, yalnız o an bir Raporlar sayfasındaysak açık başlar. Ayarlar
- * (admin-only: Tez/Mercekler/Toplama/Metrikler) kullanıcı isteğiyle ESKİ mantığa
- * döndürüldü (Faz 5.8 deseni): hesap satırında, Çıkış'ın SOLUNDA duran bir dişli ikon
- * → tıklanınca hesap satırının ÜSTÜNDE yüzen bir panel açılıyor, dışına tıklayınca kapanır.
+ * localStorage'ta kalıcı, yalnız o an bir Raporlar sayfasındaysak açık başlar.
+ *
+ * Ayarlar (backlog #9 + kullanıcı isteği 2026-08-15): Tez/Mercekler/Toplama/Metrikler artık
+ * tek sekmeli sayfa (`/admin`) — dişli ikon bir açılır panel yerine DOĞRUDAN o sayfaya
+ * götürür, ayrı bir pencere/popup açılmasına gerek yok.
  */
 export function AppSidebar({
   me,
@@ -104,10 +101,9 @@ export function AppSidebar({
   children?: ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(current ? REPORT_KEYS.includes(current) : false);
-  const [adminOpen, setAdminOpen] = useState(current ? ADMIN_KEYS.includes(current) : false);
   const [collapsed, setCollapsed] = useState(false);
-  const adminWrapRef = useRef<HTMLDivElement>(null);
   const active = (k: NavKey) => k === current;
+  const onAdminPage = current ? ADMIN_KEYS.includes(current) : false;
 
   useEffect(() => {
     setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === "1");
@@ -119,7 +115,6 @@ export function AppSidebar({
     setCollapsed((v) => {
       const next = !v;
       window.localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
-      if (next) setAdminOpen(false);
       return next;
     });
   }
@@ -131,19 +126,6 @@ export function AppSidebar({
       return next;
     });
   }
-
-  // Ayarlar paneli (eski mantık): dışına tıklayınca kapanır — Faz 5.8'deki gear-popup'la
-  // birebir aynı davranış.
-  useEffect(() => {
-    if (!adminOpen) return;
-    function onClickOutside(e: MouseEvent) {
-      if (adminWrapRef.current && !adminWrapRef.current.contains(e.target as Node)) {
-        setAdminOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [adminOpen]);
 
   return (
     <div
@@ -238,62 +220,36 @@ export function AppSidebar({
       {collapsed && <div className="min-h-0 flex-1" />}
 
       <div className={`shrink-0 ${collapsed ? "mt-3 border-t border-white/[0.14] pt-3" : "mt-2 pt-1"}`}>
-        <div ref={adminWrapRef} className="relative">
-          {adminOpen && (
-            <div
-              className={`absolute bottom-full z-20 mb-2 space-y-0.5 rounded-card border border-hair bg-elevated p-2 shadow-lg ${
-                collapsed ? "left-0 w-56" : "left-1.5 right-1.5"
-              }`}
-            >
-              <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">Ayarlar</div>
-              <NavItem href="/admin/tez" active={active("tez")} icon={<IconFileText className="h-4 w-4" />}>
-                Tez
-              </NavItem>
-              <NavItem href="/admin/mercekler" active={active("mercekler")} icon={<IconAperture className="h-4 w-4" />}>
-                Mercekler
-              </NavItem>
-              <NavItem href="/admin/toplama" active={active("toplama")} icon={<IconDownload className="h-4 w-4" />}>
-                Toplama
-              </NavItem>
-              <NavItem href="/admin/metrikler" active={active("metrikler")} icon={<IconBarChart className="h-4 w-4" />}>
-                Metrikler
-              </NavItem>
-            </div>
-          )}
-
-          <div className={`flex items-center gap-2 px-1.5 ${collapsed ? "flex-col" : ""}`}>
-            {me && !collapsed && (
-              <>
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-xs font-bold text-white">
-                  {initialsOf(me.display_name)}
-                </div>
-                <span className="min-w-0 flex-1 truncate text-xs text-ink-secondary">{me.display_name}</span>
-              </>
-            )}
-            {me && collapsed && (
-              <div
-                title={me.display_name}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-xs font-bold text-white"
-              >
+        <div className={`flex items-center gap-2 px-1.5 ${collapsed ? "flex-col" : ""}`}>
+          {me && !collapsed && (
+            <>
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-xs font-bold text-white">
                 {initialsOf(me.display_name)}
               </div>
-            )}
-            {me?.is_admin && (
-              <button
-                onClick={() => setAdminOpen((v) => !v)}
-                title="Ayarlar"
-                aria-label="Ayarlar"
-                className={`grid h-8 w-8 shrink-0 place-items-center rounded-btn transition ${
-                  adminOpen || (current && ADMIN_KEYS.includes(current))
-                    ? "bg-white/[0.08] text-ink"
-                    : "text-ink-muted hover:bg-white/[0.05] hover:text-ink"
-                }`}
-              >
-                <IconSliders className="h-4 w-4" />
-              </button>
-            )}
-            {me && <LogoutButton />}
-          </div>
+              <span className="min-w-0 flex-1 truncate text-xs text-ink-secondary">{me.display_name}</span>
+            </>
+          )}
+          {me && collapsed && (
+            <div
+              title={me.display_name}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-xs font-bold text-white"
+            >
+              {initialsOf(me.display_name)}
+            </div>
+          )}
+          {me?.is_admin && (
+            <Link
+              href="/admin"
+              title="Ayarlar"
+              aria-label="Ayarlar"
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-btn transition ${
+                onAdminPage ? "bg-white/[0.08] text-ink" : "text-ink-muted hover:bg-white/[0.05] hover:text-ink"
+              }`}
+            >
+              <IconSliders className="h-4 w-4" />
+            </Link>
+          )}
+          {me && <LogoutButton />}
         </div>
       </div>
     </div>

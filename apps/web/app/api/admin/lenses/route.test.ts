@@ -76,14 +76,15 @@ describe("POST /api/admin/lenses", () => {
     );
   });
 
-  it("builtin id ile çakışırsa _custom soneki eklenir (arbitraj/beyaz-alan düzenlenemez)", async () => {
+  it("arbitraj/beyaz-alan artık sıradan satır — özel id namespace koruması yok, sadece normal çakışma kuralı işler", async () => {
     requireAdminMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: true });
-    const { from, insert } = makeDb([]);
+    // DB'de "arbitrage" zaten var (migrate edilmiş admin-merceği) — normal çakışma-numaralama devreye girer.
+    const { from, insert } = makeDb(["arbitrage"]);
     serverDbMock.mockReturnValue({ from });
 
     const res = await POST(req({ ...VALID_BODY, name: "arbitrage" }));
-    expect(await res.json()).toEqual({ ok: true, lens_id: "arbitrage_custom" });
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ lens_id: "arbitrage_custom" }));
+    expect(await res.json()).toEqual({ ok: true, lens_id: "arbitrage_2" });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ lens_id: "arbitrage_2" }));
   });
 
   it("aynı isimde kayıt zaten varsa numaralı sonek dener", async () => {

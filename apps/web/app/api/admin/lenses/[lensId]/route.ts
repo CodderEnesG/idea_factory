@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: { lensId: string
   if (typeof body["extra_note_label"] === "string" && body["extra_note_label"].trim()) {
     patch["extra_note_label"] = body["extra_note_label"].trim();
   }
-  if (typeof body["weight"] === "number" && body["weight"] > 0) patch["weight"] = body["weight"];
+  if (typeof body["weight"] === "number" && body["weight"] >= 0) patch["weight"] = body["weight"];
   if (isStringArray(body["questions"]) && body["questions"].length > 0) {
     patch["questions"] = body["questions"];
   }

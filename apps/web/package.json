@@ -1,9 +1,9 @@
 {
   "name": "@idea-factory/web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3100",
+    "dev": "next dev -p 3100 --turbo",
     "prebuild": "pnpm --filter @idea-factory/core build",
     "build": "next build",
     "start": "next start -p 3100",

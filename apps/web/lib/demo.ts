@@ -1,12 +1,12 @@
-import type { ArbitrageAnalysis, RankedItem, WhiteSpaceAnalysis } from "@idea-factory/core";
+import type { CustomAnalysis, RankedItem } from "@idea-factory/core";
 
-const d1Arbitrage: ArbitrageAnalysis = {
+const d1Arbitrage: CustomAnalysis = {
   lens: "arbitrage",
   fit: 84,
   rationale:
     "Kanıt güçlü (büyüme + fonlama). Yerel wedge: TR KOBİ'lerinde e-fatura zorunluluğu + manuel ön-muhasebe acısı. Regülasyon engel değil tetikleyici.",
   evidence: [{ fact: "ABD'de kanıtlı tur", source: "producthunt" }],
-  adaptation_notes: "e-fatura/GİB entegrasyonu gerekir; aşılabilir kırılma noktası.",
+  extra_note: "e-fatura/GİB entegrasyonu gerekir; aşılabilir kırılma noktası.",
   risks: ["yerel muhasebe yazılımı oyuncuları"],
   confidence: "high",
   validation_needed: [],
@@ -14,13 +14,13 @@ const d1Arbitrage: ArbitrageAnalysis = {
   tags: ["e-fatura", "kobi"],
 };
 
-const d1WhiteSpace: WhiteSpaceAnalysis = {
+const d1WhiteSpace: CustomAnalysis = {
   lens: "white_space",
   fit: 70,
   rationale:
     "TR'de doğrudan aynı segmenti hedefleyen olgun bir oyuncu görünmüyor; birkaç genel muhasebe yazılımı dolaylı rakip.",
   evidence: [{ fact: "arama sonuçlarında net bir 1:1 rakip yok", source: "web_search" }],
-  competitive_landscape:
+  extra_note:
     "Genel muhasebe yazılımları (Logo, Mikro) segmenti kısmen kapsıyor ama AI-ön-muhasebeye odaklı değil.",
   risks: ["mevcut oyuncular hızla özellik ekleyebilir"],
   confidence: "med",
@@ -35,12 +35,12 @@ const d1WhiteSpace: WhiteSpaceAnalysis = {
   tags: ["e-fatura", "kobi"],
 };
 
-const d2Arbitrage: ArbitrageAnalysis = {
+const d2Arbitrage: CustomAnalysis = {
   lens: "arbitrage",
   fit: 63,
   rationale: "Yerel wedge var (restoran zincirleri) ama TR ödeme isteği ve CAC belirsiz.",
   evidence: [{ fact: "ABD'de büyüme sinyali", source: "producthunt" }],
-  adaptation_notes: "yerel POS entegrasyonları; küçük işletme fiyat hassasiyeti.",
+  extra_note: "yerel POS entegrasyonları; küçük işletme fiyat hassasiyeti.",
   risks: ["düşük ödeme isteği olabilir"],
   confidence: "med",
   validation_needed: [
@@ -54,13 +54,13 @@ const d2Arbitrage: ArbitrageAnalysis = {
   tags: ["restoran", "vertical"],
 };
 
-const d3Arbitrage: ArbitrageAnalysis = {
+const d3Arbitrage: CustomAnalysis = {
   lens: "arbitrage",
   fit: 14,
   rationale:
     "Anti-pattern: ağır bankacılık regülasyonu + büyük sermaye gereği. capital_range ve risk_appetite ile çelişir.",
   evidence: [{ fact: "lisanslı neobank + devasa tur", source: "producthunt" }],
-  adaptation_notes: "BDDK lisansı yıllar + milyonlar; mandate dışı.",
+  extra_note: "BDDK lisansı yıllar + milyonlar; mandate dışı.",
   risks: ["ağır regülasyon", "sermaye-ağır"],
   confidence: "high",
   validation_needed: [],

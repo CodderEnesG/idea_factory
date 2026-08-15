@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { buildDigest } from "./digest.js";
 import type { RankedItem } from "./ranker.js";
-import type { ArbitrageAnalysis } from "./lenses.config.js";
+import { ARBITRAGE_SEED_LENS, buildCustomLens, type CustomAnalysis } from "./lenses.config.js";
 import type { Signal } from "./signal.js";
+
+// Artık builtin varsayılan mercek yok (arbitraj da admin-merceği) — gerçek çağıranlar gibi
+// (apps/worker/src/digest.ts) registry açıkça verilir.
+const ARBITRAGE_REGISTRY = [buildCustomLens(ARBITRAGE_SEED_LENS)];
 
 function item(id: string, fit: number, validation = false): RankedItem {
   const action = fit >= 80 ? "pursue" : fit >= 50 ? "watch" : "kill";
@@ -19,12 +23,12 @@ function item(id: string, fit: number, validation = false): RankedItem {
     fetched_at: "2026-01-01T00:00:00Z",
     content_hash: id,
   };
-  const analysis: ArbitrageAnalysis = {
+  const analysis: CustomAnalysis = {
     lens: "arbitrage",
     fit,
     rationale: `gerekçe ${id}`,
     evidence: fit >= 80 ? [{ fact: "f", source: "s" }] : [],
-    adaptation_notes: "uyarlama notu",
+    extra_note: "uyarlama notu",
     risks: ["risk1"],
     confidence: fit >= 80 ? "high" : "med",
     validation_needed: validation
@@ -47,7 +51,7 @@ describe("buildDigest", () => {
   });
 
   it("doğrulama bekleyenler bölümü üretir", () => {
-    const md = buildDigest([item("c", 60, true)]);
+    const md = buildDigest([item("c", 60, true)], { lensRegistry: ARBITRAGE_REGISTRY });
     expect(md).toContain("Doğrulama Bekleyenler");
     expect(md).toContain("eksik veri");
   });

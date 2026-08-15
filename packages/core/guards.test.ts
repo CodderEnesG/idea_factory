@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { checkAnalysisGuards } from "./guards.js";
-import { fitBand, type ArbitrageAnalysis, type WhiteSpaceAnalysis } from "./lenses.config.js";
+import { fitBand, type CustomAnalysis } from "./lenses.config.js";
 
-const base: ArbitrageAnalysis = {
+const base: CustomAnalysis = {
   lens: "arbitrage",
   fit: 85,
   rationale: "kanıtlı model + net yerel wedge",
   evidence: [{ fact: "ABD'de hızlı büyüme", source: "https://example.com" }],
-  adaptation_notes: "e-fatura entegrasyonu gerekir",
+  extra_note: "e-fatura entegrasyonu gerekir",
   risks: ["yerel oyuncular"],
   confidence: "high",
   validation_needed: [],
@@ -31,7 +31,7 @@ describe("checkAnalysisGuards", () => {
   });
 
   it("geçerli watch (dolu validation_needed) temiz geçer", () => {
-    const watch: ArbitrageAnalysis = {
+    const watch: CustomAnalysis = {
       ...base,
       fit: 65,
       confidence: "med",
@@ -47,7 +47,7 @@ describe("checkAnalysisGuards", () => {
   });
 
   it("güven kapısı: 80+ ama high değil", () => {
-    const bad: ArbitrageAnalysis = {
+    const bad: CustomAnalysis = {
       ...base,
       confidence: "med",
       recommended_action: "pursue",
@@ -67,7 +67,7 @@ describe("checkAnalysisGuards", () => {
   });
 
   it("izle boş validation_needed ile geçersiz", () => {
-    const bad: ArbitrageAnalysis = {
+    const bad: CustomAnalysis = {
       ...base,
       fit: 60,
       confidence: "med",
@@ -87,7 +87,7 @@ describe("ön kapı guard'ı (signal_kind)", () => {
   });
 
   it("kovalanamaz sinyalde fit≤20 + kill temiz geçer", () => {
-    const a: ArbitrageAnalysis = {
+    const a: CustomAnalysis = {
       ...base,
       fit: 15,
       confidence: "high",
@@ -108,12 +108,12 @@ describe("ön kapı guard'ı (signal_kind)", () => {
 });
 
 describe("checkAnalysisGuards — mercek-bağımsızlık (white_space)", () => {
-  const whiteSpace: WhiteSpaceAnalysis = {
+  const whiteSpace: CustomAnalysis = {
     lens: "white_space",
     fit: 82,
     rationale: "yerli oyuncu yok, talep kanıtı güçlü",
     evidence: [{ fact: "TR'de doğrudan rakip bulunamadı", source: "https://example.com" }],
-    competitive_landscape: "en yakın oyuncu dolaylı, farklı segment",
+    extra_note: "en yakın oyuncu dolaylı, farklı segment",
     risks: ["boşluk hızla kapanabilir"],
     confidence: "high",
     validation_needed: [],

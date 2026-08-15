@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconCheck } from "./icons";
 
 export type Decision = "pursue" | "watch" | "kill";
 
@@ -9,30 +10,34 @@ export interface UserDecision {
   decision: Decision;
 }
 
-const OPTS: { d: Decision; label: string; cls: string }[] = [
-  { d: "pursue", label: "Kovala", cls: "hover:border-pursue hover:text-pursue" },
-  { d: "watch", label: "İzle", cls: "hover:border-watch hover:text-watch" },
-  { d: "kill", label: "Ele", cls: "hover:border-kill hover:text-kill" },
+const OPTS: { d: Decision; label: string }[] = [
+  { d: "pursue", label: "Kovala" },
+  { d: "watch", label: "İzle" },
+  { d: "kill", label: "Ele" },
 ];
 
-const CHOSEN: Record<Decision, string> = {
-  pursue: "border-pursue text-pursue",
-  watch: "border-watch text-watch",
-  kill: "border-kill text-kill",
+// Marka imzası: karar anı = dolgulu, renkli pill (nötr kutucuk değil). Seçiliyken bant rengiyle
+// dolar + hafif parıltı verir — "kaydedildi" hissi tek bakışta. watch (amber) beyaz metinle
+// kontrast düşük olduğundan koyu metin kullanır.
+const FILLED: Record<Decision, string> = {
+  pursue: "bg-pursue text-white shadow-[0_0_20px_-4px_rgba(12,163,12,0.6)]",
+  watch: "bg-watch text-canvas shadow-[0_0_20px_-4px_rgba(250,178,25,0.6)]",
+  kill: "bg-kill text-white shadow-[0_0_20px_-4px_rgba(208,59,59,0.6)]",
 };
-
-const LABEL: Record<Decision, string> = { pursue: "Kovala", watch: "İzle", kill: "Ele" };
+const TINTED: Record<Decision, string> = {
+  pursue: "bg-pursue/10 text-pursue hover:bg-pursue/20",
+  watch: "bg-watch/10 text-watch hover:bg-watch/20",
+  kill: "bg-kill/10 text-kill hover:bg-kill/20",
+};
 
 export function DecisionButtons({
   signalId,
   mine = null,
-  others = [],
   onDecided,
   size = "sm",
 }: {
   signalId: string;
   mine?: Decision | null;
-  others?: UserDecision[];
   onDecided?: (d: Decision) => void;
   size?: "sm" | "lg";
 }) {
@@ -64,38 +69,31 @@ export function DecisionButtons({
     }
   }
 
-  const pad = size === "lg" ? "px-6 py-3 text-base" : "px-4 py-2 text-sm";
+  const pad = size === "lg" ? "px-6 py-3.5 text-base" : "px-4 py-2.5 text-sm";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div className="flex gap-2">
-        {OPTS.map((o) => (
-          <button
-            key={o.d}
-            data-decision={o.d}
-            disabled={busy}
-            onClick={() => decide(o.d)}
-            className={`rounded border bg-elevated font-mono font-medium text-ink transition disabled:opacity-50 ${pad} ${
-              chosen === o.d ? CHOSEN[o.d] : `border-hair ${o.cls}`
-            }`}
-          >
-            {o.label}
-            {chosen === o.d ? " ✓" : ""}
-          </button>
-        ))}
+        {OPTS.map((o) => {
+          const isChosen = chosen === o.d;
+          return (
+            <button
+              key={o.d}
+              data-decision={o.d}
+              disabled={busy}
+              onClick={() => decide(o.d)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full font-display font-semibold transition disabled:opacity-50 ${pad} ${
+                isChosen ? FILLED[o.d] : TINTED[o.d]
+              }`}
+            >
+              {isChosen && <IconCheck className="h-4 w-4 shrink-0" strokeWidth={2.5} />}
+              {o.label}
+            </button>
+          );
+        })}
       </div>
       {failed && (
         <p className="text-xs text-kill">Karar kaydedilemedi, bağlantını kontrol edip tekrar dene.</p>
-      )}
-      {others.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
-          <span>ekip:</span>
-          {others.map((o) => (
-            <span key={o.user} className={`chip ${CHOSEN[o.decision]}`}>
-              {o.user}: {LABEL[o.decision]}
-            </span>
-          ))}
-        </div>
       )}
     </div>
   );

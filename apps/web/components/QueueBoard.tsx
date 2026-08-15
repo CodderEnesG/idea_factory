@@ -4,15 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
-import type { IngestionSettings } from "../lib/active-ingestion-settings";
 import { QueueRow } from "./QueueRow";
 import { DetailPanel } from "./DetailPanel";
 import { AppSidebar } from "./AppSidebar";
-import { IngestionSettingsForm } from "./IngestionSettingsForm";
 import { BAND } from "./card-visuals";
 import { canonicalSourceName } from "../lib/source-health";
-import { formatSource } from "../lib/source-labels";
-import { IconAward, IconDownload, IconSearch, IconSliders, IconZap } from "./icons";
+import { normalizeTag, distinct, distinctSources } from "../lib/facet-filters";
+import { IconAward, IconSearch, IconSliders, IconSparkle, IconZap } from "./icons";
 
 type SortMode = "fit" | "recent" | "band" | "confidence" | "comments";
 type ActivityFilter = "all" | "mine" | "friend" | "both";
@@ -56,51 +54,10 @@ function activityOf(item: CardView, meName: string): { mine: boolean; friend: bo
   return { mine, friend };
 }
 
-// Sektör/pazar alanları serbest metin AI çıktısı — "Fintech"/"fintech", "US"/"USA"/"United
-// States"/"ABD" gibi aynı şeyi anlatan varyantlar ayrı filtre satırı olarak görünmesin diye
-// büyük/küçük harf + boşluk normalize edilir, bilinen eş anlamlılar tek etikette birleşir.
-const TAG_ALIASES: Record<string, string> = {
-  us: "US",
-  usa: "US",
-  "united states": "US",
-  abd: "US",
-  global: "Global",
-};
-
-function normalizeTag(raw: string): { key: string; label: string } {
-  const trimmed = raw.trim().replace(/\s+/g, " ");
-  const lower = trimmed.toLowerCase();
-  const alias = TAG_ALIASES[lower];
-  if (alias) return { key: alias.toLowerCase(), label: alias };
-  return { key: lower, label: trimmed };
-}
-
-function distinct(items: CardView[], pick: (i: CardView) => string | null): { key: string; label: string }[] {
-  const byKey = new Map<string, string>();
-  for (const i of items) {
-    const v = pick(i);
-    if (!v) continue;
-    const { key, label } = normalizeTag(v);
-    if (!byKey.has(key)) byKey.set(key, label);
-  }
-  return [...byKey.entries()]
-    .map(([key, label]) => ({ key, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, "tr"));
-}
-
-// Kaynak filtresi ayrı: "tldr:founders"/"tldr:ai" gibi alt-kategoriler tek "TLDR" seçeneğinde
-// birleşmeli (source-health.ts'teki kanonikleştirmeyle aynı mantık), sektör/pazar gibi serbest
-// metin değil.
-function distinctSources(items: CardView[]): { key: string; label: string }[] {
-  const byKey = new Map<string, string>();
-  for (const i of items) {
-    const key = canonicalSourceName(i.source);
-    if (!byKey.has(key)) byKey.set(key, formatSource(i.source));
-  }
-  return [...byKey.entries()]
-    .map(([key, label]) => ({ key, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, "tr"));
-}
+// Kuyruk son ziyaretten beri gelen fırsatları "yeni" işaretler — sunucu tarafında kullanıcı
+// bazlı bir "son görülme" alanı yok, bu yüzden tarayıcıya özgü localStorage kullanılıyor
+// (sidebar collapse/filtre tercihleriyle aynı desen).
+const LAST_SEEN_KEY = "idea-factory:queue-last-seen";
 
 /**
  * Kuyruk (Faz 5.5): kenar çubuğu (nav + arama/filtre + fırsat listesi, hepsi TEK sütun —
@@ -114,13 +71,11 @@ export function QueueBoard({
   meName,
   me,
   demo,
-  ingestionSettings,
 }: {
   items: CardView[];
   meName: string;
   me: SessionUser | null;
   demo?: boolean;
-  ingestionSettings?: IngestionSettings | null;
 }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
@@ -132,15 +87,26 @@ export function QueueBoard({
   const [undecidedOnly, setUndecidedOnly] = useState(false);
   const [bandFilter, setBandFilter] = useState<Set<CardView["band"]>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [ingestionOpen, setIngestionOpen] = useState(false);
-  const [localIngestion, setLocalIngestion] = useState<IngestionSettings | null>(null);
-  const ingestionWrapRef = useRef<HTMLDivElement>(null);
-  const effectiveIngestion = localIngestion ?? ingestionSettings ?? null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localMine, setLocalMine] = useState<Map<string, Decision>>(new Map());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [newOnly, setNewOnly] = useState(false);
+  const [lastSeen, setLastSeen] = useState<number | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
   const filtersWrapRef = useRef<HTMLDivElement>(null);
+
+  // Bu ziyarette "yeni" sayılacak eşik — önceki ziyaretin son-görülme zamanı önce state'e
+  // okunuyor, SONRA storage bugüne güncelleniyor (sıra önemli: tersi olsa hiçbir şey hiç
+  // "yeni" görünmez).
+  useEffect(() => {
+    const stored = window.localStorage.getItem(LAST_SEEN_KEY);
+    setLastSeen(stored ? Number(stored) : Date.now());
+    window.localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+  }, []);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(FILTERS_KEY);
@@ -185,17 +151,6 @@ export function QueueBoard({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [filtersOpen]);
 
-  useEffect(() => {
-    if (!ingestionOpen) return;
-    function onClickOutside(e: MouseEvent) {
-      if (ingestionWrapRef.current && !ingestionWrapRef.current.contains(e.target as Node)) {
-        setIngestionOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [ingestionOpen]);
-
   // Filtre/arama/sıralama değişince ilk sayfaya dön — kenar çubuğu artık kalıcı bir "Daha
   // fazla" menü bölümü taşıdığı için liste alanı küçüldü, yeni filtrede eskisinden kalan
   // yüzlerce satırı tek seferde DOM'a basmak yerine ilk PAGE_SIZE ile başlanıyor.
@@ -235,6 +190,11 @@ export function QueueBoard({
     return { pursue, watch, kill, bench, undecided };
   }, [resolved]);
 
+  const newIds = useMemo(() => {
+    if (lastSeen === null) return new Set<string>();
+    return new Set(resolved.filter((i) => freshness(i) > lastSeen).map((i) => i.id));
+  }, [resolved, lastSeen]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = resolved.filter((i) => {
@@ -243,6 +203,7 @@ export function QueueBoard({
       if (market && (!i.market || normalizeTag(i.market).key !== market)) return false;
       if (source && canonicalSourceName(i.source) !== source) return false;
       if (benchOnly && !i.bench) return false;
+      if (newOnly && !newIds.has(i.id)) return false;
       if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
       if (bandFilter.size > 0 && !bandFilter.has(i.band)) return false;
       if (activity !== "all") {
@@ -259,7 +220,7 @@ export function QueueBoard({
       list = [...list].sort((a, b) => CONFIDENCE_RANK[a.confidence] - CONFIDENCE_RANK[b.confidence] || b.fit - a.fit);
     else if (sort === "comments") list = [...list].sort((a, b) => b.comments.length - a.comments.length || b.fit - a.fit);
     return list;
-  }, [resolved, search, sector, market, source, benchOnly, undecidedOnly, bandFilter, skipped, activity, sort, meName]);
+  }, [resolved, search, sector, market, source, benchOnly, newOnly, newIds, undecidedOnly, bandFilter, skipped, activity, sort, meName]);
 
   // Seçili öğe filtrelerin dışına düşerse (ör. "yalnız kararsızlar"da karar verilince)
   // listedeki ilk öğeye düş — bu aynı zamanda oto-ilerlemenin tamamı: ekstra state gerekmez.
@@ -276,6 +237,7 @@ export function QueueBoard({
     (market ? 1 : 0) +
     (source ? 1 : 0) +
     (benchOnly ? 1 : 0) +
+    (newOnly ? 1 : 0) +
     (activity !== "all" ? 1 : 0) +
     (undecidedOnly ? 1 : 0) +
     bandFilter.size;
@@ -285,6 +247,7 @@ export function QueueBoard({
     setMarket("");
     setSource("");
     setBenchOnly(false);
+    setNewOnly(false);
     setActivity("all");
     setUndecidedOnly(false);
     setBandFilter(new Set());
@@ -300,10 +263,60 @@ export function QueueBoard({
     ...(activity !== "all" ? [{ key: "activity", label: ACTIVITY_LABEL[activity], onClear: () => setActivity("all" as ActivityFilter) }] : []),
     ...(undecidedOnly ? [{ key: "undecided", label: "Kararsızlar", onClear: () => setUndecidedOnly(false) }] : []),
     ...(benchOnly ? [{ key: "bench", label: "Bench", onClear: () => setBenchOnly(false) }] : []),
+    ...(newOnly ? [{ key: "new", label: "Yeni", onClear: () => setNewOnly(false) }] : []),
   ];
 
   const pillBtn = (active: boolean) =>
     `chip gap-1.5 transition ${active ? "border-strong text-ink" : "text-ink-muted hover:text-ink"}`;
+
+  function toggleSelectedId(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Toplu karar: seçili fırsatların hepsine tek istekte aynı kararı yaz. Kısmi başarısızlık
+  // olursa (bkz. DecisionButtons'taki tekil-hata düzeltmesi) başarılı olanlar seçimden düşer,
+  // başarısızlar seçili kalır — kullanıcı yalnız kalanları tekrar dener.
+  async function bulkDecide(d: Decision) {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        const res = await fetch("/api/decisions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ signal_id: id, decision: d }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return id;
+      }),
+    );
+    const succeeded = results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+      .map((r) => r.value);
+    if (succeeded.length > 0) {
+      setLocalMine((prev) => {
+        const next = new Map(prev);
+        for (const id of succeeded) next.set(id, d);
+        return next;
+      });
+    }
+    const succeededSet = new Set(succeeded);
+    setSelectedIds((prev) => new Set([...prev].filter((id) => !succeededSet.has(id))));
+    setBulkBusy(false);
+    const failedCount = ids.length - succeeded.length;
+    if (failedCount > 0) {
+      setBulkError(`${failedCount} fırsat için kaydedilemedi, tekrar dene.`);
+    } else {
+      setSelectMode(false);
+    }
+  }
 
   return (
     // Tek kenar çubuğu: nav (AppSidebar) + Kuyruk'un kendi başlığı/filtreleri/listesi hepsi
@@ -403,12 +416,15 @@ export function QueueBoard({
 
                 <div className="space-y-1.5">
                   <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Hızlı filtreler</div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button onClick={() => setUndecidedOnly((v) => !v)} className={`${pillBtn(undecidedOnly)} w-full justify-center`}>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => setUndecidedOnly((v) => !v)} className={`${pillBtn(undecidedOnly)} justify-center`}>
                       <IconZap className="h-3.5 w-3.5" /> Kararsızlar ({counts.undecided})
                     </button>
-                    <button onClick={() => setBenchOnly((v) => !v)} className={`${pillBtn(benchOnly)} w-full justify-center`}>
+                    <button onClick={() => setBenchOnly((v) => !v)} className={`${pillBtn(benchOnly)} justify-center`}>
                       <IconAward className="h-3.5 w-3.5" /> Bench ({counts.bench})
+                    </button>
+                    <button onClick={() => setNewOnly((v) => !v)} className={`${pillBtn(newOnly)} justify-center`}>
+                      <IconSparkle className="h-3.5 w-3.5" /> Yeni ({newIds.size})
                     </button>
                   </div>
                 </div>
@@ -447,58 +463,83 @@ export function QueueBoard({
           )}
 
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[11px] text-ink-muted">{filtered.length}</span>
+            {selectMode ? (
+              <button
+                onClick={() => {
+                  setSelectMode(false);
+                  setSelectedIds(new Set());
+                  setBulkError(null);
+                }}
+                className="text-[11px] text-ink-muted hover:text-ink"
+              >
+                Vazgeç
+              </button>
+            ) : (
+              <span className="font-mono text-[11px] text-ink-muted">{filtered.length}</span>
+            )}
             <div className="flex items-center gap-1">
-              {BANDS.map((b) => {
-                const active = bandFilter.has(b);
-                return (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => toggleBand(b)}
-                    aria-pressed={active}
-                    title={`${BAND[b].label} ile filtrele (${counts[b]})`}
-                    style={active ? { boxShadow: `inset 0 0 0 1px ${BAND[b].hex}` } : undefined}
-                    className={`flex items-center gap-1 rounded-btn px-1.5 py-0.5 font-mono text-[11px] transition ${
-                      active ? `bg-white/[0.06] ${BAND[b].text}` : "text-ink-muted hover:bg-white/[0.03] hover:text-ink"
-                    }`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${BAND[b].dot}`} />
-                    {counts[b]}
-                  </button>
-                );
-              })}
+              {!selectMode &&
+                BANDS.map((b) => {
+                  const active = bandFilter.has(b);
+                  return (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => toggleBand(b)}
+                      aria-pressed={active}
+                      title={`${BAND[b].label} ile filtrele (${counts[b]})`}
+                      style={active ? { boxShadow: `inset 0 0 0 1px ${BAND[b].hex}` } : undefined}
+                      className={`flex items-center gap-1 rounded-btn px-1.5 py-0.5 font-mono text-[11px] transition ${
+                        active ? `bg-white/[0.06] ${BAND[b].text}` : "text-ink-muted hover:bg-white/[0.03] hover:text-ink"
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${BAND[b].dot}`} />
+                      {counts[b]}
+                    </button>
+                  );
+                })}
+              <button
+                type="button"
+                onClick={() => setSelectMode((v) => !v)}
+                title="Toplu seç"
+                className={`rounded-btn px-1.5 py-0.5 font-mono text-[11px] transition ${
+                  selectMode ? "bg-white/[0.06] text-ink" : "text-ink-muted hover:bg-white/[0.03] hover:text-ink"
+                }`}
+              >
+                Seç
+              </button>
             </div>
           </div>
 
-          {effectiveIngestion && (
-            <div ref={ingestionWrapRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setIngestionOpen((v) => !v)}
-                title="Çekim ayarları"
-                className={`flex w-full items-center gap-1.5 rounded-btn px-2 py-1 font-mono text-[11px] transition ${
-                  ingestionOpen ? "text-ink" : "text-ink-muted hover:text-ink"
-                }`}
-              >
-                <IconDownload className="h-3 w-3 shrink-0" />
-                <span>
-                  kaynak başına: {effectiveIngestion.per_source_limit || "∞"}
-                </span>
-              </button>
-
-              {ingestionOpen && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-card border border-hair bg-elevated p-3 text-xs shadow-lg">
-                  <div className="mb-2 text-[11px] font-semibold text-ink">Toplama ayarları</div>
-                  <IngestionSettingsForm
-                    key={effectiveIngestion.version}
-                    initial={effectiveIngestion}
-                    onSaved={setLocalIngestion}
-                  />
-                </div>
-              )}
+          {selectMode && (
+            <div className="flex items-center gap-1.5 rounded-btn border border-hair bg-elevated px-2 py-1.5">
+              <span className="text-[11px] text-ink-muted">{selectedIds.size} seçili</span>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  disabled={bulkBusy || selectedIds.size === 0}
+                  onClick={() => bulkDecide("pursue")}
+                  className="chip disabled:opacity-40 hover:border-pursue hover:text-pursue"
+                >
+                  Kovala
+                </button>
+                <button
+                  disabled={bulkBusy || selectedIds.size === 0}
+                  onClick={() => bulkDecide("watch")}
+                  className="chip disabled:opacity-40 hover:border-watch hover:text-watch"
+                >
+                  İzle
+                </button>
+                <button
+                  disabled={bulkBusy || selectedIds.size === 0}
+                  onClick={() => bulkDecide("kill")}
+                  className="chip disabled:opacity-40 hover:border-kill hover:text-kill"
+                >
+                  Ele
+                </button>
+              </div>
             </div>
           )}
+          {bulkError && <p className="text-[11px] text-kill">{bulkError}</p>}
         </div>
 
         <div className="scroll-emphasis min-h-0 flex-1 overflow-y-auto py-1">
@@ -509,8 +550,10 @@ export function QueueBoard({
             <QueueRow
               key={item.id}
               item={item}
-              selected={item.id === selected?.id}
-              onSelect={() => setSelectedId(item.id)}
+              selected={selectMode ? selectedIds.has(item.id) : item.id === selected?.id}
+              onSelect={() => (selectMode ? toggleSelectedId(item.id) : setSelectedId(item.id))}
+              selectMode={selectMode}
+              isNew={newIds.has(item.id)}
             />
           ))}
           {filtered.length > visible.length && (

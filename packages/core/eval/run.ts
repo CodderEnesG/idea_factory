@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { analyzeSignal } from "../analyst.js";
-import { arbitrageLens, type RecommendedAction } from "../lenses.config.js";
+import { ARBITRAGE_SEED_LENS, buildCustomLens, type RecommendedAction } from "../lenses.config.js";
 import { golden } from "./golden.js";
 import { evalCases } from "./cases.js";
 
@@ -19,6 +19,8 @@ function weight(exp: RecommendedAction, got: RecommendedAction): number {
     (exp === "pursue" && got === "kill") || (exp === "kill" && got === "pursue");
   return opposite ? 0 : 0.5;
 }
+
+const arbitrageLens = buildCustomLens(ARBITRAGE_SEED_LENS);
 
 async function main(): Promise<void> {
   if (evalCases.length === 0) {

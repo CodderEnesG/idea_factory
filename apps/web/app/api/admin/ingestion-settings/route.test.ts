@@ -9,7 +9,8 @@ vi.mock("../../../../lib/supabase", () => ({ serverDb: serverDbMock }));
 
 import { POST } from "./route";
 
-const VALID_BODY = { per_source_limit: 20, concurrency: 3 };
+const ALL_SOURCES = ["producthunt", "tldr", "webrazzi", "techcrunch", "ycombinator"];
+const VALID_BODY = { per_source_limit: 20, concurrency: 3, enabled_sources: ALL_SOURCES, min_interval_hours: 0 };
 
 function req(body: unknown): Request {
   return new Request("http://localhost/api/admin/ingestion-settings", {
@@ -65,7 +66,7 @@ describe("POST /api/admin/ingestion-settings", () => {
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
         version: "v3",
-        config: { per_source_limit: 0, concurrency: 1 },
+        config: { per_source_limit: 0, concurrency: 1, enabled_sources: ALL_SOURCES, min_interval_hours: 0 },
         is_active: true,
         created_by: "enes",
       }),

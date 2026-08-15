@@ -14,11 +14,6 @@ export interface LensRow {
   created_at: string;
 }
 
-const BUILTIN = [
-  { name: "Arbitraj", note: "Uyarlama — başka pazarda kanıtlı mı, TR'de ne kırılır?" },
-  { name: "Beyaz-alan", note: "Rekabet ortamı — TR/MENA'da zaten dolu mu, boşluk gerçek mi?" },
-];
-
 function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => void }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(row.name);
@@ -102,7 +97,7 @@ function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => voi
           <div className="flex gap-3">
             <input
               type="number"
-              min={0.1}
+              min={0}
               step={0.1}
               value={weight}
               onChange={(e) => setWeight(Number(e.target.value))}
@@ -198,7 +193,7 @@ function NewLensForm({ onCreated }: { onCreated: (r: LensRow) => void }) {
       <div className="flex gap-3">
         <input
           type="number"
-          min={0.1}
+          min={0}
           step={0.1}
           value={weight}
           onChange={(e) => setWeight(Number(e.target.value))}
@@ -239,36 +234,17 @@ export function LensManager({ initial }: { initial: LensRow[] }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          Builtin
-        </h2>
-        <div className="space-y-2">
-          {BUILTIN.map((b) => (
-            <div key={b.name} className="glass p-4 opacity-70">
-              <span className="font-display text-sm font-bold">{b.name}</span>
-              <p className="mt-0.5 text-xs text-ink-muted">{b.note}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          Admin-mercekleri
-        </h2>
-        <div className="space-y-2">
-          {rows.length === 0 && (
-            <p className="text-sm text-ink-muted">Henüz admin-merceği eklenmedi.</p>
-          )}
-          {rows.map((r) => (
-            <LensCard
-              key={r.lens_id}
-              row={r}
-              onSaved={(next) => setRows((rs) => rs.map((x) => (x.lens_id === next.lens_id ? next : x)))}
-            />
-          ))}
-        </div>
+      <div className="space-y-2">
+        {rows.length === 0 && (
+          <p className="text-sm text-ink-muted">Henüz mercek eklenmedi.</p>
+        )}
+        {rows.map((r) => (
+          <LensCard
+            key={r.lens_id}
+            row={r}
+            onSaved={(next) => setRows((rs) => rs.map((x) => (x.lens_id === next.lens_id ? next : x)))}
+          />
+        ))}
       </div>
 
       <NewLensForm onCreated={(r) => setRows((rs) => [...rs, r])} />

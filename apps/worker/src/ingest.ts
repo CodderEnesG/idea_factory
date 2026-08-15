@@ -7,10 +7,10 @@ import { techcrunch } from "./sources/techcrunch.js";
 import { ycombinator } from "./sources/ycombinator.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
-import { loadActiveIngestionSettings } from "./lib/ingestion-settings-db.js";
+import { loadActiveIngestionSettings, shouldSkipForInterval } from "./lib/ingestion-settings-db.js";
 import { limitPerSource } from "./lib/limit-per-source.js";
 
-const SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch, ycombinator];
+const ALL_SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch, ycombinator];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
 // URL uzunluk limitini aşıp "fetch failed" veriyordu (4 kaynak sonrası görüldü) → parçala.
@@ -44,14 +44,17 @@ async function filterExisting(signals: Signal[]): Promise<Signal[]> {
 /** Sabit boyutlu havuz (bkz. backfill-lens.ts): `concurrency` kadar kaynak aynı anda çeker.
  *  concurrency=1 → eskisiyle birebir aynı, sıralı davranış. Bir kaynağın patlaması diğerlerini
  *  düşürmez (try/catch korunuyor). */
-async function fetchAll(settings: { per_source_limit: number; concurrency: number }): Promise<Signal[]> {
+async function fetchAll(
+  sources: Source[],
+  settings: { per_source_limit: number; concurrency: number },
+): Promise<Signal[]> {
   let collected: Signal[] = [];
   let next = 0;
   const worker = async (): Promise<void> => {
     for (;;) {
       const i = next++;
-      if (i >= SOURCES.length) return;
-      const src = SOURCES[i];
+      if (i >= sources.length) return;
+      const src = sources[i];
       if (!src) return;
       try {
         const rows = limitPerSource(await src.fetch(), settings.per_source_limit);
@@ -63,17 +66,31 @@ async function fetchAll(settings: { per_source_limit: number; concurrency: numbe
     }
   };
   await Promise.all(
-    Array.from({ length: Math.min(settings.concurrency, SOURCES.length) }, worker),
+    Array.from({ length: Math.min(settings.concurrency, sources.length) }, worker),
   );
   return collected;
 }
 
 async function main(): Promise<void> {
   const settings = await loadActiveIngestionSettings();
+
+  if (await shouldSkipForInterval(settings.min_interval_hours)) {
+    console.log(
+      `[ingest] asgari çekim aralığı (${settings.min_interval_hours} saat) henüz dolmadı — bu koşu atlandı`,
+    );
+    return;
+  }
+
+  const sources = ALL_SOURCES.filter((s) => settings.enabled_sources.includes(s.name));
+  if (sources.length === 0) {
+    console.warn("[ingest] uyarı: hiçbir kaynak aktif değil (toplama ayarları) — çekim atlandı");
+    return;
+  }
+
   console.log(
-    `toplama ayarları: kaynak başı limit=${settings.per_source_limit || "sınırsız"}, paralellik=${settings.concurrency}`,
+    `toplama ayarları: kaynak başı limit=${settings.per_source_limit || "sınırsız"}, paralellik=${settings.concurrency}, aktif kaynaklar=${sources.map((s) => s.name).join(", ")}`,
   );
-  const collected = await fetchAll(settings);
+  const collected = await fetchAll(sources, settings);
 
   const deduped = dedupeBatch(collected);
   const fresh = await filterExisting(deduped);

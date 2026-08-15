@@ -16,10 +16,15 @@ export function QueueRow({
   item,
   selected,
   onSelect,
+  selectMode,
+  isNew,
 }: {
   item: CardView;
+  /** Normal modda "sağ panelde açık" öğe; `selectMode`de "toplu seçime dahil" anlamına gelir. */
   selected: boolean;
   onSelect: () => void;
+  selectMode?: boolean;
+  isNew?: boolean;
 }) {
   const band = BAND[item.band];
   return (
@@ -40,12 +45,25 @@ export function QueueRow({
         selected ? `${BORDER_BY_BAND[item.band]} bg-white/[0.05]` : "border-l-transparent hover:bg-white/[0.025]"
       }`}
     >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${band.dot}`} />
+      {selectMode ? (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onSelect}
+          onClick={(e) => e.stopPropagation()}
+          className="h-3.5 w-3.5 shrink-0 accent-brand"
+        />
+      ) : (
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${band.dot}`} />
+      )}
       <span className="w-6 shrink-0 text-right font-mono text-xs font-bold text-ink-muted">
         {item.fit}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-ink">{item.title}</div>
+        <div className="flex items-center gap-1.5 truncate text-ink">
+          {isNew && <span title="Yeni" className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />}
+          <span className="truncate">{item.title}</span>
+        </div>
         <div className="truncate font-mono text-[10.5px] text-ink-muted">
           {formatSource(item.source)}
           {item.sector && ` · ${item.sector}`}
@@ -53,7 +71,7 @@ export function QueueRow({
       </div>
       {item.mine !== null && <span className="shrink-0 text-[10px] text-ink-muted">✓</span>}
       {item.bench && <IconAward className="h-3 w-3 shrink-0 text-ink-muted" />}
-      <OpportunityMenu url={item.url} />
+      {!selectMode && <OpportunityMenu url={item.url} />}
     </div>
   );
 }

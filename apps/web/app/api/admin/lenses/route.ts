@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { serverDb } from "../../../../lib/supabase";
 import { requireAdmin } from "../../../../lib/auth";
 
-const BUILTIN_IDS = new Set(["arbitrage", "white_space"]);
-
 function slugify(name: string): string {
   return (
     name
@@ -19,7 +17,8 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === "string" && x.trim().length > 0);
 }
 
-/** Admin-only: yeni admin-merceği ekler. Builtin (arbitraj/beyaz-alan) burada YOK, düzenlenemez. */
+/** Admin-only: yeni admin-merceği ekler. Arbitraj/beyaz-alan da (2026-08-15'ten) sıradan bir
+ *  satır — özel bir id namespace koruması yok, çakışma normal `for` döngüsüyle (aşağıda) ele alınır. */
 export async function POST(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ ok: false, error: "yetki gerekli (admin)" }, { status: 403 });
@@ -28,7 +27,7 @@ export async function POST(req: Request) {
   const name = typeof body?.["name"] === "string" ? body["name"].trim() : "";
   const extraNoteLabel =
     typeof body?.["extra_note_label"] === "string" ? body["extra_note_label"].trim() : "";
-  const weight = typeof body?.["weight"] === "number" && body["weight"] > 0 ? body["weight"] : 1;
+  const weight = typeof body?.["weight"] === "number" && body["weight"] >= 0 ? body["weight"] : 1;
   const questions = body?.["questions"];
   if (!name || !extraNoteLabel || !isStringArray(questions) || questions.length === 0) {
     return NextResponse.json({ ok: false, error: "geçersiz mercek gövdesi" }, { status: 400 });
@@ -39,7 +38,6 @@ export async function POST(req: Request) {
 
   const base = slugify(name);
   let lensId = base;
-  if (BUILTIN_IDS.has(lensId)) lensId = `${base}_custom`;
   for (let i = 2; i < 50; i++) {
     const { data } = await db.from("lenses").select("lens_id").eq("lens_id", lensId).maybeSingle();
     if (!data) break;
