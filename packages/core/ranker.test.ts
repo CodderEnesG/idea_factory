@@ -45,6 +45,22 @@ describe("rank", () => {
     expect(rank(items).map((r) => r.signal.id)).toEqual(["pursue", "watch", "kill"]);
   });
 
+  it("bant içinde confidence tiebreak — yüksek güven önce, tazelikten de fit'ten de önce (problem 2)", () => {
+    const items: RankedItem[] = [
+      {
+        signal: sig("dusuk-guven-taze", "2026-06-01T00:00:00Z"),
+        analyses: { arbitrage: { ...ana(85), confidence: "low" } },
+      },
+      {
+        signal: sig("yuksek-guven-eski", "2026-01-01T00:00:00Z"),
+        analyses: { arbitrage: { ...ana(82), confidence: "high" } },
+      },
+    ];
+    // ikisi de pursue; yüksek-güven-eski hem daha eski hem daha düşük fit ama confidence
+    // önce kazanır — düşük güvenli "kovala" artık taze/yüksek-fit diye önde göstermiyor.
+    expect(rank(items).map((r) => r.signal.id)).toEqual(["yuksek-guven-eski", "dusuk-guven-taze"]);
+  });
+
   it("bant içinde tazelik tiebreak — yeni önce", () => {
     const items: RankedItem[] = [
       { signal: sig("eski", "2026-01-01T00:00:00Z"), analyses: { arbitrage: ana(85) } },

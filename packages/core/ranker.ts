@@ -71,8 +71,9 @@ export interface RankOptions {
 }
 
 /**
- * Sıralayıcı: önce kompozit fit bandı (pursue > watch > kill), sonra BANT İÇİNDE tazelik
- * tiebreak (skora karışmaz — eski-yüksek yeni-düşüğü ezemez, tersi de). fit son tiebreak.
+ * Sıralayıcı: önce kompozit fit bandı (pursue > watch > kill), sonra BANT İÇİNDE confidence
+ * tiebreak (problem 2: "fırsat ayırt edilemiyor" — düşük güvenli bir "kovala" artık taze
+ * diye yüksek güvenli birinin önüne geçemiyor), sonra tazelik (skora karışmaz), fit son.
  */
 export function rank(items: RankedItem[], opts: RankOptions = {}): RankedItem[] {
   return [...items].sort((a, b) => {
@@ -82,6 +83,9 @@ export function rank(items: RankedItem[], opts: RankOptions = {}): RankedItem[] 
     const bandB = opts.bandOverride?.(b) ?? cb.band;
     const band = BAND_RANK[bandA] - BAND_RANK[bandB];
     if (band !== 0) return band;
+    // CONF_RANK: low=0, high=2 — yüksek güven önce gelsin diye ters (b-a) çıkarılıyor.
+    const conf = CONF_RANK[cb.confidence] - CONF_RANK[ca.confidence];
+    if (conf !== 0) return conf;
     const fresh = freshnessTs(b.signal) - freshnessTs(a.signal);
     if (fresh !== 0) return fresh;
     return cb.fit - ca.fit;

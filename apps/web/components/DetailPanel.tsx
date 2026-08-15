@@ -16,6 +16,7 @@ import {
   IconAward,
   IconBanknote,
   IconGlobe,
+  IconLock,
   IconMessage,
   IconSearch,
   IconSparkle,
@@ -47,11 +48,15 @@ const FACT_ICON: Partial<Record<FactKind, (props: { className?: string }) => JSX
  */
 export function DetailPanel({
   item,
+  meName,
   onDecided,
+  onFinalized,
   onSkip,
 }: {
   item: CardView;
+  meName: string;
   onDecided: (d: Decision) => void;
+  onFinalized: (f: { decision: Decision; decidedBy: string } | null) => void;
   onSkip?: () => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,6 +67,34 @@ export function DetailPanel({
   const debate = useDebate(item.id, item.debates);
   const [composerOpen, setComposerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
+
+  // Kesinleşmiş karar (0013, problem 1/2) — herhangi bir üye kilitleyebilir/açabilir.
+  // Kilitleme, o an ekranda görünen AI bandını DEĞİL, kendi kararını (`item.mine`) esas alır
+  // — Panom'daki "sürüklenen sütun kilitlenir" mantığıyla aynı: kilitlemeden önce bir karar
+  // vermiş olman gerekir.
+  async function toggleFinal() {
+    setLockBusy(true);
+    try {
+      if (item.finalDecision !== null) {
+        const res = await fetch("/api/decisions/final", {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ signal_id: item.id }),
+        });
+        if (res.ok) onFinalized(null);
+      } else if (item.mine !== null) {
+        const res = await fetch("/api/decisions/final", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ signal_id: item.id, decision: item.mine }),
+        });
+        if (res.ok) onFinalized({ decision: item.mine, decidedBy: meName });
+      }
+    } finally {
+      setLockBusy(false);
+    }
+  }
 
   // Kullanıcı isteği: "yapay zekadan çıkan sonuçta ekip kısmına kaydedilsin" — AI
   // Yorumcusu'nun en son turunun nihai kararı da karar butonlarının altındaki "ekip:"
@@ -132,6 +165,11 @@ export function DetailPanel({
                 <span className={`h-1.5 w-1.5 rounded-full ${band.dot}`} /> {band.label}
               </span>
               <span>· güven: {CONFIDENCE_LABEL[item.confidence]}</span>
+              {item.finalDecision !== null && (
+                <span className="inline-flex items-center gap-1 text-brand" title={`Kilitleyen: ${item.finalDecidedBy}`}>
+                  · <IconLock className="h-3 w-3" /> Kesinleşti: {BAND[item.finalDecision].label} ({item.finalDecidedBy})
+                </span>
+              )}
               {item.bench && (
                 <span className="inline-flex items-center gap-1 text-brand">
                   · <IconAward className="h-3 w-3" /> bench
@@ -289,6 +327,24 @@ export function DetailPanel({
           <div className="flex items-center gap-2">
             <DecisionButtons signalId={item.id} mine={item.mine} onDecided={onDecided} />
             <div className="ml-auto flex shrink-0 items-center gap-2">
+              {(item.finalDecision !== null || item.mine !== null) && (
+                <button
+                  onClick={toggleFinal}
+                  disabled={lockBusy}
+                  title={
+                    item.finalDecision !== null
+                      ? "Ekip kararı kilidini aç"
+                      : "Kendi kararını ekip kararı olarak kilitle"
+                  }
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border transition disabled:opacity-50 ${
+                    item.finalDecision !== null
+                      ? "border-strong bg-white/[0.06] text-brand"
+                      : "border-hair bg-elevated text-ink-secondary hover:border-strong hover:text-ink"
+                  }`}
+                >
+                  <IconLock className="h-4 w-4" />
+                </button>
+              )}
               {item.isAdmin && (
                 <button
                   onClick={debate.start}

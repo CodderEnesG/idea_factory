@@ -2,7 +2,7 @@ import type { CardView } from "../lib/card-view";
 import { BAND } from "./card-visuals";
 import { formatSource } from "../lib/source-labels";
 import { OpportunityMenu } from "./OpportunityMenu";
-import { IconAward } from "./icons";
+import { IconAward, IconLock } from "./icons";
 
 const BORDER_BY_BAND: Record<CardView["band"], string> = {
   pursue: "border-l-pursue",
@@ -69,6 +69,7 @@ export function QueueRow({
           {item.sector && ` · ${item.sector}`}
         </div>
       </div>
+      {item.finalDecision !== null && <IconLock className="h-3 w-3 shrink-0 text-brand" />}
       {item.mine !== null && <span className="shrink-0 text-[10px] text-ink-muted">✓</span>}
       {item.bench && <IconAward className="h-3 w-3 shrink-0 text-ink-muted" />}
       {!selectMode && <OpportunityMenu url={item.url} />}

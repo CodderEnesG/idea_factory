@@ -9,6 +9,7 @@ import {
 import type { Decision, UserDecision } from "../components/DecisionButtons";
 import type { Comment } from "../components/Comments";
 import type { TaskItem } from "../components/TaskList";
+import type { FinalDecision } from "./load-final-decisions";
 import type { CardView, DebateView, Fact } from "./card-view";
 
 const KIND_LABEL: Record<string, string> = {
@@ -32,6 +33,7 @@ export function buildCardView(
   lensRegistry: Lens[],
   isAdmin: boolean,
   debates: DebateView[],
+  final: FinalDecision | null = null,
 ): CardView {
   const { signal, analyses } = item;
   const comp = composite(analyses, lensRegistry);
@@ -96,5 +98,9 @@ export function buildCardView(
     tasks,
     isAdmin,
     debates,
+    finalDecision: final?.decision ?? null,
+    finalDecidedBy: final?.decidedBy ?? null,
+    finalReason: final?.reason ?? null,
+    watchReviewAt: (signal as { watch_review_at?: string | null }).watch_review_at ?? null,
   };
 }

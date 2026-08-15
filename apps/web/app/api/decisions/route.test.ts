@@ -78,4 +78,59 @@ describe("POST /api/decisions", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ ok: false, error: "db patladı" });
   });
+
+  it("kovala ilk kez seçilince ve hiç görev yoksa başlangıç görevleri eklenir (problem 3)", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const decisionsInsert = vi.fn().mockResolvedValue({ error: null });
+    let taskMode: "count" | "insert" = "count";
+    const tasksObj: Record<string, unknown> = {};
+    tasksObj.select = vi.fn(() => {
+      taskMode = "count";
+      return tasksObj;
+    });
+    tasksObj.eq = vi.fn(() => tasksObj);
+    tasksObj.insert = vi.fn((rows: unknown[]) => {
+      taskMode = "insert";
+      (tasksObj as { insertedRows?: unknown }).insertedRows = rows;
+      return tasksObj;
+    });
+    (tasksObj as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve(taskMode === "count" ? { count: 0 } : { error: null }).then(resolve);
+
+    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj })[t]);
+    serverDbMock.mockReturnValue({ from });
+
+    await POST(req({ signal_id: "s1", decision: "pursue" }));
+    expect(tasksObj.insert).toHaveBeenCalledTimes(1);
+    const rows = (tasksObj as { insertedRows?: { signal_id: string; owner: string }[] }).insertedRows!;
+    expect(rows.every((r) => r.signal_id === "s1" && r.owner === "enes")).toBe(true);
+  });
+
+  it("kovala seçilince ama zaten görev varsa başlangıç görevleri eklenmez", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const decisionsInsert = vi.fn().mockResolvedValue({ error: null });
+    const tasksObj: Record<string, unknown> = {};
+    tasksObj.select = vi.fn(() => tasksObj);
+    tasksObj.eq = vi.fn(() => tasksObj);
+    tasksObj.insert = vi.fn(() => tasksObj);
+    (tasksObj as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve({ count: 3 }).then(resolve);
+
+    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj })[t]);
+    serverDbMock.mockReturnValue({ from });
+
+    await POST(req({ signal_id: "s1", decision: "pursue" }));
+    expect(tasksObj.insert).not.toHaveBeenCalled();
+  });
+
+  it("izle/ele seçilince başlangıç görevleri hiç kontrol edilmez", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const decisionsInsert = vi.fn().mockResolvedValue({ error: null });
+    const tasksSelect = vi.fn();
+    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: { select: tasksSelect } })[t]);
+    serverDbMock.mockReturnValue({ from });
+
+    await POST(req({ signal_id: "s1", decision: "watch" }));
+    expect(tasksSelect).not.toHaveBeenCalled();
+  });
 });

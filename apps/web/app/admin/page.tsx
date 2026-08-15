@@ -4,7 +4,8 @@ import { loadItems } from "../../lib/load-items";
 import { loadLensRegistry } from "../../lib/load-lens-registry";
 import { loadActiveThesis } from "../../lib/active-thesis";
 import { loadActiveIngestionSettings } from "../../lib/active-ingestion-settings";
-import { weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal } from "../../lib/metrics";
+import { weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal, finalizedPursueCount } from "../../lib/metrics";
+import { loadFinalDecisions } from "../../lib/load-final-decisions";
 import { computeSourceHealth, type SourceHealth, type SourceStatus } from "../../lib/source-health";
 import { formatSource } from "../../lib/source-labels";
 import { AppSidebar } from "../../components/AppSidebar";
@@ -164,7 +165,7 @@ export default async function AdminPage({
     );
   }
 
-  const [thesis, customLenses, ingestionSettings, { items, demo }, decisionRows, sourceRows, lensRegistry] =
+  const [thesis, customLenses, ingestionSettings, { items, demo }, decisionRows, sourceRows, lensRegistry, finalDecisions] =
     await Promise.all([
       loadActiveThesis(),
       loadLenses(),
@@ -173,6 +174,7 @@ export default async function AdminPage({
       loadDecisionRows(),
       loadSourceRows(),
       loadLensRegistry(),
+      loadFinalDecisions(),
     ]);
 
   const sourceHealth = computeSourceHealth(sourceRows);
@@ -184,6 +186,7 @@ export default async function AdminPage({
   const latest = latestDecisionPerSignal(decisionRows);
   const pursueCount = [...latest.values()].filter((d) => d === "pursue").length;
   const noise = noiseRatio(items, lensRegistry);
+  const finalizedPursue = finalizedPursueCount([...finalDecisions.values()]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -243,7 +246,12 @@ export default async function AdminPage({
                 </div>
               )}
 
-              <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5">
+                <StatTile
+                  label="Kesinleşmiş fırsat (kovala)"
+                  value={String(finalizedPursue)}
+                  hint={`${finalDecisions.size} sinyal kilitlendi — problem 1/2: ekibin gerçekten karar verdiği sayı`}
+                />
                 <StatTile
                   label="Nitelikli fırsat (bu hafta)"
                   value={String(thisWeek.qualified)}

@@ -20,5 +20,8 @@ export const SignalSchema = z.object({
   // Şekil StoredEnrichmentSchema (enrichment.ts); tüketici safeParse ile daraltır.
   enrichment: z.unknown().nullable().optional(),
   enriched_at: z.string().nullable().optional(),
+  // 0013 — bkz. supabase/migrations/0013_final_decisions.sql. Yalnız `final_decisions`'ta
+  // "watch" kesinleştiğinde set edilir; ingest/enrich bu kolonu hiç yazmaz.
+  watch_review_at: z.string().nullable().optional(),
 });
 export type Signal = z.infer<typeof SignalSchema>;

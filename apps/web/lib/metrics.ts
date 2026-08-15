@@ -70,6 +70,12 @@ export function decisionRatio(totalSignals: number, decidedSignalCount: number):
   return decidedSignalCount / totalSignals;
 }
 
+/** Gerçek/kesinleşmiş fırsat sayısı (0013, problem 2: "fırsat ayırt edilemiyor") — AI'ın
+ *  "pursue" dediği ham sayı DEĞİL, bir üyenin gerçekten kilitlediği "kovala" sayısı. */
+export function finalizedPursueCount(finalDecisions: { decision: Decision }[]): number {
+  return finalDecisions.filter((d) => d.decision === "pursue").length;
+}
+
 /** Append-only `decisions` log'undan sinyal başına EN YENİ kararı çıkarır — satırlar
  *  created_at DESC sırayla gelmeli (ilk görülen kazanır). */
 export function latestDecisionPerSignal(

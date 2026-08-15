@@ -910,3 +910,58 @@ Kullanıcı: "sürekli bana soru sorma, pipeline'a al" — ikisi de sormadan ç�
    "Kararsızlar" açılınca hem panel içinde hem panel kapatıldığında altta "Kararsızlar ×"
    çipi + "Temizle" linki + rozet "1" doğru göründü; çipteki "×"e tıklanınca yalnız o filtre
    kalkıp liste 885'e geri döndü; konsol hatasız.
+
+Not: bu turdan sonra iki sürüm main'e landed ama PLAN.md'ye hiç işlenmedi — `v0.2.0`
+(Faz 4 admin araçları + Faz 5 Kuyruk'un chat-app mimarisine geçişi, commit `75370cb`) ve
+`v0.3.0` (Ayarlar tek sekmeli sayfa, mercek migrasyonu, çekim panel kontrolü, marka imzalı
+alt bar, commit `4e9ec21`, 2026-08-15). Retroaktif doküman borcu — ayrı bir tur ister.
+
+## 18. Kesinleşmiş karar + Panom kanban yeniden tasarımı (2026-08-15)
+
+Kullanıcı beş somut ürün problemi tanımladı: (1) herkes fikir belirtiyor ama netice
+belirlenmiyor, (2) bu yüzden fırsat ayırt edilemiyor, (3) adım atma yönü güçsüz, (4) Panom
+genel yapı/tasarımla uymuyor — görsel/yapısal uyumsuzluk + sürükle-bırak kanban eksik +
+kalabalık/kullanışamaz (AskUserQuestion, üçü de seçildi), (5) elenen/izlenen sinyaller
+sonsuza kadar birikiyor, hiç arşivlenmiyor/geri gelmiyor.
+
+**Kök neden analizi:** `decisions` bilinçli olarak kişi-başı paralel bir log (`load-
+decisions.ts`) — hiçbir zaman "bu artık kesin karar" diyen tek bir alan yoktu. Panom da
+yalnız İZLEYEN kullanıcının kendi kararına göre gruplanıyordu.
+
+**Uygulanan çözüm:**
+1. **`final_decisions` tablosu** (`0013_final_decisions.sql`, kullanıcı Supabase'e
+   UYGULAMALI, henüz yapılmadı) — sinyal başına TEK "resmi/ekip" karar, kişisel
+   `decisions`'tan ayrı. Kullanıcı kararı: **herhangi bir üye kilitleyebilir/açabilir**, admin
+   kısıtı yok. `signals.watch_review_at` (izle kilitlenince +30 gün, başka banda geçince
+   null) — Panom'un "Bugün gözden geçir" bloğu bunu okur (problem 5).
+2. **`ranker.ts`**: `bandOverride` önceliği artık final > kişisel > AI bandı
+   (`queue/page.tsx`); sort'a confidence tiebreak eklendi (band sonrası, tazelikten önce) —
+   düşük güvenli "kovala" artık taze diye yüksek güvenlinin önüne geçemiyor (problem 2).
+3. **Otomatik başlangıç görevleri**: "kovala" ilk kez seçilince (kişisel ya da kilitli) ve
+   hiç görev yoksa 3 genel şablon görev eklenir (`task-templates.ts`) — boş checklist yerine
+   düzenlenebilir bir başlangıç (problem 3). Mercek-özel şablon YOK (mercekler artık tamamen
+   admin-dinamik).
+4. **Panom tamamen kanban'a yeniden yazıldı** (`PanomBoard.tsx`/`PanomCard.tsx`): 3 sütun
+   yan yana, native HTML5 sürükle-bırak (kütüphane eklenmedi — mevcut minimal dependency
+   listesiyle tutarlı). Sürüklemek KİŞİSEL kararı yazar; ayrı bir "Kilitle" düğmesi ekip
+   kararını KESİNLEŞTİRİR. Kilitli kartlar sürüklenemez (önce kilit açılmalı). Ele varsayılan
+   katlı (yalnız sayı + "Göster"); İzle "Bugün gözden geçir" (watch_review_at geçmiş) üstte,
+   geri kalanı katlı; her sütun `daha fazla yükle` ile sayfalanır (binlerce kart aynı anda
+   DOM'a basılmıyor). Kart Kuyruk'un görsel diliyle (BAND renkleri, kompakt satır) uyumlu.
+5. **Kuyruk'a da kilit görünürlüğü eklendi** (yalnız Panom'a hapsetmemek için): `QueueRow`'da
+   kilit ikonu, `DetailPanel`'de "Kesinleşti: X (kim)" rozeti + kilitle/aç düğmesi (aynı
+   `/api/decisions/final` uç noktası, Panom'la simetrik optimistic-update deseni).
+6. **`/admin/metrikler`**: "Kesinleşmiş fırsat (kovala)" istatistik kutusu eklendi —
+   AI'ın ham "pursue" sayısı değil, gerçekten kilitlenmiş sayı (problem 2).
+
+**Doğrulama:** `tsc --noEmit` (core + web) temiz, `next build` (prod) temiz, `pnpm -r test`
+210/210 yeşil (final/route.test.ts 12 yeni test + decisions/route.test.ts'e 3 + ranker.test.ts'e
+1 confidence-tiebreak testi eklendi). `browse` ile izole demo modda (SUPABASE_URL boş, port
+3101, gerçek DB'ye dokunulmadı) doğrulandı: Kuyruk'ta Kovala→Kilitle→Kilidi aç akışı uçtan uca
+çalıştı (rozet/ikon/buton durumu doğru güncellendi, konsol hatasız), Panom boş durumu doğru
+render edildi. Kanban'ın gerçek veri üzerindeki sürükle-bırak/sütun davranışı demo modda test
+edilemedi (DB gerekiyor) — kod incelemesi + tip kontrolü + Kuyruk'ta doğrulanan aynı fetch
+deseniyle güvence altına alındı.
+
+**Kullanıcıda bekleyen:** `0013_final_decisions.sql`'i Supabase SQL Editor'den uygula (mevcut
+`0010_digests.sql` de hâlâ bekliyor, bkz. §11 madde 7).

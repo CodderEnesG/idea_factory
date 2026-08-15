@@ -81,4 +81,10 @@ export interface CardView {
   tasks: TaskItem[];
   isAdmin: boolean;
   debates: DebateView[];
+  /** 0013 — kişisel kararlardan ayrı, sinyal başına TEK "resmi" karar (problem 1). */
+  finalDecision: Decision | null;
+  finalDecidedBy: string | null;
+  finalReason: string | null;
+  /** final karar "watch" iken set edilir (+30g); geçmişse Panom "Bugün gözden geçir"e girer. */
+  watchReviewAt: string | null;
 }

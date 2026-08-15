@@ -89,6 +89,7 @@ export function QueueBoard({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localMine, setLocalMine] = useState<Map<string, Decision>>(new Map());
+  const [localFinal, setLocalFinal] = useState<Map<string, { decision: Decision; decidedBy: string } | null>>(new Map());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [newOnly, setNewOnly] = useState(false);
@@ -168,11 +169,21 @@ export function QueueBoard({
   }
 
   // Karar verilince tam sayfa yenilemeden panel/liste/sayaçlar güncellensin diye — sunucudan
-  // gelen `items` sabit kalır, üstüne bu oturumdaki taze kararları bindiriyoruz.
-  const resolved = useMemo(
-    () => (localMine.size === 0 ? items : items.map((i) => (localMine.has(i.id) ? { ...i, mine: localMine.get(i.id)! } : i))),
-    [items, localMine],
-  );
+  // gelen `items` sabit kalır, üstüne bu oturumdaki taze kararları/kilitleri bindiriyoruz.
+  const resolved = useMemo(() => {
+    if (localMine.size === 0 && localFinal.size === 0) return items;
+    return items.map((i) => {
+      const mine = localMine.has(i.id) ? localMine.get(i.id)! : i.mine;
+      const finalOv = localFinal.has(i.id) ? localFinal.get(i.id) : undefined;
+      if (!localMine.has(i.id) && finalOv === undefined) return i;
+      return {
+        ...i,
+        mine,
+        finalDecision: finalOv === undefined ? i.finalDecision : (finalOv?.decision ?? null),
+        finalDecidedBy: finalOv === undefined ? i.finalDecidedBy : (finalOv?.decidedBy ?? null),
+      };
+    });
+  }, [items, localMine, localFinal]);
 
   const sectors = useMemo(() => distinct(resolved, (i) => i.sector), [resolved]);
   const markets = useMemo(() => distinct(resolved, (i) => i.market), [resolved]);
@@ -577,7 +588,9 @@ export function QueueBoard({
           {selected ? (
             <DetailPanel
               item={selected}
+              meName={meName}
               onDecided={(d) => setLocalMine((prev) => new Map(prev).set(selected.id, d))}
+              onFinalized={(f) => setLocalFinal((prev) => new Map(prev).set(selected.id, f))}
               onSkip={
                 undecidedOnly
                   ? () => setSkipped((prev) => new Set(prev).add(selected.id))

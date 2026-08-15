@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { serverDb } from "../../../lib/supabase";
 import { getSession } from "../../../lib/auth";
 import { authEnabled } from "../../../lib/session";
+import { PURSUE_STARTER_TASKS } from "../../../lib/task-templates";
 
 const VALID = new Set(["pursue", "watch", "kill"]);
 
@@ -30,5 +31,22 @@ export async function POST(req: Request) {
     .from("decisions")
     .insert({ signal_id: body.signal_id, decision: body.decision, decided_by: decidedBy });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+  // Problem 3 ("adım atma yönü güçsüz"): "kovala" ilk kez seçildiğinde boş checklist yerine
+  // düzenlenebilir bir başlangıç. Yalnız bu (sinyal, kullanıcı) için hiç görev yoksa ekler —
+  // kullanıcı sildiyse ya da zaten kendi görevlerini yazdıysa tekrar tekrar spam etmez.
+  if (body.decision === "pursue") {
+    const { count } = await db
+      .from("item_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("signal_id", body.signal_id)
+      .eq("owner", decidedBy);
+    if (!count) {
+      await db
+        .from("item_tasks")
+        .insert(PURSUE_STARTER_TASKS.map((task) => ({ signal_id: body.signal_id, owner: decidedBy, body: task })));
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
