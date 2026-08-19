@@ -257,6 +257,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
               dragOver={dragOverCol === "pursue"}
               onDragOver={(e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDragOverCol("pursue");
               }}
               onDragLeave={() => setDragOverCol(null)}
@@ -278,6 +279,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
               dragOver={dragOverCol === "watch"}
               onDragOver={(e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDragOverCol("watch");
               }}
               onDragLeave={() => setDragOverCol(null)}
@@ -333,6 +335,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
               dragOver={dragOverCol === "kill"}
               onDragOver={(e) => {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
                 setDragOverCol("kill");
               }}
               onDragLeave={() => setDragOverCol(null)}
@@ -387,7 +390,12 @@ function KanbanColumn({
   return (
     <div
       onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
+      onDragLeave={(e) => {
+        // Alt bir karta/elemana girince de dragleave tetiklenir (DOM olay modeli) — gerçekten
+        // sütunun dışına çıkılmadıysa yok say, aksi halde sürükleme sırasında vurgu titrer.
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        onDragLeave();
+      }}
       onDrop={onDrop}
       className={`flex min-h-0 flex-col overflow-hidden transition ${dragOver ? "bg-white/[0.04]" : ""}`}
     >

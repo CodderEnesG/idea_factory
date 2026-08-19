@@ -64,6 +64,7 @@ export function PanomCard({
             href={item.url}
             target="_blank"
             rel="noreferrer"
+            draggable={false}
             className="block truncate font-display text-sm font-semibold text-ink hover:text-brand"
           >
             {item.title}
