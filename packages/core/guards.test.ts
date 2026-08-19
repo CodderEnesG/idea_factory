@@ -130,3 +130,48 @@ describe("checkAnalysisGuards — mercek-bağımsızlık (white_space)", () => {
     expect(checkAnalysisGuards(bad).some((v) => v.includes("bant-aksiyon"))).toBe(true);
   });
 });
+
+describe("arbitraj tabanı guard'ı (g) — 2026-08-19, AI Yorumcusu bulgusu", () => {
+  it("traction VE TR/MENA wedge'i ikisi de yoksa 80+ reddedilir", () => {
+    const v = checkAnalysisGuards(base, { lensId: "arbitrage", traction: "yok", markets: ["UK", "EU"] });
+    expect(v.some((x) => x.includes("arbitraj tabanı eksik"))).toBe(true);
+  });
+
+  it("traction null/boş/bilinmiyor da 'yok' sayılır", () => {
+    expect(
+      checkAnalysisGuards(base, { lensId: "arbitrage", traction: null, markets: [] }).some((x) =>
+        x.includes("arbitraj tabanı eksik"),
+      ),
+    ).toBe(true);
+    expect(
+      checkAnalysisGuards(base, { lensId: "arbitrage", traction: "bilinmiyor", markets: [] }).some((x) =>
+        x.includes("arbitraj tabanı eksik"),
+      ),
+    ).toBe(true);
+  });
+
+  it("yalnız traction varsa (TR wedge'i olmasa da) geçer", () => {
+    const v = checkAnalysisGuards(base, { lensId: "arbitrage", traction: "500+ ücretli kullanıcı", markets: ["UK"] });
+    expect(v.some((x) => x.includes("arbitraj tabanı eksik"))).toBe(false);
+  });
+
+  it("yalnız TR/MENA wedge'i varsa (traction olmasa da) geçer", () => {
+    const v = checkAnalysisGuards(base, { lensId: "arbitrage", traction: "yok", markets: ["Türkiye", "MENA"] });
+    expect(v.some((x) => x.includes("arbitraj tabanı eksik"))).toBe(false);
+  });
+
+  it("fit 80 altındaysa hiç devreye girmez (izle/ele bantları serbest)", () => {
+    const watch = { ...base, fit: 70, recommended_action: "watch" as const, confidence: "med" as const, validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }] };
+    const v = checkAnalysisGuards(watch, { lensId: "arbitrage", traction: "yok", markets: [] });
+    expect(v.some((x) => x.includes("arbitraj tabanı eksik"))).toBe(false);
+  });
+
+  it("başka bir mercekte (white_space, custom) hiç devreye girmez", () => {
+    const v = checkAnalysisGuards(base, { lensId: "white_space", traction: "yok", markets: [] });
+    expect(v.some((x) => x.includes("arbitraj tabanı eksik"))).toBe(false);
+  });
+
+  it("lensId hiç verilmezse (eski çağrı yeri) hiç devreye girmez — geriye dönük uyum", () => {
+    expect(checkAnalysisGuards(base)).toEqual([]);
+  });
+});

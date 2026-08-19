@@ -5,6 +5,11 @@ import { isActionableKind, type SignalKind } from "./enrichment.js";
 /** Guard'ların analiz dışında bakabildiği bağlam (zenginleştirmeden gelir). */
 export interface GuardContext {
   signalKind?: SignalKind;
+  /** Yalnız `lensId === "arbitrage"` iken (g) guard'ı devreye girer — diğer mercekler
+   *  (white_space, custom) farklı kriterlere göre çalışır, bu kural onlara uygulanmaz. */
+  lensId?: string;
+  traction?: string | null;
+  markets?: string[];
 }
 
 /** Kovalanamaz sinyal için fit tavanı — üstü "meta-öğrenme" rasyonalizasyonudur. */
@@ -60,6 +65,22 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
     if (a.recommended_action !== "kill") {
       v.push(
         `ön kapı: signal_kind=${ctx.signalKind} için recommended_action=kill olmalı (gelen: ${a.recommended_action})`,
+      );
+    }
+  }
+
+  // (g) arbitraj tabanı: bu merceğin bütün mantığı "başka pazarda kanıtlanmış mı" (traction)
+  // VE "Türkiye'de somut giriş noktası var mı" (wedge) sorularına dayanır (bkz. ARBITRAGE_SEED_LENS
+  // questions[]). AI Yorumcusu 2026-08-19'da 25+ gerçek tartışmada tekrar tekrar aynı boşluğu
+  // yakaladı: analist bu soruları soruyor ama cevabı fit'e yansıtmıyordu — "Traction: yok" olan
+  // bir sinyal 88 alabiliyordu (bkz. PLAN.md §20). 80+ bandı için ikisinden EN AZ biri şart.
+  if (ctx.lensId === "arbitrage" && a.fit >= 80) {
+    const traction = ctx.traction?.trim() ?? "";
+    const hasTraction = traction !== "" && !/^(yok|none|no traction|bilinmiyor)$/i.test(traction);
+    const hasTrWedge = (ctx.markets ?? []).some((m) => /türkiye|turkey|\btr\b|mena/i.test(m));
+    if (!hasTraction && !hasTrWedge) {
+      v.push(
+        "arbitraj tabanı eksik: ne başka pazarda kanıt (traction) ne TR/MENA wedge'i var — fit 80+ olamaz",
       );
     }
   }

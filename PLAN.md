@@ -1012,3 +1012,34 @@ dokunulmadı — onlar AI'ın kendi ham görüşünü haritalıyor, karar-ayarl�
 Doğrulama: `tsc --noEmit` + `pnpm -r test` (117/117 web) yeşil, gerçek Supabase'e karşı canlı
 test edildi (`/browse`, muhammed hesabı) — Kuyruk'ta İzle işaretlenince üst rozet/nokta/sayaçlar
 anında turuncuya döndü, Panom'da aynı sinyal doğru sütuna (İzle) düştü.
+
+## 20. Arbitraj tabanı guard'ı — AI Yorumcusu'nun bulduğu tekrarlayan kalibrasyon boşluğu (2026-08-19)
+
+Kullanıcı isteğiyle geçici bir script (`apps/worker/scripts/bulk-debate-tmp.ts`, commit
+EDİLMEDİ, iş bitince silindi) yazılıp en yüksek fit'li 46 "Kovala" (arbitrage, fit≥80,
+henüz tartışılmamış) sinyal AI Yorumcusu'ndan (çok-ajanlı tartışma odası) geçirildi.
+**Sonuç (tüm zamanlar, 58 tartışma): 43 ele (%74) · 15 izle (%26) · 0 kovala (%0).** Tartışılan
+HER sinyal ham AI kompozit skorunda zaten "Kovala" idi — tartışma hiçbirini onaylamadı.
+
+**Kök neden (2 gerçek transkript incelenerek doğrulandı, spekülasyon değil):** tek-geçişli
+arbitraj analisti kendi sorduğu soruları (`ARBITRAGE_SEED_LENS.questions`: "başka pazarda
+gerçekten işe yaramış mı — traction?", "Yerel wedge: Türkiye'de somut giriş noktası?") soruyor
+ama cevabı fit puanına yansıtmıyordu. Örnek: "Skippr AI" sinyalinin kendi zenginleştirme verisi
+`traction: yok` diyordu, yine de fit=88 almıştı — tartışmada hem Şüpheci Yatırımcı hem
+TARAFSIZ Pazar-Rekabet Analisti bunu bağımsız olarak yakaladı (roster yanlılığı değil, gerçek
+boşluk). "Cleanlist AI" sinyalinde pazarlar yalnız "UK, EU" idi, Türkiye'ye dair hiçbir iz yok
+— yine 88 almıştı.
+
+**Uygulanan düzeltme:** `packages/core/guards.ts`'e yeni bir mekanik guard (g) eklendi —
+`GuardContext`'e `lensId`/`traction`/`markets` eklendi, yalnız `lensId==="arbitrage"` VE
+`fit>=80` iken devreye girer: traction hem TR/MENA wedge'i (markets içinde "Türkiye"/"Turkey"/
+"TR"/"MENA" geçmiyor) ikisi de yoksa ihlal döner, analiz yeniden denenir (guard-retry mekanizması
+zaten vardı). `analyst.ts` bu context'i `checkAnalysisGuards`'a artık besliyor. Diğer mercekler
+(white_space, custom) etkilenmedi — guard yalnız `lensId==="arbitrage"` iken çalışıyor. 7 yeni
+test (`guards.test.ts`), tsc + 226 test (core 73 + worker 36 + web 117) yeşil.
+
+**Sıradaki:** bu guard'ın etkisini görmek için önce mevcut `analyses` satırlarının yeniden
+işlenmesi (backfill) gerekmiyor — yalnız sonraki analiz/tick'lerde devreye girer. Bir sonraki
+cron koşusundan sonra yeni "Kovala" sinyallerinin bu iki kriteri gerçekten karşılayıp
+karşılamadığı gözlenmeli; eğer tek-geçişli skor artık daha güvenilirse, AI Yorumcusu'nun
+otomatikleştirilip otomatikleştirilmeyeceği (§21) buna göre yeniden değerlendirilebilir.

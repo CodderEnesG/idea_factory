@@ -112,6 +112,9 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
       ...(enrParsed.success && enrParsed.data.signal_kind
         ? { signalKind: enrParsed.data.signal_kind }
         : {}),
+      lensId: lens.id,
+      traction: enrParsed.success ? enrParsed.data.traction : undefined,
+      markets: enrParsed.success ? enrParsed.data.markets : undefined,
     });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;
