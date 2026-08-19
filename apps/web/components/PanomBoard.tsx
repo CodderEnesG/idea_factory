@@ -8,7 +8,7 @@ import { AppSidebar } from "./AppSidebar";
 import { PanomCard } from "./PanomCard";
 import { canonicalSourceName } from "../lib/source-health";
 import { normalizeTag, distinct, distinctSources } from "../lib/facet-filters";
-import { IconSearch } from "./icons";
+import { IconInbox, IconSearch } from "./icons";
 
 interface Resolved extends CardView {
   effective: Decision;
@@ -342,11 +342,19 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
               onDrop={(e) => handleDrop(e, "kill")}
             >
               {!killOpen ? (
+                // Katlı durum bilinçli (kullanıcı kararı: binlerce "ele" kartı sonsuza kadar
+                // ekranda durmasın) — ama eski hali (ince bir buton + altında koca boş alan)
+                // sayfa yüklenmemiş gibi görünüyordu. Bu, katlanmanın kendisinin kasıtlı bir
+                // durum olduğunu gösteren bir yer tutucu.
                 <button
                   onClick={() => setKillOpen(true)}
-                  className="w-full rounded-btn border border-hair py-2 text-xs text-ink-muted transition hover:border-strong hover:text-ink"
+                  className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.14] py-10 text-ink-muted transition hover:border-white/25 hover:text-ink"
                 >
-                  Göster ({(byBand.get("kill") ?? []).length})
+                  <IconInbox className="h-5 w-5" />
+                  <span className="text-xs">
+                    {(byBand.get("kill") ?? []).length} sinyal ele alındı — varsayılan katlı
+                  </span>
+                  <span className="chip mt-1">Göster ({(byBand.get("kill") ?? []).length})</span>
                 </button>
               ) : (
                 <>
