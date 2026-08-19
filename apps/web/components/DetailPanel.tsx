@@ -165,6 +165,11 @@ export function DetailPanel({
                 <span className={`h-1.5 w-1.5 rounded-full ${band.dot}`} /> {band.label}
               </span>
               <span>· güven: {CONFIDENCE_LABEL[item.confidence]}</span>
+              {item.mine !== null && item.finalDecision === null && (
+                <span className={`inline-flex items-center gap-1 ${BAND[item.mine].text}`}>
+                  · Sen: {BAND[item.mine].label}
+                </span>
+              )}
               {item.finalDecision !== null && (
                 <span className="inline-flex items-center gap-1 text-brand" title={`Kilitleyen: ${item.finalDecidedBy}`}>
                   · <IconLock className="h-3 w-3" /> Kesinleşti: {BAND[item.finalDecision].label} ({item.finalDecidedBy})
