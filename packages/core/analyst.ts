@@ -8,6 +8,7 @@ import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
+import { groundSignal, lensNeedsGrounding } from "./grounding.js";
 
 /** Golden few-shot çapası: bir sinyal + onun onaylı analizi. */
 export interface FewShotExample<TAnalysis extends BaseAnalysis = BaseAnalysis> {
@@ -26,6 +27,7 @@ export interface AnalyzeOptions {
   fewShot?: FewShotExample[];
   knowledge?: KnowledgeLayer;
   maxRetries?: number; // şema/guard ihlalinde yeniden deneme
+  grounder?: (signal: Signal) => Promise<string | null>; // test injection; varsayılan groundSignal
 }
 
 function pickProvider(opts: AnalyzeOptions): AnalystProvider {
@@ -66,6 +68,15 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
   const ctxText =
     ctx.notes.length > 0 ? `\n\nİlgili geçmiş bağlam:\n- ${ctx.notes.join("\n- ")}` : "";
 
+  // Grounding (PLAN.md §11 madde 2) — yalnız GROUNDING_ENABLED + rekabet ortamı sorusu
+  // döndüğü mercekler (arbitraj/beyaz-alan) için, tek sefer (retry döngüsü boyunca aynı
+  // bulgu tekrar kullanılır — grounding sonucu şema/guard ihlalinden etkilenmez).
+  const grounder = opts.grounder ?? groundSignal;
+  const groundingText = lensNeedsGrounding(lens.id) ? await grounder(signal) : null;
+  const groundingBlock = groundingText
+    ? `\n\nGrounding bulgusu (canlı arama sonucu, olgu olarak kullan ama sorgula):\n${groundingText}`
+    : "";
+
   const system = lens.buildSystemPrompt(thesis) + renderFewShot(opts.fewShot ?? []);
   const jsonSchema = zodToJsonSchema(lens.schema, { target: "jsonSchema7" }) as Record<
     string,
@@ -75,7 +86,8 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
 
   // Zenginleştirme varsa prompt'a olgu bloğu olarak gir (yoksa bugünkü davranış).
   const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
-  const baseUser = lens.buildUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText;
+  const baseUser =
+    lens.buildUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText + groundingBlock;
   let feedback = "";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {

@@ -250,6 +250,21 @@ adımlar. Hiçbiri henüz uygulanmadı — kullanıcı yönü seçtiğinde işar
 2. **Kademeli model + grounding** (madde 6, faz 2 notu) — şu an her sinyal tek modelle (Gemini/Opus)
    puanlanıyor, gerçek web-arama grounding'i yok; hacim arttıkça maliyet/kalite dengesi için en
    yüksek kaldıraçlı iş.
+
+   **Grounding yarısı — kod hazır, DEVREDE DEĞİL (2026-08-19).** `packages/core/grounding.ts`:
+   yalnız arbitraj+beyaz-alan merceklerinde, asıl yapılandırılmış analiz çağrısından ÖNCE serbest
+   bir Google Search ön-çağrısı (`GROUNDING_ENABLED=true` ile açılır, varsayılan kapalı — sıfır
+   prod riski). Teknik kısıt: Gemini/Anthropic'in structured-output modu (responseSchema /
+   forced tool-use) ile arama tool'u aynı çağrıda birleşemiyor, o yüzden iki-adımlı (grounding
+   metni asıl prompta düz metin olarak eklenir). 20sn timeout var (`GROUNDING_TIMEOUT_MS`).
+
+   **Pilot sonucu (2026-08-19, 20'lik eval seti) — YETERSİZ, karar vermeye yetmiyor.** Koşu
+   sırasında ~8 vaka geçici bir DNS kesintisiyle (`oauth2.googleapis.com` ENOTFOUND) tamamen
+   düştü (0 puan, paydada kaldı) — ham skor (0.475) bu yüzden yanıltıcı. Yalnız ağdan etkilenmeyen
+   12 vakada baseline 0.958 (11.5/12) → grounding açıkken 0.875 (10.5/12): tek bir zıt-uç flip
+   (Faturaport: doğru "kovala" → yanlış "ele") skoru düşürüyor, geri kalanı nötr/karışık. n=12 çok
+   küçük, gürültüden ayırt edilemiyor — **white_space ağırlığı (0→1) bu veriyle DEĞİŞTİRİLMEDİ.**
+   Sıradaki: ağ sorunu olmadan temiz bir pilot tekrarı, sonra karar.
 3. ~~**Yeni mercekler**~~ — **TAMAM (2026-08-09), kapsam kullanıcı kararıyla daraltıldı: zorunlu
    yeni built-in mercek EKLENMEDİ** (mevcut arbitraj+beyaz-alan korunuyor); kullanıcının kendi
    mercek ekleme akışının uçtan uca sağlam olduğu doğrulandı/sağlamlaştırıldı. Bulgu: pipeline
