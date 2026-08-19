@@ -23,16 +23,18 @@ export const dynamic = "force-dynamic";
 export default async function PanomPage() {
   const me = await getSession();
   const meName = me?.username ?? "web";
-  const [{ items }, decisions, finalDecisions, comments, tasks, lensRegistry] = await Promise.all([
+  const isAdmin = me?.is_admin ?? false;
+  // loadDebates yalnız isAdmin'e bağlı (session zaten çözüldü) — eskiden Promise.all'dan
+  // SONRA ayrı bir await'ti, sayfanın kritik yoluna gereksiz bir tam round-trip ekliyordu.
+  const [{ items }, decisions, finalDecisions, comments, tasks, lensRegistry, debates] = await Promise.all([
     loadItems(),
     loadDecisions(),
     loadFinalDecisions(),
     loadComments(),
     loadTasks(meName),
     loadLensRegistry(),
+    loadDebates(isAdmin),
   ]);
-  const isAdmin = me?.is_admin ?? false;
-  const debates = await loadDebates(isAdmin);
 
   const cards = rank(items, { lensRegistry })
     .map((item) => {
