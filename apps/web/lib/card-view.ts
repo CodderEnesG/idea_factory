@@ -67,6 +67,10 @@ export interface CardView {
   fit: number;
   confidence: Confidence;
   band: Band;
+  /** Kesinleşmiş > kişisel > AI Yorumcusu > AI kompozit bandı — bkz. `resolveEffectiveBand`.
+   *  Görsel bant/rozet/sıralama artık HEP bunu kullanır; `band` (ham AI) ayrı bir bilgi olarak
+   *  kalır ("AI: X" dökümünde). */
+  effectiveBand: Band;
   bench: boolean;
   notActionable: boolean;
   noData: boolean;
@@ -87,4 +91,25 @@ export interface CardView {
   finalReason: string | null;
   /** final karar "watch" iken set edilir (+30g); geçmişse Panom "Bugün gözden geçir"e girer. */
   watchReviewAt: string | null;
+}
+
+/**
+ * Tek hiyerarşi (2026-08-19 kullanıcı kararı) — Kuyruk/Panom'da üç ayrı, birbirinden habersiz
+ * "kim kazanır" mantığı vardı (Panom grubu: final??mine; Kuyruk sıralaması: final??mine, yoksa
+ * ham banda düş; görünen rozet/nokta: HER ZAMAN ham AI bandı, kararların hiç etkisi yoktu; AI
+ * Yorumcusu hiçbir yerde işlevsel değildi, yalnız etiketti). Artık TEK yer, sunucu (`build-card-
+ * view.ts`) ve istemci (`PanomBoard.tsx`'in canlı override'ları) aynı fonksiyonu çağırıyor.
+ *
+ * Sıra: Kesinleşmiş (kilitli ekip kararı) > Kişisel karar > AI Yorumcusu (tartışma yapıldıysa)
+ * > AI kompozit bandı (hiçbiri yoksa varsayılan). AI Yorumcusu admin-only veri olduğu için
+ * (`load-debates.ts`: admin değilse harita hep boş döner) bu katman admin olmayanlarda zaten
+ * doğal olarak atlanır — ekstra dallanma gerekmiyor.
+ */
+export function resolveEffectiveBand(
+  aiBand: Band,
+  mine: Decision | null,
+  finalDecision: Decision | null,
+  debateVerdict: Band | null,
+): Band {
+  return finalDecision ?? mine ?? debateVerdict ?? aiBand;
 }

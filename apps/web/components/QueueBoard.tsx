@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CardView } from "../lib/card-view";
+import { resolveEffectiveBand, type CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
 import { QueueRow } from "./QueueRow";
@@ -176,11 +176,15 @@ export function QueueBoard({
       const mine = localMine.has(i.id) ? localMine.get(i.id)! : i.mine;
       const finalOv = localFinal.has(i.id) ? localFinal.get(i.id) : undefined;
       if (!localMine.has(i.id) && finalOv === undefined) return i;
+      const finalDecision = finalOv === undefined ? i.finalDecision : (finalOv?.decision ?? null);
       return {
         ...i,
         mine,
-        finalDecision: finalOv === undefined ? i.finalDecision : (finalOv?.decision ?? null),
+        finalDecision,
         finalDecidedBy: finalOv === undefined ? i.finalDecidedBy : (finalOv?.decidedBy ?? null),
+        // Kararla birlikte anında güncellenmezse nokta rengi/sıralama sayfa yenilenene kadar
+        // eski AI bandını gösterip dururdu (2026-08-19 bulgusu) — aynı hiyerarşiyi burada da uygula.
+        effectiveBand: resolveEffectiveBand(i.band, mine, finalDecision, i.debates[0]?.final_verdict ?? null),
       };
     });
   }, [items, localMine, localFinal]);
@@ -192,8 +196,8 @@ export function QueueBoard({
   const counts = useMemo(() => {
     let pursue = 0, watch = 0, kill = 0, bench = 0, undecided = 0;
     for (const i of resolved) {
-      if (i.band === "pursue") pursue++;
-      else if (i.band === "watch") watch++;
+      if (i.effectiveBand === "pursue") pursue++;
+      else if (i.effectiveBand === "watch") watch++;
       else kill++;
       if (i.bench) bench++;
       if (i.mine === null) undecided++;
@@ -216,7 +220,7 @@ export function QueueBoard({
       if (benchOnly && !i.bench) return false;
       if (newOnly && !newIds.has(i.id)) return false;
       if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
-      if (bandFilter.size > 0 && !bandFilter.has(i.band)) return false;
+      if (bandFilter.size > 0 && !bandFilter.has(i.effectiveBand)) return false;
       if (activity !== "all") {
         const a = activityOf(i, meName);
         if (activity === "mine" && !a.mine) return false;
@@ -226,7 +230,8 @@ export function QueueBoard({
       return true;
     });
     if (sort === "recent") list = [...list].sort((a, b) => freshness(b) - freshness(a));
-    else if (sort === "band") list = [...list].sort((a, b) => BAND_RANK[a.band] - BAND_RANK[b.band] || b.fit - a.fit);
+    else if (sort === "band")
+      list = [...list].sort((a, b) => BAND_RANK[a.effectiveBand] - BAND_RANK[b.effectiveBand] || b.fit - a.fit);
     else if (sort === "confidence")
       list = [...list].sort((a, b) => CONFIDENCE_RANK[a.confidence] - CONFIDENCE_RANK[b.confidence] || b.fit - a.fit);
     else if (sort === "comments") list = [...list].sort((a, b) => b.comments.length - a.comments.length || b.fit - a.fit);

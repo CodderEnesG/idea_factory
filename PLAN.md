@@ -985,3 +985,30 @@ kilitlenip `final_decisions`'a satır yazıldığı, sonra kilit açılıp satı
 sorgusuyla doğrulandı, UI baştan sona doğru güncellendi. Test edilmeyen tek parça: kanban'ın
 kendi sürükle-bırak (HTML5 DnD) etkileşimi — buton yoluyla aynı uç noktaya (`/api/decisions/
 final`) gidildiği doğrulandı, ama drag event'lerinin kendisi denenmedi.
+
+## 19. Tek "etkin bant" hiyerarşisi — Kuyruk/Panom'da 3 ayrı çelişen mantık birleştirildi (2026-08-19)
+
+Kullanıcı bulgusu: "sistemin otomatik analizi (Kovala vb), AI tartışma odası ve kullanıcıların
+sonuçları hepsi farklı, nasıl bütünleştirilmeli?" Kod taramasıyla doğrulandı — üç ayrı,
+birbirinden habersiz "kim kazanır" mantığı vardı: Panom'un sütun gruplaması (`final ?? mine`),
+Kuyruk'un sıralaması (`final ?? mine`, yoksa ham AI bandı), ve görünen büyük rozet/nokta rengi
+(HER ZAMAN ham AI kompozit bandı — kararların hiç etkisi yoktu). AI Yorumcusu (tartışma odası)
+hiçbir yerde işlevsel değildi, yalnız "Yorumcu: X" etiketiydi.
+
+**Uygulanan tek hiyerarşi** (`apps/web/lib/card-view.ts::resolveEffectiveBand`, 5 test):
+**Kesinleşmiş (kilitli) > Kişisel karar > AI Yorumcusu (tartışma yapıldıysa) > AI kompozit
+bandı.** AI Yorumcusu admin-only veri olduğu için (`load-debates.ts`) bu katman admin
+olmayanlarda doğal olarak atlanır. Yeni `CardView.effectiveBand` alanı sunucuda
+(`build-card-view.ts`) tek yerde hesaplanır; `QueueRow` (nokta/kenar rengi), `DetailPanel`
+(üst rozet + FitRing — artık "AI: X · Sen: Y · Yorumcu: Z" dökümüyle birlikte), `QueueBoard`
+(sayaçlar/filtre/"bant" sıralaması, karar verilince ANINDA — sayfa yenilenmeden — yeniden
+hesaplanır) hepsi bunu kullanıyor. `queue/page.tsx`'in sunucu sıralaması da AI Yorumcusu
+katmanını içerecek şekilde genişletildi. **Panom'un kendi `final ?? mine` mantığına
+dokunulmadı** — bilinçli: Panom'un üyelik filtresi zaten final/mine'dan birini garanti eder,
+AI Yorumcusu/ham banda hiç düşülmez (Panom = "ne karar verdik", Kuyruk = "sistem şu an ne
+düşünüyor"). Harita/trend/metrics.ts'in ham `composite().band` kullanımına kasıtlı
+dokunulmadı — onlar AI'ın kendi ham görüşünü haritalıyor, karar-ayarlı görünüm değil.
+
+Doğrulama: `tsc --noEmit` + `pnpm -r test` (117/117 web) yeşil, gerçek Supabase'e karşı canlı
+test edildi (`/browse`, muhammed hesabı) — Kuyruk'ta İzle işaretlenince üst rozet/nokta/sayaçlar
+anında turuncuya döndü, Panom'da aynı sinyal doğru sütuna (İzle) düştü.

@@ -28,14 +28,16 @@ export default async function Queue() {
     loadLensRegistry(),
     loadDebates(isAdmin),
   ]);
-  // Geri-besleme döngüsü (PLAN.md §10): kesinleşmiş karar (varsa) > kendi kararım > AI bandı.
-  // Kesinleşmiş "resmi" karar en yüksek önceliğe sahip — problem 1/2 ("netice belirlenmiyor,
-  // fırsat ayırt edilemiyor"): ekip artık AI'ın önerisi yerine gerçekten karara varılanı görür.
+  // Geri-besleme döngüsü (PLAN.md §10, 2026-08-19 genişletme): kesinleşmiş karar > kendi kararım
+  // > AI Yorumcusu > AI bandı (bkz. card-view.ts resolveEffectiveBand — sıralama burada da AYNI
+  // hiyerarşiyi izler, aksi halde satırın rengiyle sıralaması çelişirdi). Kesinleşmiş "resmi"
+  // karar en yüksek önceliğe sahip — problem 1/2 ("netice belirlenmiyor, fırsat ayırt edilemiyor").
   const myBand = new Map<string, Decision>();
   for (const item of items) {
     const final = finalDecisions.get(item.signal.id)?.decision;
     const mine = decisions.get(item.signal.id)?.find((d) => d.user === meName)?.decision;
-    const band = final ?? mine;
+    const debateVerdict = debates.get(item.signal.id)?.[0]?.final_verdict;
+    const band = final ?? mine ?? debateVerdict;
     if (band) myBand.set(item.signal.id, band);
   }
   const cards = rank(items, {

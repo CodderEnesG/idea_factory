@@ -61,7 +61,10 @@ export function DetailPanel({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
-  const band = BAND[item.band];
+  const band = BAND[item.band]; // ham AI kompozit bandı — yalnız "AI:" dökümünde kullanılır
+  // Kesinleşmiş > kişisel > AI Yorumcusu > AI bandı — bkz. card-view.ts resolveEffectiveBand.
+  // Üst rozet/FitRing artık "sistem şu an ne diyor"u gösterir, ham AI görüşünü değil.
+  const effective = BAND[item.effectiveBand];
   const hasDetail = !item.noData && item.lensViews.length > 0;
   const comments = useComments(item.id, item.comments);
   const debate = useDebate(item.id, item.debates);
@@ -133,7 +136,7 @@ export function DetailPanel({
       {/* ── sabit bağlam başlığı (sürüklenemez, sade, ortalanmış) ── */}
       <div className="shrink-0 border-b border-white/[0.14] bg-surface px-5 py-3.5">
         <div className="mx-auto flex max-w-3xl items-start gap-3">
-          <FitRing fit={item.fit} hex={band.hex} size={40} />
+          <FitRing fit={item.fit} hex={effective.hex} size={40} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <a
@@ -161,13 +164,19 @@ export function DetailPanel({
               </span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-mono text-xs text-ink-muted">
-              <span className={`inline-flex items-center gap-1 ${band.text}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${band.dot}`} /> {band.label}
+              <span className={`inline-flex items-center gap-1 ${effective.text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${effective.dot}`} /> {effective.label}
               </span>
               <span>· güven: {CONFIDENCE_LABEL[item.confidence]}</span>
-              {item.mine !== null && item.finalDecision === null && (
+              <span className={`inline-flex items-center gap-1 ${band.text}`}>· AI: {band.label}</span>
+              {item.mine !== null && (
                 <span className={`inline-flex items-center gap-1 ${BAND[item.mine].text}`}>
                   · Sen: {BAND[item.mine].label}
+                </span>
+              )}
+              {latestDebate && (
+                <span className={`inline-flex items-center gap-1 ${BAND[latestDebate.final_verdict].text}`}>
+                  · Yorumcu: {BAND[latestDebate.final_verdict].label}
                 </span>
               )}
               {item.finalDecision !== null && (

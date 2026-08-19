@@ -10,7 +10,7 @@ import type { Decision, UserDecision } from "../components/DecisionButtons";
 import type { Comment } from "../components/Comments";
 import type { TaskItem } from "../components/TaskList";
 import type { FinalDecision } from "./load-final-decisions";
-import type { CardView, DebateView, Fact } from "./card-view";
+import { resolveEffectiveBand, type CardView, type DebateView, type Fact } from "./card-view";
 
 const KIND_LABEL: Record<string, string> = {
   venture: "girişim",
@@ -84,6 +84,8 @@ export function buildCardView(
     fit: comp.fit,
     confidence: comp.confidence,
     band: comp.band,
+    // debates[0] = en son tartışma (load-debates.ts created_at DESC sıralar).
+    effectiveBand: resolveEffectiveBand(comp.band, mine, final?.decision ?? null, debates[0]?.final_verdict ?? null),
     bench: isBench(comp),
     notActionable,
     noData,

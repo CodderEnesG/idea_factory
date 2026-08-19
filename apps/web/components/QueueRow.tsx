@@ -26,7 +26,9 @@ export function QueueRow({
   selectMode?: boolean;
   isNew?: boolean;
 }) {
-  const band = BAND[item.band];
+  // Kesinleşmiş/kişisel/AI Yorumcusu hiyerarşisinin sonucu — bkz. card-view.ts
+  // resolveEffectiveBand. Ham AI bandı değil, "sistem şu an ne diyor" burada.
+  const band = BAND[item.effectiveBand];
   return (
     // `role="button"` (native <button> değil): satırın sonunda ayrı bir gerçek <button>
     // (OpportunityMenu) barındırıyor — buton içine buton HTML'de geçersiz/erişilebilirlik
@@ -42,7 +44,7 @@ export function QueueRow({
         }
       }}
       className={`flex w-full cursor-pointer items-center gap-2 border-l-[3px] px-3 py-2 text-left text-[13px] transition ${
-        selected ? `${BORDER_BY_BAND[item.band]} bg-white/[0.05]` : "border-l-transparent hover:bg-white/[0.025]"
+        selected ? `${BORDER_BY_BAND[item.effectiveBand]} bg-white/[0.05]` : "border-l-transparent hover:bg-white/[0.025]"
       }`}
     >
       {selectMode ? (

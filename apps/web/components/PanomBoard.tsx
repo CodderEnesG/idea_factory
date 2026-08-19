@@ -68,6 +68,11 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
       // Kilit açılıp kişisel karar da hiç yoksa (bu üye hiç oy vermemiş) kart Panom'da
       // durmasının anlamı kalmaz — Kuyruk'un kararsızlar listesine geri düşer.
       if (mine === null && !finalOv) continue;
+      // resolveEffectiveBand (card-view.ts) ile aynı ilk iki basamak (final > kişisel) —
+      // burada AI Yorumcusu/ham AI bandına hiç düşülmez, çünkü yukarıdaki filtre zaten
+      // final veya mine'dan birinin var olmasını garanti eder (Panom = yalnız karar verilmiş
+      // sinyaller). Kuyruk'ta karar yoksa AI/Yorumcu'ya düşen sinyaller burada hiç görünmez —
+      // bu bilinçli: Panom "ne karar verdik", Kuyruk "sistem şu an ne düşünüyor" sorusuna cevap verir.
       const effective = finalOv?.decision ?? mine!;
       out.push({ ...c, mine, effective, locked: finalOv !== null, lockedBy: finalOv?.decidedBy ?? null });
     }
