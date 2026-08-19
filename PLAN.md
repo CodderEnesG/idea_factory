@@ -963,5 +963,10 @@ render edildi. Kanban'ın gerçek veri üzerindeki sürükle-bırak/sütun davra
 edilemedi (DB gerekiyor) — kod incelemesi + tip kontrolü + Kuyruk'ta doğrulanan aynı fetch
 deseniyle güvence altına alındı.
 
-**Kullanıcıda bekleyen:** `0013_final_decisions.sql`'i Supabase SQL Editor'den uygula (mevcut
-`0010_digests.sql` de hâlâ bekliyor, bkz. §11 madde 7).
+**Durum (2026-08-18 doğrulandı):** `0013_final_decisions.sql` ve `0010_digests.sql` ikisi de
+Supabase'e UYGULANMIŞ (REST API ile doğrulandı, digests dolu). Kilitle/kilit-aç akışı gerçek
+Supabase'e ve gerçek `muhammed` hesabına karşı canlı test edildi (`/browse`): bir sinyal
+kilitlenip `final_decisions`'a satır yazıldığı, sonra kilit açılıp satırın silindiği REST
+sorgusuyla doğrulandı, UI baştan sona doğru güncellendi. Test edilmeyen tek parça: kanban'ın
+kendi sürükle-bırak (HTML5 DnD) etkileşimi — buton yoluyla aynı uç noktaya (`/api/decisions/
+final`) gidildiği doğrulandı, ama drag event'lerinin kendisi denenmedi.
