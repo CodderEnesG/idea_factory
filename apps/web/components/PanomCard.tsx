@@ -75,7 +75,12 @@ export function PanomCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <span className="font-mono text-xs text-ink-secondary">{item.fit}</span>
+          <span
+            title="AI fit skoru — Sen/Yorumcu kararı farklıysa sütun yerleşimi onlara göredir"
+            className="font-mono text-xs text-ink-secondary"
+          >
+            {item.fit}
+          </span>
           <OpportunityMenu url={item.url} />
         </div>
       </div>
