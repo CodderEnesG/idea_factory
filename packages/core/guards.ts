@@ -10,6 +10,7 @@ export interface GuardContext {
   lensId?: string;
   traction?: string | null;
   markets?: string[];
+  capitalIntensity?: "low" | "medium" | "high" | "unknown";
 }
 
 /** Kovalanamaz sinyal için fit tavanı — üstü "meta-öğrenme" rasyonalizasyonudur. */
@@ -83,6 +84,18 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
         "arbitraj tabanı eksik: ne başka pazarda kanıt (traction) ne TR/MENA wedge'i var — fit 80+ olamaz",
       );
     }
+  }
+
+  // (h) bootstrap kanıtı: tez sermaye aralığı ~$0-100K'dır (thesis.config.ts capital_range).
+  // Kaynak şirketin büyük fonlama alması (traction) OLUMLU kanıt olsa da, TÜRKİYE'DE
+  // KURULACAK VERSİYONUN kendisi sermaye-yoğun bir operasyon (donanım/envanter/fiziksel
+  // altyapı) gerektiriyorsa bootstrap teziyle çelişir (bkz. ARBITRAGE_SEED_LENS soru 1).
+  // "unknown" bloklanmaz — yalnız KESİN "high" durumunda, aksi halde eksik veri yüzünden
+  // gereğinden fazla ret riski olur (traction guard'ından farklı: orada yokluk da ret sebebi).
+  if (ctx.lensId === "arbitrage" && a.fit >= 80 && ctx.capitalIntensity === "high") {
+    v.push(
+      "bootstrap kanıtı eksik: capital_intensity=high (sermaye-yoğun operasyon) ama fit 80+ — tez sermaye aralığı ~$0-100K ile çelişir",
+    );
   }
 
   return v;

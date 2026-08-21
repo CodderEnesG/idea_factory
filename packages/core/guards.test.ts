@@ -175,3 +175,44 @@ describe("arbitraj tabanı guard'ı (g) — 2026-08-19, AI Yorumcusu bulgusu", (
     expect(checkAnalysisGuards(base)).toEqual([]);
   });
 });
+
+describe("bootstrap kanıtı guard'ı (h) — 2026-08-21, ölçek uygunluğu kalibrasyonu", () => {
+  it("capital_intensity=high iken traction/wedge olsa da 80+ reddedilir", () => {
+    const v = checkAnalysisGuards(base, {
+      lensId: "arbitrage",
+      traction: "500+ ücretli kullanıcı",
+      markets: ["Türkiye"],
+      capitalIntensity: "high",
+    });
+    expect(v.some((x) => x.includes("bootstrap kanıtı eksik"))).toBe(true);
+  });
+
+  it("capital_intensity=low/medium/unknown iken engellemez", () => {
+    for (const ci of ["low", "medium", "unknown"] as const) {
+      const v = checkAnalysisGuards(base, {
+        lensId: "arbitrage",
+        traction: "500+ ücretli kullanıcı",
+        markets: ["Türkiye"],
+        capitalIntensity: ci,
+      });
+      expect(v.some((x) => x.includes("bootstrap kanıtı eksik"))).toBe(false);
+    }
+  });
+
+  it("fit 80 altındaysa capital_intensity=high olsa da devreye girmez", () => {
+    const watch = {
+      ...base,
+      fit: 70,
+      recommended_action: "watch" as const,
+      confidence: "med" as const,
+      validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }],
+    };
+    const v = checkAnalysisGuards(watch, { lensId: "arbitrage", capitalIntensity: "high" });
+    expect(v.some((x) => x.includes("bootstrap kanıtı eksik"))).toBe(false);
+  });
+
+  it("başka bir mercekte (white_space, custom) hiç devreye girmez", () => {
+    const v = checkAnalysisGuards(base, { lensId: "white_space", capitalIntensity: "high" });
+    expect(v.some((x) => x.includes("bootstrap kanıtı eksik"))).toBe(false);
+  });
+});

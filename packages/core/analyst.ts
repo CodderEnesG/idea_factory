@@ -115,6 +115,7 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
       lensId: lens.id,
       traction: enrParsed.success ? enrParsed.data.traction : undefined,
       markets: enrParsed.success ? enrParsed.data.markets : undefined,
+      capitalIntensity: enrParsed.success ? enrParsed.data.capital_intensity : undefined,
     });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;
