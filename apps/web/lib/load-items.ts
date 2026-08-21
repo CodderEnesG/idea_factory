@@ -13,7 +13,12 @@ const MAX_PAGES = 20;
 // 2026-08-21 grep'iyle doğrulandı). `type`/`summary_raw`/`content_hash`/`enriched_at` hiçbir
 // yerde okunmuyor — `signals(*)` yerine bunları seçmek payload'ı ~%20 küçültüyor (enrichment
 // JSONB'si zaten baskın kalem, o yüzden bu kadarla sınırlı).
-const SIGNAL_COLUMNS = "id, source, market, sector, posted_at, fetched_at, enrichment, watch_review_at";
+// DİKKAT: `title` ve `url` kart başlığı/linki için ZORUNLU — önceki sürümde bunlar grep
+// sonucunda görülüp listeye yazılırken atlanmıştı, kartlar boş başlık+href'siz link render
+// ediyordu (2026-08-21, /design-review ile Panom'da yakalandı). Bu satırı değiştirirken
+// PanomCard.tsx / build-card-view.ts'nin okuduğu TÜM alanları tekrar grep'le.
+const SIGNAL_COLUMNS =
+  "id, source, title, url, market, sector, posted_at, fetched_at, enrichment, watch_review_at";
 
 /** Tüm merceklerin analiz satırlarını çeker, sinyal başına `analyses` haritasında gruplar.
  *  `/queue`, `/harita`, `/trend` paylaşır — Supabase env yoksa DEMO_ITEMS'a düşer. */
