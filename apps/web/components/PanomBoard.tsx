@@ -190,7 +190,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
     <div className="flex h-screen overflow-hidden">
       <AppSidebar me={me} current="panom" />
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-white/[0.12] px-6 py-5">
+        <header className="shrink-0 border-b border-white/[0.12] px-6 pt-16 pb-5 md:pt-5">
           <h1 className="font-display text-2xl font-bold">Panom</h1>
           <p className="mt-1 text-sm text-ink-secondary">
             {resolved.length} karar verilmiş sinyal · sürükle = kendi kararın, kilitle = ekip kararı
@@ -254,7 +254,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
         ) : filtered.length === 0 ? (
           <p className="p-6 text-sm text-ink-muted">Bu filtrelerle eşleşen karar yok.</p>
         ) : (
-          <div className="grid min-h-0 flex-1 grid-cols-3 divide-x divide-white/[0.1] overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.1] overflow-y-auto md:grid md:grid-cols-3 md:divide-x md:divide-y-0 md:overflow-hidden">
             {/* Kovala */}
             <KanbanColumn
               group={GROUPS[0]!}
@@ -410,14 +410,14 @@ function KanbanColumn({
         onDragLeave();
       }}
       onDrop={onDrop}
-      className={`flex min-h-0 flex-col overflow-hidden transition ${dragOver ? "bg-white/[0.04]" : ""}`}
+      className={`flex min-h-0 shrink-0 flex-col overflow-visible transition md:min-h-0 md:shrink md:overflow-hidden ${dragOver ? "bg-white/[0.04]" : ""}`}
     >
       <div className="flex shrink-0 items-center gap-2 px-4 pb-3 pt-4">
         <span className={`h-2 w-2 rounded-full ${group.dot}`} />
         <h2 className={`font-display text-sm font-semibold ${group.text}`}>{group.label}</h2>
         <span className="font-mono text-xs text-ink-muted">({count})</span>
       </div>
-      <div className="scroll-emphasis min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">{children}</div>
+      <div className="scroll-emphasis min-h-0 flex-1 space-y-2.5 overflow-visible px-4 pb-4 md:overflow-y-auto">{children}</div>
     </div>
   );
 }

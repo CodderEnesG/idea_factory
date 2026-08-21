@@ -27,7 +27,7 @@ export default async function DigestPage({
     <div className="flex h-screen overflow-hidden">
       <AppSidebar me={me} current="digest" />
       <main className="min-w-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-6 pt-16 pb-8 md:pt-8">
         <header className="mb-6">
           <h1 className="font-display text-3xl font-bold">Digest</h1>
           <p className="mt-1 text-sm text-ink-secondary">

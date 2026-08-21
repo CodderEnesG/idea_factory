@@ -158,7 +158,7 @@ export default async function AdminPage({
     return (
       <div className="flex h-screen overflow-hidden">
         <AppSidebar me={me} current={initialTab} />
-        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-ink-muted">
+        <div className="min-w-0 flex-1 overflow-y-auto px-6 pt-24 pb-16 text-center text-sm text-ink-muted md:pt-16">
           Bu sayfa yalnız adminlere açık.
         </div>
       </div>

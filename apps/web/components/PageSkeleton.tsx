@@ -5,7 +5,7 @@
  *  ikon+metin satırları, alt hesap satırı (avatar + ayarlar + çıkış ikonu). */
 export function SidebarSkeleton() {
   return (
-    <div className="flex h-full w-[300px] shrink-0 flex-col border-r border-white/[0.12] px-3 py-4">
+    <div className="hidden h-full w-[300px] shrink-0 flex-col border-r border-white/[0.12] px-3 py-4 md:flex">
       <div className="mb-3 flex shrink-0 items-center justify-between gap-1 px-1.5">
         <div className="flex items-center gap-2.5">
           <span className="h-3 w-3 rounded-full bg-gradient-to-br from-brand to-brand2" />
@@ -32,7 +32,7 @@ export function PageSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <SidebarSkeleton />
-      <main className="min-w-0 flex-1 overflow-hidden px-6 py-8">
+      <main className="min-w-0 flex-1 overflow-hidden px-6 pt-16 pb-8 md:pt-8">
         <div className="mx-auto max-w-6xl animate-pulse space-y-4">
           <div className="h-8 w-56 rounded-btn bg-white/[0.06]" />
           <div className="h-4 w-72 rounded-btn bg-white/[0.04]" />

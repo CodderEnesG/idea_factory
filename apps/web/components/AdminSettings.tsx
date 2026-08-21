@@ -41,26 +41,28 @@ export function AdminSettings({
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl gap-8 px-6 py-10">
-      <nav className="w-44 shrink-0 space-y-0.5">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 pt-16 pb-10 md:flex-row md:gap-8 md:pt-10">
+      <nav className="md:w-44 md:shrink-0">
         <h1 className="mb-4 px-2.5 font-display text-lg font-bold text-ink">Ayarlar</h1>
-        {TABS.map((t) => {
-          const isActive = t.key === active;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => selectTab(t.key)}
-              aria-current={isActive}
-              className={`flex w-full items-center gap-2.5 rounded-btn px-2.5 py-2 text-left text-sm transition ${
-                isActive ? "bg-white/[0.06] text-ink" : "text-ink-secondary hover:bg-white/[0.03] hover:text-ink"
-              }`}
-            >
-              <t.icon className="h-4 w-4 shrink-0" />
-              {t.label}
-            </button>
-          );
-        })}
+        <div className="flex gap-0.5 overflow-x-auto md:flex-col md:space-y-0.5 md:overflow-visible">
+          {TABS.map((t) => {
+            const isActive = t.key === active;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => selectTab(t.key)}
+                aria-current={isActive}
+                className={`flex shrink-0 items-center gap-2.5 rounded-btn px-2.5 py-2 text-left text-sm transition md:w-full ${
+                  isActive ? "bg-white/[0.06] text-ink" : "text-ink-secondary hover:bg-white/[0.03] hover:text-ink"
+                }`}
+              >
+                <t.icon className="h-4 w-4 shrink-0" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </nav>
       <div className="min-w-0 flex-1">{content[active]}</div>
     </div>

@@ -134,7 +134,7 @@ export function DetailPanel({
     // React state'i taşırdı — bu bug'ı daha önce bulup baştan önledik).
     <div key={item.id} ref={rootRef} className="flex h-full flex-col">
       {/* ── sabit bağlam başlığı (sürüklenemez, sade, ortalanmış) ── */}
-      <div className="shrink-0 border-b border-white/[0.14] bg-surface px-5 py-3.5">
+      <div className="shrink-0 border-b border-white/[0.14] bg-surface px-5 pb-3.5 pt-14 md:pt-3.5">
         <div className="mx-auto flex max-w-3xl items-start gap-3">
           <FitRing fit={item.fit} hex={effective.hex} size={40} />
           <div className="min-w-0 flex-1">

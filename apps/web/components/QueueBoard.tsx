@@ -585,7 +585,7 @@ export function QueueBoard({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {demo && (
-          <div className="shrink-0 border-b border-strong bg-elevated px-5 py-2 text-sm text-brand">
+          <div className="shrink-0 border-b border-strong bg-elevated py-2 pl-14 pr-5 text-sm text-brand md:pl-5">
             Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
           </div>
         )}

@@ -12,6 +12,8 @@ import {
   IconGlobe,
   IconTrendingUp,
   IconMessage,
+  IconMenu,
+  IconX,
 } from "./icons";
 import type { SessionUser } from "../lib/session";
 
@@ -102,6 +104,10 @@ export function AppSidebar({
 }) {
   const [moreOpen, setMoreOpen] = useState(current ? REPORT_KEYS.includes(current) : false);
   const [collapsed, setCollapsed] = useState(false);
+  // <768px: kenar çubuğu varsayılan kapalı bir "drawer" (bkz. render — fixed + -translate-x-full).
+  // Sayfa değişince AppSidebar yeniden mount olduğu için (yukarıdaki not) her navigasyonda
+  // kendiliğinden false'a döner, ayrıca kapatmaya gerek yok.
+  const [mobileOpen, setMobileOpen] = useState(false);
   const active = (k: NavKey) => k === current;
   const onAdminPage = current ? ADMIN_KEYS.includes(current) : false;
 
@@ -128,10 +134,31 @@ export function AppSidebar({
   }
 
   return (
-    <div
-      className="flex h-full shrink-0 flex-col border-r border-white/[0.12] bg-surface px-3 py-4 transition-[width] duration-150"
-      style={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
-    >
+    <>
+      {/* <768px: kenar çubuğu ekran dışında dururken menüyü açan sabit buton (bkz. drawer notu). */}
+      {!mobileOpen && (
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Menüyü aç"
+          className="fixed left-3 top-3 z-50 grid h-9 w-9 place-items-center rounded-btn border border-white/[0.12] bg-surface text-ink-secondary shadow-lg md:hidden"
+        >
+          <IconMenu className="h-4 w-4" />
+        </button>
+      )}
+      {/* Arka plan örtüsü: dışarı tıklayınca kapansın (mobil drawer deseni). */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-[45] flex h-full shrink-0 flex-col border-r border-white/[0.12] bg-surface px-3 py-4 transition-transform duration-200 md:static md:translate-x-0 md:transition-[width] md:duration-150 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{ width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
+      >
       <div
         className={`mb-3 flex shrink-0 items-center gap-1 px-1.5 ${collapsed ? "justify-center" : "justify-between"}`}
       >
@@ -146,11 +173,18 @@ export function AppSidebar({
             onClick={toggleCollapsed}
             title="Kenar çubuğunu daralt"
             aria-label="Kenar çubuğunu daralt"
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-btn text-ink-muted transition hover:bg-white/[0.05] hover:text-ink"
+            className="hidden h-6 w-6 shrink-0 place-items-center rounded-btn text-ink-muted transition hover:bg-white/[0.05] hover:text-ink md:grid"
           >
             <IconChevronLeft className="h-3.5 w-3.5" />
           </button>
         )}
+        <button
+          onClick={() => setMobileOpen(false)}
+          aria-label="Menüyü kapat"
+          className="grid h-6 w-6 shrink-0 place-items-center rounded-btn text-ink-muted transition hover:bg-white/[0.05] hover:text-ink md:hidden"
+        >
+          <IconX className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {collapsed && (
@@ -252,6 +286,7 @@ export function AppSidebar({
           {me && <LogoutButton />}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
