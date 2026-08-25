@@ -5,12 +5,40 @@ import { tldr } from "./sources/tldr.js";
 import { webrazzi } from "./sources/webrazzi.js";
 import { techcrunch } from "./sources/techcrunch.js";
 import { ycombinator } from "./sources/ycombinator.js";
+import { webrazziFintech } from "./sources/webrazzi-fintech.js";
+import { webrazziEticaret } from "./sources/webrazzi-eticaret.js";
+import { techcrunchFintech } from "./sources/techcrunch-fintech.js";
+import { webrazziYazilim } from "./sources/webrazzi-yazilim.js";
+import { techcrunchEnterprise } from "./sources/techcrunch-enterprise.js";
+import { techcrunchCommerce } from "./sources/techcrunch-commerce.js";
+import { saastr } from "./sources/saastr.js";
+import { euStartups } from "./sources/eu-startups.js";
+import { sifted } from "./sources/sifted.js";
+import { fintechtime } from "./sources/fintechtime.js";
+import { finberg } from "./sources/finberg.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 import { loadActiveIngestionSettings, shouldSkipForInterval } from "./lib/ingestion-settings-db.js";
 import { limitPerSource } from "./lib/limit-per-source.js";
 
-const ALL_SOURCES: Source[] = [productHunt, tldr, webrazzi, techcrunch, ycombinator];
+const ALL_SOURCES: Source[] = [
+  productHunt,
+  tldr,
+  webrazzi,
+  techcrunch,
+  ycombinator,
+  webrazziFintech,
+  webrazziEticaret,
+  techcrunchFintech,
+  webrazziYazilim,
+  techcrunchEnterprise,
+  techcrunchCommerce,
+  saastr,
+  euStartups,
+  sifted,
+  fintechtime,
+  finberg,
+];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
 // URL uzunluk limitini aşıp "fetch failed" veriyordu (4 kaynak sonrası görüldü) → parçala.

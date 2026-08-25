@@ -1,7 +1,24 @@
 import { db } from "../db.js";
 
 // web/lib/source-health.ts'teki KNOWN_SOURCES ile senkron tutulmalı.
-const KNOWN_SOURCES = ["producthunt", "tldr", "webrazzi", "techcrunch", "ycombinator"];
+const KNOWN_SOURCES = [
+  "producthunt",
+  "tldr",
+  "webrazzi",
+  "techcrunch",
+  "ycombinator",
+  "webrazzi_fintech",
+  "webrazzi_eticaret",
+  "techcrunch_fintech",
+  "webrazzi_yazilim",
+  "techcrunch_enterprise",
+  "techcrunch_commerce",
+  "saastr",
+  "eu_startups",
+  "sifted",
+  "fintechtime",
+  "finberg",
+];
 
 export interface IngestionSettings {
   per_source_limit: number;

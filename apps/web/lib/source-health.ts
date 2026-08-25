@@ -1,7 +1,24 @@
 // Kaynak sağlığı (PLAN.md §11 madde 10). Kanonik kaynak listesi apps/worker/src/ingest.ts'teki
 // SOURCES dizisiyle senkron tutulmalı — yeni bir worker kaynağı eklenince buraya da eklenir.
 // tldr.ts alt-kategori başına farklı `source` yazıyor (ör. "tldr:founders") — hepsi "tldr" altında toplanır.
-export const KNOWN_SOURCES = ["producthunt", "tldr", "webrazzi", "techcrunch", "ycombinator"] as const;
+export const KNOWN_SOURCES = [
+  "producthunt",
+  "tldr",
+  "webrazzi",
+  "techcrunch",
+  "ycombinator",
+  "webrazzi_fintech",
+  "webrazzi_eticaret",
+  "techcrunch_fintech",
+  "webrazzi_yazilim",
+  "techcrunch_enterprise",
+  "techcrunch_commerce",
+  "saastr",
+  "eu_startups",
+  "sifted",
+  "fintechtime",
+  "finberg",
+] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WARN_AFTER_MS = 2 * DAY_MS; // cron günde 2 kez (07:00/19:00) — 2 gün sessizlik uyarı
