@@ -133,7 +133,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
-  console.error("ingest başarısız:", e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0)) // diğer worker script'leriyle aynı desen — undici keep-alive bekletmesin
+  .catch((e) => {
+    console.error("ingest başarısız:", e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
