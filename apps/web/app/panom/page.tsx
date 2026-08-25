@@ -53,7 +53,11 @@ export default async function PanomPage() {
         finalDecisions.get(item.signal.id) ?? null,
       );
     })
-    .filter((c) => c.mine !== null || c.finalDecision !== null);
+    // Panom eskiden yalnız BEN karar verdiysem ya da kilitliyse gösteriyordu — başka bir
+    // üyenin (ör. eski "web" varsayılan hesabı, ya da takım arkadaşı) verdiği karar hiç
+    // görünmüyordu (2026-08-24 kullanıcı bulgusu). Artık `c.others.length > 0` da sayılır;
+    // hangi kararın gösterileceği (final > mine > en son başkasınınki) PanomBoard'da çözülür.
+    .filter((c) => c.mine !== null || c.finalDecision !== null || c.others.length > 0);
 
   return <PanomBoard cards={cards} me={me} meName={meName} />;
 }

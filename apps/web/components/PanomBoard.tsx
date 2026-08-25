@@ -12,6 +12,8 @@ import { IconInbox, IconSearch } from "./icons";
 
 interface Resolved extends CardView {
   effective: Decision;
+  /** Gösterilen karar benim değil, kilitli de değilse kimin kararı olduğu (ör. "muhammed"). */
+  effectiveUser: string | null;
   locked: boolean;
   lockedBy: string | null;
 }
@@ -65,16 +67,20 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
         : c.finalDecision
           ? { decision: c.finalDecision, decidedBy: c.finalDecidedBy ?? "?" }
           : null;
-      // Kilit açılıp kişisel karar da hiç yoksa (bu üye hiç oy vermemiş) kart Panom'da
+      // Kimse (ne ben ne başka bir üye) karar vermemiş ve kilit de yoksa kart Panom'da
       // durmasının anlamı kalmaz — Kuyruk'un kararsızlar listesine geri düşer.
-      if (mine === null && !finalOv) continue;
-      // resolveEffectiveBand (card-view.ts) ile aynı ilk iki basamak (final > kişisel) —
-      // burada AI Yorumcusu/ham AI bandına hiç düşülmez, çünkü yukarıdaki filtre zaten
-      // final veya mine'dan birinin var olmasını garanti eder (Panom = yalnız karar verilmiş
-      // sinyaller). Kuyruk'ta karar yoksa AI/Yorumcu'ya düşen sinyaller burada hiç görünmez —
-      // bu bilinçli: Panom "ne karar verdik", Kuyruk "sistem şu an ne düşünüyor" sorusuna cevap verir.
-      const effective = finalOv?.decision ?? mine!;
-      out.push({ ...c, mine, effective, locked: finalOv !== null, lockedBy: finalOv?.decidedBy ?? null });
+      // `others[0]` en son karar (loadDecisions created_at DESC sıralar, bkz. card-view.ts).
+      const latestOther = c.others[0] ?? null;
+      if (mine === null && !finalOv && !latestOther) continue;
+      // Final > kişisel > başka birinin en son kararı (2026-08-24: herkesin gerçek "Kovala"
+      // kararı panoda görünsün istendi — eskiden yalnız BEN karar verdiysem ya da kilitliyse
+      // gösterirdi, takım arkadaşının/eski "web" hesabının kararı hiç görünmezdi).
+      // resolveEffectiveBand (card-view.ts) ile Kuyruk/rozet mantığından KASITLI farklı: o
+      // dördüncü basamakta ham AI bandına düşer, burada düşmez — Panom yalnız gerçekten karar
+      // verilmiş sinyalleri gösterir.
+      const effective = finalOv?.decision ?? mine ?? latestOther!.decision;
+      const effectiveUser = finalOv || mine !== null ? null : latestOther!.user;
+      out.push({ ...c, mine, effective, effectiveUser, locked: finalOv !== null, lockedBy: finalOv?.decidedBy ?? null });
     }
     return out;
   }, [cards, mineOverride, finalOverride]);
@@ -301,6 +307,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
                         key={item.id}
                         item={item}
                         effective={item.effective}
+                        effectiveUser={item.effectiveUser}
                         locked={item.locked}
                         lockedBy={item.lockedBy}
                         onLock={() => lock(item.id, "watch")}
@@ -446,6 +453,7 @@ function CardList({
           key={item.id}
           item={item}
           effective={item.effective}
+          effectiveUser={item.effectiveUser}
           locked={item.locked}
           lockedBy={item.lockedBy}
           onLock={() => onLock(item.id)}

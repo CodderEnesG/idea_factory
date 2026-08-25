@@ -27,6 +27,7 @@ const BORDER_BY_BAND: Record<Decision, string> = {
 export function PanomCard({
   item,
   effective,
+  effectiveUser = null,
   locked,
   lockedBy,
   onLock,
@@ -34,6 +35,8 @@ export function PanomCard({
 }: {
   item: CardView;
   effective: Decision;
+  /** Gösterilen karar benim değil, kilitli de değilse kimin kararı olduğu (ör. "muhammed"). */
+  effectiveUser?: string | null;
   locked: boolean;
   lockedBy: string | null;
   onLock: () => void;
@@ -42,6 +45,7 @@ export function PanomCard({
   const [showDetail, setShowDetail] = useState(false);
   const band = BAND[item.band];
   const mineBand = item.mine ? BAND[item.mine] : null;
+  const otherBand = !item.mine && effectiveUser ? BAND[effective] : null;
   const debate = item.debates[0];
   const doneTasks = item.tasks.filter((t) => t.done).length;
 
@@ -93,6 +97,13 @@ export function PanomCard({
             <span className="text-ink-muted">·</span>
             <span className="text-ink-muted">Sen:</span>
             <span className={`font-semibold ${mineBand.text}`}>{mineBand.label}</span>
+          </>
+        )}
+        {otherBand && (
+          <>
+            <span className="text-ink-muted">·</span>
+            <span className="text-ink-muted">{effectiveUser}:</span>
+            <span className={`font-semibold ${otherBand.text}`}>{otherBand.label}</span>
           </>
         )}
         {debate && (
