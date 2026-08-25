@@ -66,16 +66,26 @@ async function fetchShortlist(
   return { shortlist, skipped: window.length - scored.length };
 }
 
+// PostgREST sorgusu URL query string'e gömülür; ANALYZE_LIMIT büyütülünce (kısa liste
+// 800+ sinyale çıktığında) tek `.in()` çağrısı "Bad Request" ile patlıyordu (bkz. ingest.ts
+// EXISTING_CHUNK aynı sorun/çözüm) — parçala.
+const DONE_CHUNK = 200;
+
 /** Belirli bir mercek için, kısa liste içinden hangileri zaten analiz edilmiş. */
 async function doneSetFor(lensId: string, signalIds: string[]): Promise<Set<string>> {
   if (FORCE || signalIds.length === 0) return new Set();
-  const { data, error } = await db
-    .from("analyses")
-    .select("signal_id")
-    .eq("lens", lensId)
-    .in("signal_id", signalIds);
-  if (error) throw new Error(`analyses sorgu hatası: ${error.message}`);
-  return new Set((data ?? []).map((r) => r.signal_id as string));
+  const done = new Set<string>();
+  for (let i = 0; i < signalIds.length; i += DONE_CHUNK) {
+    const chunk = signalIds.slice(i, i + DONE_CHUNK);
+    const { data, error } = await db
+      .from("analyses")
+      .select("signal_id")
+      .eq("lens", lensId)
+      .in("signal_id", chunk);
+    if (error) throw new Error(`analyses sorgu hatası: ${error.message}`);
+    for (const r of data ?? []) done.add(r.signal_id as string);
+  }
+  return done;
 }
 
 async function main(): Promise<void> {
