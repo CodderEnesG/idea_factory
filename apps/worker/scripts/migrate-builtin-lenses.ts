@@ -20,6 +20,7 @@ async function seedIfMissing(def: CustomLensDef): Promise<void> {
     name: def.name,
     weight: def.weight,
     extra_note_label: def.extraNoteLabel,
+    grounding: def.grounding ?? false,
     questions: def.questions,
     active: true,
     created_by: "migration",

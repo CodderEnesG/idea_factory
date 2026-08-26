@@ -46,8 +46,41 @@ function TurnCard({ turn }: { turn: DebateTurnView }) {
  *  ayırt etsin diye ışıltı ikonu taşıyor. Tam transkript (tur tur gerekçe/kanıt) varsayılan
  *  gizli — "detayları göster" ile genişliyor, tekrar okumak isteyene okunaklı kalsın diye
  *  `TurnCard` metinleri sohbet balonlarıyla aynı `text-sm` taban boyutunu kullanıyor. */
-function DebateTranscript({ debate }: { debate: DebateView }) {
+function DebateTranscript({ debate, signalId }: { debate: DebateView; signalId: string }) {
   const [open, setOpen] = useState(false);
+  // Transkript liste sorgusunda YOK (FAZ6_PLAN.md §Faz 2.3) — kart açılınca lazy çekilir.
+  const [turns, setTurns] = useState(debate.transcript);
+  const [loading, setLoading] = useState(false);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const turnCount = debate.turn_count ?? turns?.length ?? 0;
+
+  async function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (turns) return;
+    setLoading(true);
+    setLoadErr(null);
+    try {
+      const res = await fetch(`/api/debates/${signalId}`);
+      const j = (await res.json().catch(() => null)) as
+        | { debates?: { id: string; transcript: DebateTurnView[] }[] }
+        | null;
+      const row = j?.debates?.find((d) => d.id === debate.id);
+      if (!row) {
+        setLoadErr("transkript bulunamadı");
+        return;
+      }
+      setTurns(row.transcript);
+    } catch {
+      setLoadErr("transkript yüklenemedi");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="flex items-start gap-2.5">
       <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-brand2 text-white">
@@ -68,16 +101,16 @@ function DebateTranscript({ debate }: { debate: DebateView }) {
           {debate.final_commentary}
         </p>
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggle}
           className="mt-2 text-xs font-medium text-brand hover:underline"
         >
-          {open ? "Tartışmanın tamamını gizle ▴" : `Tartışmanın tamamını gör — ${debate.transcript.length} tur ▾`}
+          {open ? "Tartışmanın tamamını gizle ▴" : `Tartışmanın tamamını gör — ${turnCount} tur ▾`}
         </button>
         {open && (
           <div className="mt-3 space-y-2 border-t border-hair pt-3">
-            {debate.transcript.map((t, i) => (
-              <TurnCard key={i} turn={t} />
-            ))}
+            {loading && <div className="text-xs text-ink-muted">Transkript yükleniyor…</div>}
+            {loadErr && <div className="text-xs text-kill">{loadErr}</div>}
+            {turns?.map((t, i) => <TurnCard key={i} turn={t} />)}
           </div>
         )}
       </div>
@@ -234,10 +267,13 @@ export function DebateFeed({
   debates,
   progress,
   error,
+  signalId,
 }: {
   debates: DebateView[];
   progress: Progress | null;
   error: string | null;
+  /** Transkriptler lazy yükleniyor — hangi sinyalin uç noktasına gidileceği. */
+  signalId: string;
 }) {
   if (debates.length === 0 && !progress && !error) return null;
   return (
@@ -247,7 +283,7 @@ export function DebateFeed({
       {debates.length > 0 && (
         <div className="mt-2 space-y-3">
           {debates.map((d) => (
-            <DebateTranscript key={d.id} debate={d} />
+            <DebateTranscript key={d.id} debate={d} signalId={signalId} />
           ))}
         </div>
       )}
@@ -273,7 +309,7 @@ export function DebateRoom({ signalId, initial }: { signalId: string; initial: D
           {busy ? "tartışıyorlar…" : "AI Yorumcusu başlat"}
         </button>
       </div>
-      <DebateFeed debates={debates} progress={progress} error={error} />
+      <DebateFeed debates={debates} progress={progress} error={error} signalId={signalId} />
     </div>
   );
 }

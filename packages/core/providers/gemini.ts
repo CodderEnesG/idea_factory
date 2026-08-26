@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import type { AnalystProvider, GenerateArgs } from "./types.js";
+import { isTimeoutError, llmTimeoutMs, timeoutError } from "../deadline.js";
 
 /**
  * Vertex/AI-Studio seçimi + auth kurulumu — GeminiProvider VE grounding.ts (PLAN.md §11
@@ -54,11 +55,23 @@ export class GeminiProvider implements AnalystProvider {
     if (/gemini-3/.test(this.model)) {
       config["thinkingConfig"] = { thinkingLevel: "low" };
     }
-    const res = await this.ai.models.generateContent({
-      model: this.model,
-      contents: user,
-      config,
-    });
+    // Zaman aşımı (FAZ6_PLAN.md §Faz 1.1): timeout'suz bir çağrı, asılan Vertex bağlantısında
+    // tick'i sonsuza kadar bekletir — cron.ts'in `running` guard'ı da kalıcı kilitlenir ve
+    // pipeline sessizce ölür. grounding.ts:44 aynı deseni bu SDK sürümünde zaten kullanıyor.
+    const ms = llmTimeoutMs();
+    config["abortSignal"] = AbortSignal.timeout(ms);
+    let res;
+    try {
+      res = await this.ai.models.generateContent({
+        model: this.model,
+        contents: user,
+        config,
+      });
+    } catch (e) {
+      // Çıplak AbortError log'da kota hatasından ayrılamıyordu — ayırt edilebilir mesaj.
+      if (isTimeoutError(e)) throw timeoutError(this.name, this.model, ms);
+      throw e;
+    }
     const text = res.text;
     if (!text) throw new Error("gemini: boş yanıt");
     return JSON.parse(text);

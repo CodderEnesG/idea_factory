@@ -53,6 +53,16 @@ jobs:
           TRIAGE_LIMIT: ${{ vars.TRIAGE_LIMIT || '100' }}
           ANALYZE_LIMIT: ${{ vars.ANALYZE_LIMIT || '40' }}
           ANALYZE_PER_SOURCE_CAP: ${{ vars.ANALYZE_PER_SOURCE_CAP || '12' }}
+          # Yorumcu kapısı (FAZ6_PLAN.md §Faz 2): her AI-kovala adayı 2 bağımsız tartışmadan
+          # geçer. TUR tavanı (sinyal değil) — günde ~2.3 aday x 2 tur + birikmiş kuyruk payı.
+          DEBATE_AUTO_LIMIT: ${{ vars.DEBATE_AUTO_LIMIT || '8' }}
+          # Asılan LLM bağlantısı tick'i sonsuza kadar bekletmesin.
+          LLM_TIMEOUT_MS: ${{ vars.LLM_TIMEOUT_MS || '90000' }}
+          ANALYZE_DEADLINE_MS: ${{ vars.ANALYZE_DEADLINE_MS || '240000' }}
+          DEBATE_DEADLINE_MS: ${{ vars.DEBATE_DEADLINE_MS || '300000' }}
+          # Grounding: yalnız `lenses.grounding = true` merceklerde (0015 → beyaz-alan).
+          GROUNDING_ENABLED: ${{ vars.GROUNDING_ENABLED || 'false' }}
+          GROUNDING_TIMEOUT_MS: ${{ vars.GROUNDING_TIMEOUT_MS || '30000' }}
           GEMINI_USE_VERTEX: "true"
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT || 'idea-factory-502619' }}
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION || 'us-central1' }}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeSourceHealth, canonicalSourceName } from "./source-health";
+import { computeSourceHealth, canonicalSourceName, KNOWN_SOURCES } from "./source-health";
 
 const NOW = new Date("2026-08-09T12:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
@@ -17,15 +17,13 @@ describe("canonicalSourceName", () => {
 });
 
 describe("computeSourceHealth", () => {
-  it("veri yokken 5 bilinen kaynağın hepsi 'never' ile döner", () => {
+  // Kaynak listesi 5 -> 16'ya çıktı (fintech/e-ticaret sektör boşluğu, 2026-08-25). Test
+  // sabit listeye bağlıydı ve o turda güncellenmemişti; artık KNOWN_SOURCES'tan türetiliyor
+  // ki yeni kaynak eklemek testi bir daha kırmasın.
+  it("veri yokken bilinen kaynakların hepsi 'never' ile döner", () => {
     const health = computeSourceHealth([], NOW);
-    expect(health.map((h) => h.name)).toEqual([
-      "producthunt",
-      "techcrunch",
-      "tldr",
-      "webrazzi",
-      "ycombinator",
-    ]);
+    expect(health.map((h) => h.name)).toEqual([...KNOWN_SOURCES].sort());
+    expect(health).toHaveLength(KNOWN_SOURCES.length);
     expect(health.every((h) => h.status === "never" && h.last7d === 0 && h.last30d === 0)).toBe(true);
   });
 

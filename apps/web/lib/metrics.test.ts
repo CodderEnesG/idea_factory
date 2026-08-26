@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
 import type { RankedItem, Signal, BaseAnalysis } from "@idea-factory/core";
-import { isQualified, weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal } from "./metrics";
+import {
+  isQualified,
+  weeklyQualified,
+  noiseRatio,
+  decisionRatio,
+  latestDecisionPerSignal,
+  pursuePrecision,
+  debateVerdictMix,
+  groundingCoverage,
+} from "./metrics";
 
 function sig(id: string, postedAt: string): Signal {
   return {
@@ -104,5 +113,97 @@ describe("weeklyQualified", () => {
     const bad: RankedItem = { signal: sig("bad", "not-a-date"), analyses: { arbitrage: analysis(90) } };
     const buckets = weeklyQualified([bad], 2);
     expect(buckets.reduce((s, b) => s + b.total, 0)).toBe(0);
+  });
+});
+
+describe("pursuePrecision — kapı gerçekten iş yapıyor mu (FAZ6 §Faz 5.5)", () => {
+  const row = (
+    signalId: string,
+    gatedBand: "pursue" | "watch" | "kill",
+    gate: "confirmed" | "caveat" | "pending" | "vetoed" | "n/a",
+    competition: string | null = null,
+  ) => ({ signalId, gatedBand, gate, competition });
+
+  it("yalnız kapılı bandı kovala OLAN ve insan kararı OLAN sinyaller sayılır", () => {
+    const rows = [
+      row("a", "pursue", "confirmed"),
+      row("b", "pursue", "caveat"),
+      row("c", "watch", "pending"), // kovala değil
+      row("d", "pursue", "confirmed"), // insan bakmamış
+    ];
+    const decisions = new Map<string, "pursue" | "watch" | "kill">([
+      ["a", "pursue"],
+      ["b", "kill"],
+      ["c", "pursue"],
+    ]);
+    const r = pursuePrecision(rows, decisions);
+    expect(r.overall.reviewed).toBe(2);
+    expect(r.overall.agreed).toBe(1);
+    expect(r.overall.precision).toBe(0.5);
+  });
+
+  it("kapı kırılımı: onaylı vs çekinceli ayrı ayrı ölçülür", () => {
+    const rows = [
+      row("a", "pursue", "confirmed"),
+      row("b", "pursue", "confirmed"),
+      row("c", "pursue", "caveat"),
+    ];
+    const decisions = new Map<string, "pursue" | "watch" | "kill">([
+      ["a", "pursue"],
+      ["b", "pursue"],
+      ["c", "kill"],
+    ]);
+    const r = pursuePrecision(rows, decisions);
+    expect(r.byGate.confirmed.precision).toBe(1);
+    expect(r.byGate.caveat.precision).toBe(0);
+  });
+
+  it("rekabet kovası kırılımı; beyaz-alan analizi olmayanlar 'yok' kovasında", () => {
+    const rows = [row("a", "pursue", "confirmed", "boş"), row("b", "pursue", "confirmed", null)];
+    const decisions = new Map<string, "pursue" | "watch" | "kill">([
+      ["a", "pursue"],
+      ["b", "kill"],
+    ]);
+    const r = pursuePrecision(rows, decisions);
+    expect(r.byCompetition["boş"]!.precision).toBe(1);
+    expect(r.byCompetition["yok"]!.precision).toBe(0);
+  });
+
+  it("hiç incelenmemişse precision null — 0 ile karıştırılmamalı", () => {
+    const r = pursuePrecision([row("a", "pursue", "confirmed")], new Map());
+    expect(r.overall.precision).toBeNull();
+    expect(r.overall.reviewed).toBe(0);
+  });
+});
+
+describe("debateVerdictMix", () => {
+  it("kovala/izle/ele sayar", () => {
+    expect(debateVerdictMix(["kill", "kill", "watch", "pursue"])).toEqual({
+      pursue: 1,
+      watch: 1,
+      kill: 2,
+    });
+  });
+
+  it("boş girdi hepsi sıfır", () => {
+    expect(debateVerdictMix([])).toEqual({ pursue: 0, watch: 0, kill: 0 });
+  });
+});
+
+describe("groundingCoverage — Faz 4'ün TEK ölçütü (taban %66)", () => {
+  it("yalnız hedef merceğin satırlarını sayar", () => {
+    const rows = [
+      { lens: "white_space", confidence: "low" },
+      { lens: "white_space", confidence: "high" },
+      { lens: "arbitrage", confidence: "low" }, // sayılmamalı
+    ];
+    const r = groundingCoverage(rows);
+    expect(r.total).toBe(2);
+    expect(r.low).toBe(1);
+    expect(r.lowRatio).toBe(0.5);
+  });
+
+  it("hiç satır yoksa oran null", () => {
+    expect(groundingCoverage([]).lowRatio).toBeNull();
   });
 });

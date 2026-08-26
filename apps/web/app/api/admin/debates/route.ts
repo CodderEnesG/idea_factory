@@ -57,6 +57,10 @@ export async function POST(req: Request) {
             transcript: result.transcript,
             final_verdict: result.final_verdict,
             final_commentary: result.final_commentary,
+            // Elle tetiklenen tartışma bir KAPI turu değildir (0014). Kapı yalnız
+            // `kind='auto'` satırlarını sayar — tek bir manuel tetikleme kapıyı erken
+            // kapatmamalı. Verdict'i yine de temkinli-kazanır kuralına girer.
+            kind: "manual",
           })
           .select("id, transcript, final_verdict, final_commentary, created_by, created_at")
           .single();
@@ -64,7 +68,7 @@ export async function POST(req: Request) {
         if (insertError || !inserted) {
           write({ type: "error", error: insertError?.message ?? "kayıt hatası" });
         } else {
-          write({ type: "done", debate: inserted });
+          write({ type: "done", debate: { ...inserted, kind: "manual", run_no: null, turn_count: result.transcript.length } });
         }
       } catch (e) {
         write({ type: "error", error: e instanceof Error ? e.message : "tartışma başarısız" });

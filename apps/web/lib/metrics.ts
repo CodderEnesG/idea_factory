@@ -87,3 +87,97 @@ export function latestDecisionPerSignal(
   }
   return map;
 }
+
+/* ── Kalibrasyon ölçümleri (FAZ6_PLAN.md §Faz 5.5) ─────────────────────────
+ *
+ * Ayrı bir outcome tablosuna gerek yok: insan kararları SAHİP OLDUĞUMUZ ground truth.
+ * Bu ölçümler 2026-08-25'te elle çekilen read-only sorguların kalıcı hâli — kapının ve
+ * grounding'in işe yarayıp yaramadığı ancak böyle görülür.
+ *
+ * ÇEKİNCE (UI'da da yazılı olmalı): bu, *insan incelemesine* karşı kesinliktir ve
+ * kovala-bandı sinyallerinin yalnız bir kısmı incelenmiştir. Seçim yanlılığı gerçek —
+ * insanlar zaten ilginç görüneni inceliyor.
+ */
+
+export type GateState = "n/a" | "pending" | "confirmed" | "caveat" | "vetoed";
+
+export interface PrecisionBucket {
+  /** İncelenmiş (insan kararı olan) sinyal sayısı. */
+  reviewed: number;
+  /** Bunlardan insanın da "kovala" dediği sayı. */
+  agreed: number;
+  /** agreed / reviewed — payda 0 ise null. */
+  precision: number | null;
+}
+
+function bucket(rows: { agreed: boolean }[]): PrecisionBucket {
+  const reviewed = rows.length;
+  const agreed = rows.filter((r) => r.agreed).length;
+  return { reviewed, agreed, precision: reviewed ? agreed / reviewed : null };
+}
+
+export interface PursuePrecisionInput {
+  signalId: string;
+  /** Kapıdan geçmiş bant (`resolveGatedBand` sonucu). */
+  gatedBand: Decision;
+  gate: GateState;
+  /** Beyaz-alan kovası: "boş" | "kalabalık" | "karışık" | "belirsiz" (yoksa null). */
+  competition: string | null;
+}
+
+export interface PursuePrecisionResult {
+  /** Kapılı bandı "kovala" olanların insan-kovala kesinliği. Taban (kapısız): %22. */
+  overall: PrecisionBucket;
+  /** Kapı kırılımı — kapının iş yaptığını kanıtlar. */
+  byGate: Record<"confirmed" | "caveat", PrecisionBucket>;
+  /** Rekabet kovası kırılımı — beyaz-alanın değerini ölçer (2026-08-26: %40 vs %7, n=10/28). */
+  byCompetition: Record<string, PrecisionBucket>;
+}
+
+/**
+ * Kapılı bandı "kovala" olan ve bir insanın karar verdiği sinyallerde, insanın da "kovala"
+ * deme oranı. `latestDecisions`: `latestDecisionPerSignal()` çıktısı.
+ */
+export function pursuePrecision(
+  rows: PursuePrecisionInput[],
+  latestDecisions: Map<string, Decision>,
+): PursuePrecisionResult {
+  const scored = rows
+    .filter((r) => r.gatedBand === "pursue" && latestDecisions.has(r.signalId))
+    .map((r) => ({ ...r, agreed: latestDecisions.get(r.signalId) === "pursue" }));
+
+  const byCompetition: Record<string, PrecisionBucket> = {};
+  for (const key of ["boş", "kalabalık", "karışık", "belirsiz", "yok"]) {
+    byCompetition[key] = bucket(scored.filter((r) => (r.competition ?? "yok") === key));
+  }
+
+  return {
+    overall: bucket(scored),
+    byGate: {
+      confirmed: bucket(scored.filter((r) => r.gate === "confirmed")),
+      caveat: bucket(scored.filter((r) => r.gate === "caveat")),
+    },
+    byCompetition,
+  };
+}
+
+/** Tartışma verdict karışımı. 2026-08-25 tabanı: 195 ele / 62 izle / 3 kovala.
+ *  Bu dağılım 74/26/0'a geri çökerse kapı kuyruğu boğuyor demektir — ilk burada görünür. */
+export function debateVerdictMix(verdicts: Decision[]): Record<Decision, number> {
+  const mix: Record<Decision, number> = { pursue: 0, watch: 0, kill: 0 };
+  for (const v of verdicts) mix[v]++;
+  return mix;
+}
+
+/**
+ * Beyaz-alan analizlerinin ne kadarı `confidence: low` — grounding'in işe yarayıp
+ * yaramadığının TEK ölçütü. Taban (2026-08-26, grounding kapalıyken): 434/662 = %66.
+ */
+export function groundingCoverage(
+  analyses: { lens: string; confidence: string }[],
+  lensId = "white_space",
+): { total: number; low: number; lowRatio: number | null } {
+  const rows = analyses.filter((a) => a.lens === lensId);
+  const low = rows.filter((a) => a.confidence === "low").length;
+  return { total: rows.length, low, lowRatio: rows.length ? low / rows.length : null };
+}

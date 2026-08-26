@@ -5,13 +5,14 @@ import type { AnalystProvider } from "./providers/types.js";
 import type { Signal } from "./signal.js";
 
 const whiteSpaceLens = buildCustomLens(WHITE_SPACE_SEED_LENS);
-// grounding'e ihtiyacı olmayan bir mercek — id GROUNDED_LENS_IDS'te değil (grounding.ts).
+// grounding'e ihtiyacı olmayan bir mercek — `grounding: false` (0015'ten beri mercek özelliği).
 const timingLens = buildCustomLens({
   id: "timing",
   name: "Zamanlama",
   weight: 1,
   extraNoteLabel: "Not",
   questions: ["q1"],
+  grounding: false,
 });
 type WhiteSpaceAnalysis = CustomAnalysis;
 
@@ -83,7 +84,7 @@ describe("analyzeSignal — lens id normalizasyonu", () => {
   });
 });
 
-describe("analyzeSignal — grounding (PLAN.md §11 madde 2)", () => {
+describe("analyzeSignal — grounding (mercek özelliği, 0015)", () => {
   afterEach(() => {
     delete process.env["GROUNDING_ENABLED"];
   });
@@ -120,7 +121,7 @@ describe("analyzeSignal — grounding (PLAN.md §11 madde 2)", () => {
     expect(grounderCalls).toBe(0);
   });
 
-  it("GROUNDING_ENABLED=true olsa da grounding listesinde olmayan mercekte grounder çağrılmaz", async () => {
+  it("GROUNDING_ENABLED=true olsa da `grounding: false` mercekte grounder çağrılmaz", async () => {
     process.env["GROUNDING_ENABLED"] = "true";
     const p = provider([{ ...validBody(), lens: "timing" }]);
     let grounderCalls = 0;

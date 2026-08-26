@@ -10,6 +10,8 @@ export interface LensRow {
   extra_note_label: string;
   questions: string[];
   active: boolean;
+  /** 0015: analiz öncesi canlı web araması yapılsın mı (pahalı — mercek başına açılır). */
+  grounding?: boolean;
   created_by: string;
   created_at: string;
 }
@@ -20,6 +22,7 @@ function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => voi
   const [weight, setWeight] = useState(row.weight);
   const [extraNoteLabel, setExtraNoteLabel] = useState(row.extra_note_label);
   const [questions, setQuestions] = useState(row.questions);
+  const [grounding, setGrounding] = useState(row.grounding ?? false);
   const [busy, setBusy] = useState(false);
 
   async function patch(body: Record<string, unknown>) {
@@ -41,7 +44,7 @@ function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => voi
   }
 
   async function saveEdit() {
-    await patch({ name, weight, extra_note_label: extraNoteLabel, questions });
+    await patch({ name, weight, extra_note_label: extraNoteLabel, questions, grounding });
     setEditing(false);
   }
 
@@ -52,6 +55,11 @@ function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => voi
           <div className="flex items-center gap-2">
             <span className="font-display text-sm font-bold">{row.name}</span>
             <span className="chip text-[10px]">ağırlık {row.weight}</span>
+            {row.grounding && (
+              <span className="chip text-[10px] text-brand" title="Analiz öncesi canlı web araması yapılır (3 sorgu, ek maliyet)">
+                canlı arama
+              </span>
+            )}
             {!row.active && <span className="chip text-[10px] text-kill">pasif</span>}
           </div>
           <p className="mt-0.5 text-xs text-ink-muted">
@@ -110,6 +118,16 @@ function LensCard({ row, onSaved }: { row: LensRow; onSaved: (r: LensRow) => voi
               className="glass flex-1 px-3 py-2 text-sm text-ink focus:outline-none"
             />
           </div>
+          <label className="flex items-center gap-2 text-xs text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={grounding}
+              onChange={(e) => setGrounding(e.target.checked)}
+              className="accent-brand"
+            />
+            Canlı web araması (grounding) — analizden önce 3 hedefli arama yapılır. Rekabet/
+            pazar sorusu soran mercekler için; kanıt sorusu soranlarda ölçüldü, zarar veriyor.
+          </label>
           <TagListInput
             label="Domain soruları (sırayla sorulur)"
             values={questions}

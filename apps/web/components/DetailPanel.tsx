@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CardView } from "../lib/card-view";
+import type { CardView, ValidationTask } from "../lib/card-view";
 import type { Decision, UserDecision } from "./DecisionButtons";
 import { DecisionButtons } from "./DecisionButtons";
 import { useComments } from "./Comments";
 import { CommentFeed } from "./CommentFeed";
 import { useDebate, DebateFeed } from "./DebateRoom";
 import { TaskList } from "./TaskList";
+import { validationToTaskBody } from "../lib/task-templates";
 import { BAND, FitRing, CONFIDENCE_LABEL } from "./card-visuals";
 import { formatSource } from "../lib/source-labels";
 import { OpportunityMenu } from "./OpportunityMenu";
@@ -71,29 +72,84 @@ export function DetailPanel({
   const [composerOpen, setComposerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
+  const [lockErr, setLockErr] = useState<string | null>(null);
+  // Kilitleme gerekçesi (FAZ6_PLAN.md §Faz 6.3): kolon/API/CardView zaten vardı, hiçbir UI
+  // göndermiyor ve göstermiyordu — kilitli ekip kararları yazılı gerekçe taşımıyordu.
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [taskAddMsg, setTaskAddMsg] = useState<string | null>(null);
+
+  /** AI'ın doğrulama maddelerini görev listesine yazar (FAZ6_PLAN.md §Faz 6.4).
+   *  Aynı metni iki kez eklememek için mevcut görevlere karşı dedupe eder. */
+  async function addValidationTasks(items: ValidationTask[]) {
+    const existing = new Set(item.tasks.map((t) => t.body));
+    const bodies = items.map(validationToTaskBody).filter((b) => !existing.has(b));
+    if (bodies.length === 0) {
+      setTaskAddMsg("zaten listede");
+      return;
+    }
+    let ok = 0;
+    for (const body of bodies) {
+      try {
+        const res = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ signal_id: item.id, body }),
+        });
+        if (res.ok) ok++;
+      } catch {
+        /* aşağıda raporlanıyor */
+      }
+    }
+    setTaskAddMsg(
+      ok === bodies.length
+        ? `${ok} görev eklendi — listeyi görmek için sayfayı yenile`
+        : `${ok}/${bodies.length} görev eklenebildi`,
+    );
+  }
 
   // Kesinleşmiş karar (0013, problem 1/2) — herhangi bir üye kilitleyebilir/açabilir.
   // Kilitleme, o an ekranda görünen AI bandını DEĞİL, kendi kararını (`item.mine`) esas alır
   // — Panom'daki "sürüklenen sütun kilitlenir" mantığıyla aynı: kilitlemeden önce bir karar
   // vermiş olman gerekir.
-  async function toggleFinal() {
+  async function unlockFinal() {
     setLockBusy(true);
+    setLockErr(null);
     try {
-      if (item.finalDecision !== null) {
-        const res = await fetch("/api/decisions/final", {
-          method: "DELETE",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ signal_id: item.id }),
-        });
-        if (res.ok) onFinalized(null);
-      } else if (item.mine !== null) {
-        const res = await fetch("/api/decisions/final", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ signal_id: item.id, decision: item.mine }),
-        });
-        if (res.ok) onFinalized({ decision: item.mine, decidedBy: meName });
+      const res = await fetch("/api/decisions/final", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ signal_id: item.id }),
+      });
+      // Eskiden hata sessizdi: başarısız bir kilit/açma ne hata ne değişiklik gösteriyordu.
+      if (res.ok) onFinalized(null);
+      else setLockErr("kilit açılamadı");
+    } catch {
+      setLockErr("kilit açılamadı (bağlantı)");
+    } finally {
+      setLockBusy(false);
+    }
+  }
+
+  async function lockFinal() {
+    if (item.mine === null) return;
+    setLockBusy(true);
+    setLockErr(null);
+    try {
+      const res = await fetch("/api/decisions/final", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ signal_id: item.id, decision: item.mine, reason: reason.trim() || undefined }),
+      });
+      if (res.ok) {
+        onFinalized({ decision: item.mine, decidedBy: meName });
+        setReasonOpen(false);
+        setReason("");
+      } else {
+        setLockErr("kilitlenemedi");
       }
+    } catch {
+      setLockErr("kilitlenemedi (bağlantı)");
     } finally {
       setLockBusy(false);
     }
@@ -174,13 +230,56 @@ export function DetailPanel({
                   · Sen: {BAND[item.mine].label}
                 </span>
               )}
-              {latestDebate && (
+              {item.gate === "pending" && (
+                <span
+                  className="inline-flex items-center gap-1 text-ink-muted"
+                  title="AI kovala dedi ama Yorumcu'nun iki bağımsız turu henüz tamamlanmadı — kart o zamana kadar İzle bandında durur"
+                >
+                  · Yorumcu: bekleniyor
+                </span>
+              )}
+              {item.gate === "vetoed" && (
+                <span className="inline-flex items-center gap-1 text-kill" title="Yorumcu turlarından biri 'ele' dedi — kovala rozeti verilmedi">
+                  · Yorumcu: VETO
+                </span>
+              )}
+              {item.gate === "caveat" && (
+                <span className="inline-flex items-center gap-1 text-watch" title="İki tur da 'izle' dedi — kovala kalıyor ama çekinceli">
+                  · Yorumcu: çekinceli
+                </span>
+              )}
+              {item.gate === "confirmed" && (
+                <span className="inline-flex items-center gap-1 text-pursue" title="Yorumcu kovalamayı onayladı">
+                  · Yorumcu: onayladı
+                </span>
+              )}
+              {item.gate === "n/a" && latestDebate && (
                 <span className={`inline-flex items-center gap-1 ${BAND[latestDebate.final_verdict].text}`}>
                   · Yorumcu: {BAND[latestDebate.final_verdict].label}
                 </span>
               )}
+              {item.competition && (
+                <span
+                  className={`inline-flex items-center gap-1 ${item.competition.label === "kalabalık" ? "text-watch" : "text-ink-muted"}`}
+                  title={`Beyaz-alan merceği — fit ${item.competition.fit}, güven ${item.competition.confidence}${item.competition.note ? `\n${item.competition.note}` : ""}`}
+                >
+                  · Rekabet: {item.competition.label}
+                </span>
+              )}
+              {item.effectiveBand === "pursue" && item.competition?.label === "kalabalık" && (
+                <span className="inline-flex items-center gap-1 text-watch opacity-80" title="Kovala ama rekabet ortamı doygun görünüyor — boşluk kapanmış olabilir">
+                  · rekabet kalabalık
+                </span>
+              )}
               {item.finalDecision !== null && (
-                <span className="inline-flex items-center gap-1 text-brand" title={`Kilitleyen: ${item.finalDecidedBy}`}>
+                <span
+                  className="inline-flex items-center gap-1 text-brand"
+                  title={
+                    item.finalReason
+                      ? `Kilitleyen: ${item.finalDecidedBy}\nGerekçe: ${item.finalReason}`
+                      : `Kilitleyen: ${item.finalDecidedBy}`
+                  }
+                >
                   · <IconLock className="h-3 w-3" /> Kesinleşti: {BAND[item.finalDecision].label} ({item.finalDecidedBy})
                 </span>
               )}
@@ -302,15 +401,35 @@ export function DetailPanel({
                         )}
                         {lens.validation_needed.length > 0 && (
                           <div className="mt-3 rounded-btn border border-hair bg-elevated p-3">
-                            <div className="text-xs font-medium text-brand">Doğrulama görevleri</div>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <div className="text-xs font-medium text-brand">Doğrulama görevleri</div>
+                              {/* Bu maddeler salt-okunur duruyordu; oysa kovalamayı haklı çıkaran
+                                  analizin kendi eksikleri, jenerik şablondan iyi bir checklist. */}
+                              <button
+                                onClick={() => addValidationTasks(lens.validation_needed)}
+                                className="shrink-0 text-[11px] font-medium text-brand hover:underline"
+                              >
+                                Tümünü göreve ekle
+                              </button>
+                            </div>
                             <ul className="mt-2 space-y-1.5">
                               {lens.validation_needed.map((v, vi) => (
-                                <li key={vi} className="text-xs text-ink-secondary">
-                                  <span className="text-ink">{v.data}</span> — {v.why}{" "}
-                                  <span className="text-ink-muted">(nasıl: {v.how_to_verify})</span>
+                                <li key={vi} className="group flex items-start gap-2 text-xs text-ink-secondary">
+                                  <span className="flex-1">
+                                    <span className="text-ink">{v.data}</span> — {v.why}{" "}
+                                    <span className="text-ink-muted">(nasıl: {v.how_to_verify})</span>
+                                  </span>
+                                  <button
+                                    onClick={() => addValidationTasks([v])}
+                                    title="Bu maddeyi göreve ekle"
+                                    className="shrink-0 text-brand opacity-0 transition group-hover:opacity-100"
+                                  >
+                                    + görev
+                                  </button>
                                 </li>
                               ))}
                             </ul>
+                            {taskAddMsg && <p className="mt-2 text-[11px] text-ink-muted">{taskAddMsg}</p>}
                           </div>
                         )}
                       </div>
@@ -323,14 +442,14 @@ export function DetailPanel({
 
           {item.mine !== null && (
             <div className="rounded-lg border border-white/[0.14] bg-elevated p-3.5">
-              <TaskList signalId={item.id} initial={item.tasks} />
+              <TaskList signalId={item.id} initial={item.tasks} meName={meName} canManage={item.isAdmin} />
             </div>
           )}
 
           <CommentFeed items={comments.items} />
 
           {item.isAdmin && (
-            <DebateFeed debates={debate.debates} progress={debate.progress} error={debate.error} />
+            <DebateFeed debates={debate.debates} progress={debate.progress} error={debate.error} signalId={item.id} />
           )}
         </div>
       </div>
@@ -338,12 +457,40 @@ export function DetailPanel({
       {/* ── sabit alt bar: karar + yorum/AI daire butonları (ortalanmış) ── */}
       <div className="shrink-0 border-t border-white/[0.14] bg-surface px-5 py-3">
         <div className="mx-auto max-w-3xl">
+          {reasonOpen && item.finalDecision === null && item.mine !== null && (
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                autoFocus
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") lockFinal();
+                  if (e.key === "Escape") setReasonOpen(false);
+                }}
+                placeholder="Neden bu karar? (opsiyonel — ekip sonradan sorgulayabilsin)"
+                className="flex-1 rounded border border-white/[0.14] bg-elevated px-3 py-2 text-sm text-ink placeholder:text-ink-muted"
+              />
+              <button
+                onClick={lockFinal}
+                disabled={lockBusy}
+                className="shrink-0 rounded border border-strong bg-elevated px-3 py-2 text-sm text-brand disabled:opacity-50"
+              >
+                {lockBusy ? "…" : `${BAND[item.mine].label} olarak kilitle`}
+              </button>
+            </div>
+          )}
+          {item.finalReason && (
+            <p className="mb-2 font-mono text-xs text-ink-muted">
+              Gerekçe: <span className="text-ink-secondary">{item.finalReason}</span>
+            </p>
+          )}
+          {lockErr && <p className="mb-2 font-mono text-xs text-kill">{lockErr}</p>}
           <div className="flex items-center gap-2">
             <DecisionButtons signalId={item.id} mine={item.mine} onDecided={onDecided} />
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {(item.finalDecision !== null || item.mine !== null) && (
                 <button
-                  onClick={toggleFinal}
+                  onClick={() => (item.finalDecision !== null ? unlockFinal() : setReasonOpen((v) => !v))}
                   disabled={lockBusy}
                   title={
                     item.finalDecision !== null

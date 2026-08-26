@@ -32,9 +32,12 @@ export function PanomCard({
   lockedBy,
   onLock,
   onUnlock,
+  meName,
 }: {
   item: CardView;
   effective: Decision;
+  /** Oturum sahibi — görev listesinde "sen" etiketi ve düzenleme yetkisi için. */
+  meName?: string;
   /** Gösterilen karar benim değil, kilitli de değilse kimin kararı olduğu (ör. "muhammed"). */
   effectiveUser?: string | null;
   locked: boolean;
@@ -44,10 +47,19 @@ export function PanomCard({
 }) {
   const [showDetail, setShowDetail] = useState(false);
   const band = BAND[item.band];
+  const effectiveBandStyle = BAND[effective];
   const mineBand = item.mine ? BAND[item.mine] : null;
   const otherBand = !item.mine && effectiveUser ? BAND[effective] : null;
   const debate = item.debates[0];
   const doneTasks = item.tasks.filter((t) => t.done).length;
+  // Kapı durumu — tartışma satırı olmasa bile gösterilir ("bekleniyor" bir bilgidir).
+  const GATE_LABEL: Record<string, string> = {
+    pending: "bekleniyor",
+    confirmed: "onayladı",
+    caveat: "çekinceli",
+    vetoed: "veto",
+  };
+  const gateLabel = GATE_LABEL[item.gate] ?? null;
 
   function onDragStart(e: React.DragEvent<HTMLElement>) {
     e.dataTransfer.setData("text/plain", item.id);
@@ -90,6 +102,11 @@ export function PanomCard({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1 font-mono text-[10.5px]">
+        {/* Döküm satırı eskiden çözülmüş kararı HİÇ söylemiyordu: kart insan kararıyla "Ele"
+            sütununda dururken satır yeşil "Kovala" (ham AI) ile başlıyordu. Artık önce karar. */}
+        <span className="text-ink-muted">Karar:</span>
+        <span className={`font-semibold ${effectiveBandStyle.text}`}>{effectiveBandStyle.label}</span>
+        <span className="text-ink-muted">·</span>
         <span className="text-ink-muted">AI:</span>
         <span className={`font-semibold ${band.text}`}>{band.label}</span>
         {mineBand && (
@@ -106,11 +123,29 @@ export function PanomCard({
             <span className={`font-semibold ${otherBand.text}`}>{otherBand.label}</span>
           </>
         )}
-        {debate && (
+        {(debate || gateLabel) && (
           <>
             <span className="text-ink-muted">·</span>
-            <span className={`font-semibold ${BAND[debate.final_verdict].text}`}>
-              Yorumcu: {BAND[debate.final_verdict].label}
+            <span
+              className={`font-semibold ${debate ? BAND[debate.final_verdict].text : "text-ink-muted"}`}
+              title={
+                item.gate === "pending"
+                  ? "AI kovala dedi ama Yorumcu'nun iki turu henüz tamamlanmadı"
+                  : undefined
+              }
+            >
+              Yorumcu: {gateLabel ?? (debate ? BAND[debate.final_verdict].label : "")}
+            </span>
+          </>
+        )}
+        {item.competition && (
+          <>
+            <span className="text-ink-muted">·</span>
+            <span
+              className="text-ink-muted"
+              title={`Rekabet ortamı (beyaz-alan merceği, fit ${item.competition.fit}, güven ${item.competition.confidence})${item.competition.note ? ` — ${item.competition.note}` : ""}`}
+            >
+              Rekabet: {item.competition.label}
             </span>
           </>
         )}
@@ -150,7 +185,7 @@ export function PanomCard({
         <div className="mt-3 space-y-3 border-t border-white/[0.14] pt-3">
           {item.summary && <p className="text-xs leading-relaxed text-ink-secondary">{item.summary}</p>}
           <div className="rounded border border-white/[0.14] bg-elevated p-3">
-            <TaskList signalId={item.id} initial={item.tasks} />
+            <TaskList signalId={item.id} initial={item.tasks} meName={meName} canManage={item.isAdmin} />
           </div>
           <Comments signalId={item.id} initial={item.comments} />
           {item.isAdmin && <DebateRoom signalId={item.id} initial={item.debates} />}

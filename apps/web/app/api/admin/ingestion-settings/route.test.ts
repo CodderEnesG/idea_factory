@@ -8,8 +8,11 @@ vi.mock("../../../../lib/auth", () => ({ requireAdmin: requireAdminMock }));
 vi.mock("../../../../lib/supabase", () => ({ serverDb: serverDbMock }));
 
 import { POST } from "./route";
+import { KNOWN_SOURCES } from "../../../../lib/source-health";
 
-const ALL_SOURCES = ["producthunt", "tldr", "webrazzi", "techcrunch", "ycombinator"];
+// Kaynak listesi 5 -> 16'ya çıktı (2026-08-25); test sabit listeye bağlıydı ve o turda
+// güncellenmemişti. Artık tek doğruluk kaynağından türetiliyor.
+const ALL_SOURCES = [...KNOWN_SOURCES];
 const VALID_BODY = { per_source_limit: 20, concurrency: 3, enabled_sources: ALL_SOURCES, min_interval_hours: 0 };
 
 function req(body: unknown): Request {

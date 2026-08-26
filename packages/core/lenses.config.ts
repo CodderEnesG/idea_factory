@@ -97,7 +97,17 @@ export interface Lens<TAnalysis extends BaseAnalysis = BaseAnalysis> {
   extraNote(a: TAnalysis): string;
   /** UI'da extraNote'un önüne konan etiket (ör. "Uyarlama", "Rekabet ortamı"). */
   extraNoteLabel: string;
+  /** Bu mercek analiz öncesi canlı web araması (grounding) istiyor mu — DB `lenses.grounding`.
+   *  Eskiden `grounding.ts`'te sabit bir id listesiydi; 2026-08-26'da mercek özelliğine terfi
+   *  etti: arbitrajda KAPALI (2026-08-19 pilotu zarar gösterdi), beyaz-alanda AÇIK (satırlarının
+   *  %66'sı `confidence: low` — "TR'de kaç oyuncu var" sorusu aramasız cevaplanamıyor). */
+  grounding: boolean;
 }
+
+/** Beyaz-alan "boşluk gerçek mi" kesimi — ölçülen değer (ws≥60 → %40 insan-kovala, ws<60 → %7,
+ *  arbitraj 80+ alt kümesinde). UI çipi (`build-card-view.ts`), sıralama tiebreak'i (`ranker.ts`)
+ *  ve admin metrikleri aynı sabiti okur ki birbirinden kaymasınlar. */
+export const WHITE_SPACE_GAP_MIN = 60;
 
 /** Hiç mercek tanımlanmamışsa (ilk kurulum / DB yok) düşülecek boş kayıt — tüm mercekler artık
  *  admin-merceği (aşağıdaki `ARBITRAGE_SEED_LENS`/`WHITE_SPACE_SEED_LENS` dahil, bkz. o bölüm). */
@@ -118,6 +128,7 @@ export interface CustomLensDef {
   weight: number;
   extraNoteLabel: string;
   questions: string[]; // admin'in girdiği domain soru listesi, sırayla sorulur
+  grounding?: boolean; // DB `lenses.grounding`; yoksa false (varsayılan kapalı = sıfır ek maliyet)
 }
 
 export function buildCustomLensSchema(id: string) {
@@ -178,6 +189,7 @@ export function buildCustomLens(def: CustomLensDef): Lens<CustomAnalysis> {
     weight: def.weight,
     extraNote: (a) => a.extra_note,
     extraNoteLabel: def.extraNoteLabel,
+    grounding: def.grounding ?? false,
   };
 }
 
@@ -192,6 +204,10 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
   id: "arbitrage",
   name: "Arbitraj",
   weight: 1,
+  // Grounding KAPALI: 2026-08-19 pilotu (ağdan etkilenmemiş 12 vaka) baseline 0.958 →
+  // grounding 0.875 gösterdi; tek zıt-uç flip (Faturaport). Arama sonucu arbitrajın kanıt
+  // sorusuna değil rekabet sorusuna hizmetkâr — o soru beyaz-alanda.
+  grounding: false,
   extraNoteLabel: "Uyarlama",
   questions: [
     "Anti-pattern okuma kuralı: sinyaldeki şirketin aldığı fonlama sermaye-yoğunluk " +
@@ -210,10 +226,16 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
 export const WHITE_SPACE_SEED_LENS: CustomLensDef = {
   id: "white_space",
   name: "Beyaz-alan",
-  // 0 = kompozit SKORA girmez; kartta/haritada/trendde ikinci görüş olarak görünmeye devam
-  // eder (kullanıcı kararı 2026-08-10, THESIS_AND_LENS.md §3a'da detay). Grounding (PLAN.md
-  // §11 madde 2) devreye girince 1'e çıkarılmalı — asıl tasarım o.
+  // 0 = kompozit SKORA girmez; kartta/haritada/trendde ikinci görüş olarak görünür.
+  // 2026-08-26 ölçümü ağırlık 0'ı KALICI kıldı: arbitrajla korelasyon r=0.01 (ortogonal,
+  // gerçek ikinci görüş) ama ölçekler farklı (ws ort. fit 34.7 vs arbitraj 78.8) — ağırlık 1
+  // verilip ortalamaya sokulursa 662 analizin yalnız 3'ü 80'i geçer, kovala sütunu boşalır.
+  // Bunun yerine: görünür rekabet çipi + bant değiştirmeyen sıralama tiebreak'i (FAZ6 §Faz 5).
   weight: 0,
+  // Grounding AÇIK: bu merceğin 2., 5. ve 6. soruları ("TR/MENA'da kaç oyuncu var", "son 12 ayda
+  // fonlama var mı") canlı arama olmadan cevaplanamaz — satırların %66'sı bu yüzden
+  // `confidence: low` (434/662). Ölçüt: bu oran belirgin düşmezse grounding geri alınır.
+  grounding: true,
   extraNoteLabel: "Rekabet ortamı",
   questions: [
     "Boşluk okuma kuralı: boşluk = rakip yokluğu DEĞİL, savunulabilir rakip yokluğudur. " +

@@ -1,3 +1,5 @@
+import type { FitBand } from "@idea-factory/core";
+
 export interface DecisionLogRow {
   signal_id: string;
   decision: string;
@@ -5,16 +7,61 @@ export interface DecisionLogRow {
   created_at: string;
 }
 
+/** Kompozit bandı hesaplanmış bir sinyal — kapı adayı seçimi bunun üstünden yürür. */
+export interface GateCandidateRow {
+  signal_id: string;
+  band: FitBand;
+  fit: number;
+  /** En yeni analizin zaman damgası — taze adaylar önce tartışılsın. */
+  ts: string;
+}
+
+/** Kapının kapanması için gereken bağımsız otomatik tur sayısı (bkz. card-view.ts'teki eşi). */
+export const GATE_REQUIRED_DEBATES = 2;
+
 /**
- * decisions log'undan hangi sinyaller için otomatik AI Yorumcusu tetiklenmeli seçer (madde 3-A,
- * 2026-08-21 kararı: tam otomasyon değil, yalnız kişisel "Kovala" kararı tetikler). Kural: en az
- * bir kullanıcının EN SON kişisel kararı "pursue" olmalı VE bu sinyal için henüz hiç debate
- * yazılmamış olmalı (idempotent — aynı sinyal tekrar tekrar tartışılmaz, admin isterse mevcut
- * admin-endpoint'iyle elle yeniden tetikleyebilir).
+ * **Yorumcu kapısı** adayları (FAZ6_PLAN.md §Faz 2.4).
  *
- * `decisions` append-only bir log — `decisions` PARAMETRESİ ÇAĞIRAN TARAFINDAN created_at DESC
- * sıralı verilmelidir (apps/web/lib/load-decisions.ts ile aynı dedupe kuralı; web ve worker ayrı
- * supabase client'ları kullandığı için kod paylaşılamıyor, mantık burada tekrarlanıyor).
+ * Eskiden tartışma yalnız bir insan "Kovala" dedikten SONRA tetikleniyordu — yani en iyi
+ * ayırt edici (Yorumcu'nun insanla uyumu %60, ham AI'ın %25), ayırt etmesi gereken andan
+ * sonra çalışıyordu. Artık kompozit bandı `pursue` olan HER sinyal, insan görmeden önce iki
+ * bağımsız tartışmadan geçer.
+ *
+ * `debateCount`: sinyal başına mevcut OTOMATİK tur sayısı (manuel/admin turları sayılmaz —
+ * tek bir elle tetikleme kapıyı erken kapatmamalı).
+ */
+export function selectGateCandidates(
+  rows: GateCandidateRow[],
+  debateCount: ReadonlyMap<string, number>,
+): string[] {
+  const remaining = (id: string): number =>
+    GATE_REQUIRED_DEBATES - (debateCount.get(id) ?? 0);
+  return rows
+    .filter((r) => r.band === "pursue" && remaining(r.signal_id) > 0)
+    .sort((a, b) => {
+      // 1) Tamamlanmaya EN YAKIN önce. Yarım kalmış bir kapı hiçbir işe yaramaz: sinyal
+      //    "Yorumcu bekliyor"da asılı kalır. Bir turu eksik olanı bitirmek, yeni bir kapı
+      //    açmaktan daha çok KAPALI kapı üretir — yani ekibe daha çok karar verilebilir kart.
+      const rem = remaining(a.signal_id) - remaining(b.signal_id);
+      if (rem !== 0) return rem;
+      // 2) En yeni analiz önce, 3) yüksek fit önce.
+      if (a.ts !== b.ts) return a.ts < b.ts ? 1 : -1;
+      return b.fit - a.fit;
+    })
+    .map((r) => r.signal_id);
+}
+
+/**
+ * İkincil tetikleyici — kapının DIŞINDA kalan sinyaller için (fit<80 ama bir insan yine de
+ * "Kovala" demiş). Kapı bunları hiç seçmez ama insanın beğendiği bir sinyalde ikinci görüş
+ * hâlâ değerli, o yüzden eski seçici korunuyor.
+ *
+ * Kural: en az bir kullanıcının EN SON kişisel kararı "pursue" olmalı VE bu sinyal için
+ * henüz hiç tartışma yazılmamış olmalı.
+ *
+ * `decisions` PARAMETRESİ ÇAĞIRAN TARAFINDAN created_at DESC sıralı verilmelidir
+ * (apps/web/lib/load-decisions.ts ile aynı dedupe kuralı; web ve worker ayrı supabase
+ * client'ları kullandığı için kod paylaşılamıyor, mantık burada tekrarlanıyor).
  */
 export function selectAutoDebateCandidates(
   decisions: DecisionLogRow[],

@@ -1043,3 +1043,101 @@ işlenmesi (backfill) gerekmiyor — yalnız sonraki analiz/tick'lerde devreye g
 cron koşusundan sonra yeni "Kovala" sinyallerinin bu iki kriteri gerçekten karşılayıp
 karşılamadığı gözlenmeli; eğer tek-geçişli skor artık daha güvenilirse, AI Yorumcusu'nun
 otomatikleştirilip otomatikleştirilmeyeceği (§21) buna göre yeniden değerlendirilebilir.
+
+## 21. Faz 6 — Yorumcu kapısı: "Kovala"ya güven (2026-08-26)
+
+Ekip kovala çıkan fikirleri gerçekten geliştirip pazara sunmaya başlayacaktı. Bu yüzden önce
+sistemin bu role hazır olup olmadığı **canlı veriyle** ölçüldü (read-only Supabase sorguları,
+2026-08-25). Ayrıntılı rapor: `FAZ6_PLAN.md`.
+
+**Ölçüm: hazır değildi.** AI'ın "kovala" dediği 79 sinyalin insan kararı: 17 kovala (**%22**),
+26 izle, **36 ele (%46)**. Tam uyum %25. AI'ın "ele"si güvenilir (11/11), "kovala"sı değil.
+Eşiği yükseltmek kurtarmıyor — kesinlik `fit>=70/75/80/85/88/90` için %13/17/22/22/20/11,
+`confidence=high` şartı hiçbir şeyi değiştirmiyor. Sebep: model 0-100 skalasını kullanmıyor,
+~10 ayrık değere yığıyor (15×372, 25×197, **88×46**); insanın kovala dediği 18 sinyalin 11'i
+tam 88. fit üst uçta sıralama bilgisi taşımıyor.
+
+**Ama AI Yorumcusu çalışıyor:** insanla uyumu **%60** (ham AI %25), yorumcu-kovala →
+insan-kovala 4/4. Ve `fit>=80 AND yorumcu "ele" demedi` → kesinlik **%22 → %53** (n=15).
+Yorumcu kararın ARKASINDA duruyordu: admin-only, tick başına 3, ve yalnız insan kovala
+dedikten SONRA tetikleniyordu. Ayrıca mükerrer kayıtlar bedava bir test-retest verdi:
+27 sinyal birden çok tartışılmış, **9'unda farklı sonuç → tutarlılık %67**, yani tek koşu
+şansa açık.
+
+**Uygulanan çözüm:**
+
+1. **Yorumcu kapısı** (`apps/web/lib/card-view.ts::resolveGatedBand`) — kompozit bandı
+   `pursue` olan her sinyal, insan görmeden **iki bağımsız tartışmadan** geçer. Veto modeli:
+   biri "ele" → düşer, en az biri "kovala" → onaylı, ikisi de "izle" → kovala kalır ama
+   görünür çekince. ("İkisi de onaylasın" şartı denenmedi: verdict dağılımı 195 ele/62 izle/
+   3 kovala — kovala sütununu boşaltırdı.) Tartışma bandı artık **asla yükseltemez**; eski
+   `debateVerdict ?? aiBand` izle bandındaki bir sinyali tek bir manuel tartışmayla Kovala
+   yapıyordu, bu bir kapı değildi. `pending → watch`: iki tur tamamlanana kadar sinyal
+   hiçbir tick'te kovala bandına giremez, yani bütçe yetmezse hata temkinli tarafa bozulur.
+2. **Seçim tersine çevrildi** (`debate-auto-select.ts::selectGateCandidates`,
+   `debate-auto.ts`): girdi artık `decisions` değil `analyses` üstünden `composite()`.
+   `DEBATE_AUTO_LIMIT` 3 → 8 (artık TUR tavanı). İnsan-kovala tetikleyicisi ikincil olarak
+   korundu (fit<80 sinyaller için). Tick sırası değişmedi.
+3. **Yorumcu herkese açıldı** (`load-debates.ts`) — açıklanmayan bir veto, vetosuzluktan kötü.
+   Transkript liste sorgusundan çıkarıldı, `/api/debates/[signalId]` ile lazy yükleniyor
+   (260 × 7-tur JSONB her `/queue` render'ında en büyük yüktü). Tetiklemek admin-only kaldı.
+4. **Bant hiyerarşisi tek yere indi** (`build-card-view.ts::resolveCardBands`);
+   `queue/page.tsx`'in elle yazılmış kopyası silindi, `PanomCard`'ın ham AI çipi "Karar:"
+   ile başlayacak şekilde düzeltildi. Panom'un kasıtlı farkı `resolvePanomBand` olarak
+   isimlendirilip test edildi.
+5. **Canlı bug: ağırlık-kör kompozit confidence** (`ranker.ts`) — `fit` ağırlığa saygı
+   duyuyordu ama `confidence` reduce'u tüm analizleri geziyordu. `arbitraj 88/high` +
+   `beyaz-alan 25/low` → `confidence: "low"`. Ölçüldü: 662 iki-mercekli sinyalin **354'ü
+   (%53)** etkileniyordu; arbitrajı 80+&high olan 36 sinyalin **22'si** bench rozetini
+   (`bench.ts`) bu yüzden kaybediyor ve kartta "KOVALA · güven: düşük" yazıyordu.
+6. **Grounding mercek özelliği oldu** (`0015`, `lenses.grounding`) — beyaz-alanda AÇIK,
+   arbitrajda KAPALI (2026-08-19 pilotu arbitrajda zarar göstermişti). `grounding.ts`
+   yeniden yazıldı: sorgu artık marka adından değil **kategori ifadesinden** kuruluyor
+   (`enrichment.project_summary` + sektör) — "Skippr AI" üstünde Türkçe arama kaynak makaleyi
+   döndürüyordu, muhtemelen %66 low-confidence'ın asıl sebebi buydu. Üç paralel hedefli sorgu
+   (TR / TR-MENA İngilizce / fonlama momentumu), gerçek kaynak URL'leri
+   `groundingMetadata.groundingChunks`'tan okunuyor, ve sessiz `null` üç ayrı duruma bölündü:
+   bulundu / **arandı-bulunamadı** / arama-yapılamadı. Ortadaki durum merceğin 1. sorusunun
+   ("'kimse yapmıyor' tek başına olumlu kanıt DEĞİLDİR") var olma sebebi.
+7. **Beyaz-alan görünür sinyal** — ağırlık 0 KALICI oldu (r=0.01 ortogonal ama ölçekler
+   farklı: ws ort. 34.7 vs arbitraj 78.8; ağırlık 1 verilse 662 analizin yalnız 3'ü 80'i
+   geçer). Bunun yerine kartta "Rekabet: boş/kalabalık/karışık/belirsiz" çipi + bant
+   değiştirmeyen sıralama tiebreak'i (`competitionRank`). `confidence:low` her fit testinden
+   ÖNCE "belirsiz"e düşüyor — satırların %60-66'sı orada.
+8. **Sessiz-hata düzeltmeleri**: ingest all-sources-failed guard (tüm 16 kaynak patlasa bile
+   `exit 0` ediyordu, diğer beş aşamanın hepsinde bu guard vardı); tüm LLM çağrılarında
+   timeout + operasyon deadline'ı (`deadline.ts` — timeout'suz çağrı asılan bağlantıda
+   `cron.ts`'in `running` guard'ını kalıcı kilitliyordu); `0014`'te mükerrer tartışmayı
+   engelleyen kısmi unique index (**düz `unique(signal_id)` DEĞİL** — çift tur bilinçli);
+   demo-fallback üçe bölündü (env yok / DB hatası / sıfır satır) — DB hatasında ekibe
+   uydurma fırsatlar gösteriliyor ve üstüne gerçek karar verilebiliyordu. `error.tsx` +
+   `global-error.tsx` eklendi (uygulamada hiç yoktu).
+9. **Ekip icra akışı**: görevler ekipçe görünür oldu (`load-tasks.ts`; tohumlama kontrolü aynı
+   commit'te sinyal bazına indi, yoksa ikinci kişi aynı 3 görevi tekrar tohumlardı), düzenleme
+   + silme uç noktaları geldi (`task-templates.ts` bunu zaten vaat ediyordu ama endpoint
+   yoktu), `final_decisions.reason` uçtan uca bağlandı (kolon/API/CardView vardı, UI yoktu),
+   ve AI'ın `validation_needed` maddeleri "+ göreve ekle" ile checklist'e dönüştürülebiliyor —
+   başlangıç görevleri artık jenerik 3 cümle yerine analizin kendi eksikleri.
+10. **Ölçüm kalıcılaştı**: `packages/core/eval/calibration.ts` (`pnpm --filter
+    @idea-factory/core calibration`) + `/admin` metrikler sekmesinde 8 kalibrasyon kutusu.
+    Tabanlar kodda yazılı: kovala kesinliği %22, yorumcu-insan uyumu %60, test-retest %67,
+    verdict karışımı 3/62/195, beyaz-alan low %66.
+
+**Kapsam dışı (kullanıcı kararı):** outcome-tracking tablosu kurulmadı — kaynak şirketler
+zaten fonlama/satışla doğrulanmış, ekip kendi denemelerini dışarıda takip ediyor. Birikmiş
+analiz kuyruğu (%59 kapsama) kapatılmadı — kapı kurulmadan daha çok analiz, daha çok yanlış
+kovala demek.
+
+**Doğrulama:** `tsc --noEmit` (core+web+worker) temiz, `next build` (prod) temiz,
+`pnpm -r test` **307/307** yeşil (226'dan; 81 yeni test — kapı matrisi, deadline, grounding
+sorguları, rekabet tiebreak'i, `load-items` üç dalı, görev silme/düzenleme yetkileri,
+kalibrasyon metrikleri, `pg-compat`, ingest toplu-başarısızlık guard'ı, bozuk
+`validation_needed` JSONB'si). Kapı seçimi ve migration toleransı gerçek Supabase'e
+karşı doğrulandı.
+
+**KULLANICI YAPACAK:** `supabase/migrations/0014_debate_gate.sql` ve `0015_lens_grounding.sql`
+Supabase Dashboard → SQL Editor'dan uygulanmalı (REST üzerinden DDL yolu yok). Kod
+migration'sız da çalışacak şekilde yazıldı (`lib/pg-compat.ts` — yeni kolon yoksa eski kolon
+setine düşer), ama **kapı ancak `0014` uygulandıktan sonra devreye girer**; `debate-auto`
+migration olmadan açık bir hata mesajıyla durur (LLM çağrısı yapmadan). Grounding ayrıca
+`.env`'de `GROUNDING_ENABLED=true` ister.
