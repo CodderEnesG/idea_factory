@@ -13,6 +13,7 @@ const base: CustomAnalysis = {
   validation_needed: [],
   recommended_action: "pursue",
   tags: [],
+  local_competitor: "none_found",
 };
 
 describe("fitBand", () => {
@@ -119,6 +120,7 @@ describe("checkAnalysisGuards — mercek-bağımsızlık (white_space)", () => {
     validation_needed: [],
     recommended_action: "pursue",
     tags: [],
+    local_competitor: "none_found",
   };
 
   it("arbitrajla aynı kurallar white_space şekline de uygulanır (temiz geçer)", () => {
@@ -214,5 +216,46 @@ describe("bootstrap kanıtı guard'ı (h) — 2026-08-21, ölçek uygunluğu kal
   it("başka bir mercekte (white_space, custom) hiç devreye girmez", () => {
     const v = checkAnalysisGuards(base, { lensId: "white_space", capitalIntensity: "high" });
     expect(v.some((x) => x.includes("bootstrap kanıtı eksik"))).toBe(false);
+  });
+});
+
+describe("yerleşik rakip guard'ı (i) — 2026-09-04, AI odası bulgusu (130 sinyal taraması)", () => {
+  it("local_competitor=established iken arbitraj 80+ reddedilir", () => {
+    const bad: CustomAnalysis = { ...base, lens: "arbitrage", local_competitor: "established" };
+    const v = checkAnalysisGuards(bad, { lensId: "arbitrage" });
+    expect(v.some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(true);
+  });
+
+  it("local_competitor=none_found/early_stage/unknown iken engellemez", () => {
+    for (const lc of ["none_found", "early_stage", "unknown"] as const) {
+      const a: CustomAnalysis = { ...base, lens: "arbitrage", local_competitor: lc };
+      const v = checkAnalysisGuards(a, { lensId: "arbitrage" });
+      expect(v.some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(false);
+    }
+  });
+
+  it("fit 80 altındaysa established olsa da devreye girmez", () => {
+    const watch: CustomAnalysis = {
+      ...base,
+      lens: "arbitrage",
+      fit: 70,
+      recommended_action: "watch",
+      confidence: "med",
+      validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }],
+      local_competitor: "established",
+    };
+    const v = checkAnalysisGuards(watch, { lensId: "arbitrage" });
+    expect(v.some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(false);
+  });
+
+  it("başka bir mercekte (white_space, custom) hiç devreye girmez", () => {
+    const a: CustomAnalysis = { ...base, lens: "white_space", local_competitor: "established" };
+    const v = checkAnalysisGuards(a, { lensId: "white_space" });
+    expect(v.some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(false);
+  });
+
+  it("lensId verilmezse devreye girmez — geriye dönük uyum", () => {
+    const a: CustomAnalysis = { ...base, local_competitor: "established" };
+    expect(checkAnalysisGuards(a).some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(false);
   });
 });

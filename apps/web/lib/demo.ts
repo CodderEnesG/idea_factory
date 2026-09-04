@@ -12,6 +12,7 @@ const d1Arbitrage: CustomAnalysis = {
   validation_needed: [],
   recommended_action: "pursue",
   tags: ["e-fatura", "kobi"],
+  local_competitor: "none_found",
 };
 
 const d1WhiteSpace: CustomAnalysis = {
@@ -33,6 +34,7 @@ const d1WhiteSpace: CustomAnalysis = {
   ],
   recommended_action: "watch",
   tags: ["e-fatura", "kobi"],
+  local_competitor: "none_found",
 };
 
 const d2Arbitrage: CustomAnalysis = {
@@ -52,6 +54,7 @@ const d2Arbitrage: CustomAnalysis = {
   ],
   recommended_action: "watch",
   tags: ["restoran", "vertical"],
+  local_competitor: "unknown",
 };
 
 const d3Arbitrage: CustomAnalysis = {
@@ -66,6 +69,7 @@ const d3Arbitrage: CustomAnalysis = {
   validation_needed: [],
   recommended_action: "kill",
   tags: ["neobank", "anti-pattern"],
+  local_competitor: "unknown",
 };
 
 /** Backend yokken kuyruğu göstermek için örnek veri (Supabase env gelince kullanılmaz). */

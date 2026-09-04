@@ -43,6 +43,7 @@ function validBody(): Omit<WhiteSpaceAnalysis, "lens"> {
     recommended_action: "watch",
     tags: ["saas"],
     extra_note: "iki erken oyuncu, hakim oyuncu yok",
+    local_competitor: "early_stage",
   };
 }
 

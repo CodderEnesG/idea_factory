@@ -42,7 +42,9 @@ export async function analyzeOne(signal: Signal, lens: Lens, deps: AnalyzeOneDep
         confidence: a.confidence,
         validation_needed: a.validation_needed,
         recommended_action: a.recommended_action,
-        tags: a.tags,
+        // local_competitor'ın kendi DB kolonu yok (migration'a değmez) — audit/görünürlük için
+        // tags'e ekleniyor; guard zaten üretim anında (analyst.ts) bu alanı zorunlu kılıyor.
+        tags: [...a.tags, `local_competitor:${a.local_competitor}`],
         model: env.analysisModel(),
       },
       { onConflict: "signal_id,lens" },

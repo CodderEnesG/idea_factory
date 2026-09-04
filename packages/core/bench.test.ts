@@ -29,6 +29,7 @@ function mkItem(fit: number, confidence: CustomAnalysis["confidence"]): RankedIt
     validation_needed: [],
     recommended_action: fit >= 80 ? "pursue" : fit >= 50 ? "watch" : "kill",
     tags: [],
+    local_competitor: "unknown",
   };
   return { signal, analyses: { arbitrage: analysis } };
 }

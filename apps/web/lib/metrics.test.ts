@@ -29,6 +29,7 @@ function analysis(fit: number): BaseAnalysis {
     validation_needed: [],
     recommended_action: fit >= 80 ? "pursue" : fit >= 50 ? "watch" : "kill",
     tags: [],
+    local_competitor: "unknown",
   } as BaseAnalysis;
 }
 

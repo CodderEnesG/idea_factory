@@ -38,6 +38,7 @@ function item(id: string, fit: number, validation = false): RankedItem {
         : [{ data: "d", why: "w", how_to_verify: "h" }],
     recommended_action: action,
     tags: [],
+    local_competitor: "unknown",
   };
   return { signal, analyses: { arbitrage: analysis } };
 }

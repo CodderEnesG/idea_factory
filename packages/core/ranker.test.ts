@@ -32,6 +32,7 @@ function ana(fit: number): CustomAnalysis {
     validation_needed: action === "pursue" ? [] : [{ data: "d", why: "w", how_to_verify: "h" }],
     recommended_action: action,
     tags: [],
+    local_competitor: "unknown",
   };
 }
 

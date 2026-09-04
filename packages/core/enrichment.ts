@@ -16,7 +16,15 @@ export type CapitalIntensity = z.infer<typeof CapitalIntensity>;
  * analist bunları "meta-öğrenme" diye rasyonalize edip yüksek fit veriyordu (bkz. guards (e)).
  * venture/product/funding = kovalanabilir; essay/research/other = kovalanamaz.
  */
-export const SignalKind = z.enum(["venture", "product", "funding", "essay", "research", "other"]);
+export const SignalKind = z.enum([
+  "venture",
+  "product",
+  "funding",
+  "incumbent_feature",
+  "essay",
+  "research",
+  "other",
+]);
 export type SignalKind = z.infer<typeof SignalKind>;
 
 /** Kovalanabilir mi — ortada şirket/ürün/tur var mı? */
@@ -77,12 +85,20 @@ demektir; boş bırakmak doğru davranıştır.
 
 Alan rehberi:
 - signal_kind: sinyalin ARKASINDA somut bir teşebbüs var mı? Bunu önce belirle:
-  · venture  — adı geçen, faaliyette bir şirket/girişim.
-  · product  — belirli bir ürün/araç (lansman, launch sayfası).
-  · funding  — bir şirketin aldığı somut yatırım turu.
-  · essay    — görüş/deneme/tavsiye yazısı, ilke anlatımı, "şu dersi çıkarın" içeriği.
-  · research — araştırma, veri/rapor, pazar analizi.
-  · other    — hiçbirine uymayan.
+  · venture            — adı geçen, BAĞIMSIZ, faaliyette bir şirket/girişim (arbitraj için
+    kovalanabilir: bu şirketin TR versiyonu kurulabilir).
+  · product            — bağımsız bir girişimin belirli bir ürünü/aracı (lansman, launch sayfası).
+  · funding            — bağımsız bir şirketin aldığı somut yatırım turu.
+  · incumbent_feature  — sinyal ASLINDA halihazırda büyük/yerleşik bir oyuncunun (Meta, Google,
+    Apple, Amazon, OpenAI, Microsoft, Shopify, Stripe, Slack vb. — zaten dev bir platform/şirket)
+    kendi ürününe eklediği YENİ BİR ÖZELLİK veya güncelleme duyurusu. Ortada kopyalanacak
+    BAĞIMSIZ bir teşebbüs yok — TR'de "bu şirketi kur" değil, olsa olsa "bu platforma entegre
+    ol" sorusu var, o da ayrı bir teşebbüs değil. venture/product ile KARIŞTIRMA: kritik ayrım
+    "bu haberin öznesi kendi başına kurulabilecek bağımsız bir şirket mi, yoksa zaten dev olan
+    birinin bir özelliği mi?" — ikincisiyse incumbent_feature.
+  · essay              — görüş/deneme/tavsiye yazısı, ilke anlatımı, "şu dersi çıkarın" içeriği.
+  · research           — araştırma, veri/rapor, pazar analizi.
+  · other              — hiçbirine uymayan.
   Uyarı: newsletter başlıkları çoğu zaman essay'dir. "Şirketinizi şöyle yönetin", "X neden
   başarısız olur", "Y hakkında düşünceler" → essay. Bir şirket ADI geçmiyorsa venture DEĞİL.
 - project_summary: ne yapıyor, hangi problemi nasıl çözüyor, iş modeli (2-3 cümle, Türkçe).

@@ -11,6 +11,16 @@ export type RecommendedAction = z.infer<typeof RecommendedAction>;
 export const Confidence = z.enum(["low", "med", "high"]);
 export type Confidence = z.infer<typeof Confidence>;
 
+/**
+ * Hedef pazarda (TR/MENA veya sinyalin kendi pazarı) bu işi ZATEN yapan biri var mı?
+ * "none_found" = aranmış, bulunamamış; "unknown" = araştırılmadı/emin değil (default —
+ * eski satırlarla geriye dönük uyum, guard bunu bloklamaz). Guard (i) yalnız "established"ı
+ * arbitraj 80+ bandında reddeder (bkz. guards.ts) — soru zaten arbitraj mercek sorularında
+ * vardı (ARBITRAGE_SEED_LENS soru 5) ama cevap fit'e yansımıyordu (kullanıcı bulgusu, 2026-09-04).
+ */
+export const LocalCompetitor = z.enum(["none_found", "early_stage", "established", "unknown"]);
+export type LocalCompetitor = z.infer<typeof LocalCompetitor>;
+
 export const EvidenceItem = z.object({
   fact: z.string().min(1),
   source: z.string().min(1), // atıfsız olgu reddedilir (guard)
@@ -37,6 +47,7 @@ export const BaseAnalysisSchema = z.object({
   validation_needed: z.array(ValidationItem).max(3), // zorunlu Validation Block
   recommended_action: RecommendedAction,
   tags: z.array(z.string()).default([]),
+  local_competitor: LocalCompetitor.default("unknown"),
 });
 export type BaseAnalysis = z.infer<typeof BaseAnalysisSchema>;
 
@@ -162,6 +173,11 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy.
 - Her olgu KAYNAK atfıyla (evidence[].source); atıfsız olgu yazma.
 - validation_needed: en fazla 3, en kritik; confidence:high değilse boş bırakma.
 - extra_note alanına "${def.extraNoteLabel}" başlığı altında özet bir not yaz.
+- local_competitor: hedef pazarda (TR/MENA veya ilgili pazar) bu işi ZATEN yapan biri var mı?
+  none_found (aradım, bulamadım) / early_stage (var ama küçük/erken) / established (yerleşik,
+  olgun rakip var) / unknown (araştırmadım). BOŞ GEÇME ama UYDURMA — bilmiyorsan unknown yaz.
+  established iken fit 80+ ver YASAK (guard reddeder) — "yerleşik rakip var ama biz daha iyi
+  yaparız" bir kovala gerekçesi DEĞİLDİR, bu tam olarak "savunulabilir boşluk yok" demektir.
 
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
@@ -203,7 +219,9 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
     "Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?",
     "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame.",
     "Zamanlama: neden şimdi? Yeni yetenek/maliyet eğrisi/regülasyon mümkün mü kıldı?",
-    "Kim deniyor: Türkiye'de zaten kovalayan var mı?",
+    "Kim deniyor: Türkiye'de zaten kovalayan var mı? Cevabını local_competitor alanına da " +
+      "yaz (none_found/early_stage/established/unknown) — bu soruyu sormakla YETİNME, cevabı " +
+      "fit'e yansıt: established ise 80+ verilemez.",
   ],
 };
 

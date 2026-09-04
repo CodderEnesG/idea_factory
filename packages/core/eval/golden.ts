@@ -45,6 +45,7 @@ export const golden: GoldenCase[] = [
       validation_needed: [],
       recommended_action: "pursue",
       tags: ["e-fatura", "kobi", "on-muhasebe"],
+      local_competitor: "early_stage",
     },
   },
   {
@@ -84,6 +85,7 @@ export const golden: GoldenCase[] = [
       validation_needed: [],
       recommended_action: "pursue",
       tags: ["geo", "llm-gorunurluk", "martech"],
+      local_competitor: "early_stage",
     },
   },
   // ── İZLE ────────────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ export const golden: GoldenCase[] = [
       ],
       recommended_action: "watch",
       tags: ["sponsorluk", "etkinlik", "vertical-saas"],
+      local_competitor: "none_found",
     },
   },
   {
@@ -175,6 +178,7 @@ export const golden: GoldenCase[] = [
       ],
       recommended_action: "watch",
       tags: ["cagri-merkezi", "konusma-analitigi"],
+      local_competitor: "none_found",
     },
   },
   // ── ELE ─────────────────────────────────────────────────────────────────
@@ -210,6 +214,7 @@ export const golden: GoldenCase[] = [
       validation_needed: [],
       recommended_action: "kill",
       tags: ["robotik", "anti-pattern", "sermaye-agir"],
+      local_competitor: "unknown",
     },
   },
   {
@@ -244,6 +249,7 @@ export const golden: GoldenCase[] = [
       validation_needed: [],
       recommended_action: "kill",
       tags: ["b2c", "healthtech", "wtp-belirsiz"],
+      local_competitor: "unknown",
     },
   },
 ];

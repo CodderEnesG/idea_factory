@@ -98,5 +98,16 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
     );
   }
 
+  // (i) yerleşik rakip guard'ı: arbitraj sorusu 5 hep vardı ("kim deniyor") ama cevap fit'e
+  // yansımıyordu (2026-09-04 kullanıcı bulgusu — 130 sinyallik AI odası taramasında ham
+  // "Kovala" bandındaki sinyallerin çoğu TR'de zaten yerleşik bir rakibin olduğu ürünlerdi).
+  // "established" = hedef pazarda bu işi zaten yapan olgun/yerleşik bir oyuncu var demek —
+  // savunulabilir boşluk yok, 80+ (kovala-adayı) OLAMAZ.
+  if (ctx.lensId === "arbitrage" && a.fit >= 80 && a.local_competitor === "established") {
+    v.push(
+      "yerleşik rakip guard'ı: local_competitor=established (hedef pazarda olgun bir rakip var) ama fit 80+ — savunulabilir boşluk yok",
+    );
+  }
+
   return v;
 }
