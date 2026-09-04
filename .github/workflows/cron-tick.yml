@@ -18,7 +18,9 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # 2026-09-04: backfill iki mercek için tick'e eklendi (~10dk ek) — 50dk bazı ticklerde
+    # (41m gözlendi) zaten dardı, 65'e çıkarıldı.
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +42,7 @@ jobs:
       # worker, core'u dist/ üzerinden import eder — temiz checkout'ta önce derlenmeli.
       - run: pnpm --filter @idea-factory/core build
 
-      - name: tick (topla → zenginleştir → ön-ele → analiz → digest)
+      - name: tick (topla → zenginleştir → ön-ele → analiz → backfill → digest)
         run: pnpm tick
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -53,6 +55,13 @@ jobs:
           TRIAGE_LIMIT: ${{ vars.TRIAGE_LIMIT || '100' }}
           ANALYZE_LIMIT: ${{ vars.ANALYZE_LIMIT || '40' }}
           ANALYZE_PER_SOURCE_CAP: ${{ vars.ANALYZE_PER_SOURCE_CAP || '12' }}
+          # 2026-09-04: `analyze.ts` yalnız en-yeni pencereyi tarar (fetchShortlist), eski
+          # backlog (1177 sinyal) o pencereye bir daha hiç girmiyordu. `backfill-lens.ts` artık
+          # `tick`'in kendi parçası (iki mercek de, her koşuda kademeli) — tavan gözetimsiz
+          # günlük maliyeti sınırlıyor, ~12/gün×2 mercek×2 tick'te ~1177'lik kuyruğu haftalar
+          # içinde kapatır. Kaynak-verim ağırlığı (source-weight.ts) sırayı zaten kaliteliye çeker.
+          BACKFILL_MAX: ${{ vars.BACKFILL_MAX || '12' }}
+          BACKFILL_CONCURRENCY: ${{ vars.BACKFILL_CONCURRENCY || '3' }}
           # Yorumcu kapısı (FAZ6_PLAN.md §Faz 2): her AI-kovala adayı 2 bağımsız tartışmadan
           # geçer. TUR tavanı (sinyal değil) — günde ~2.3 aday x 2 tur + birikmiş kuyruk payı.
           DEBATE_AUTO_LIMIT: ${{ vars.DEBATE_AUTO_LIMIT || '8' }}

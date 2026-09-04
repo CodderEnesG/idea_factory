@@ -79,6 +79,9 @@ export interface DebateOptions {
   model?: string;
   apiKey?: string;
   thesis?: ThesisConfig;
+  /** Analiz aşamasında (arbitraj merceği) zaten araştırılmış bulgu — varsa brief'e eklenir,
+   *  Yorumcu'nun "Türkiye'de değil" ile "Türkiye'de rakip var" ayrımını karıştırmasını önler. */
+  localCompetitor?: { value: string; note?: string };
   /** Her tur bitince çağrılır — UI'da ilerleme göstergesi için (bkz. DebateRoom.tsx). */
   onTurn?: (info: { index: number; total: number; speaker: string }) => void;
 }
@@ -104,6 +107,15 @@ function buildRoleSystemPrompt(role: DebateRole, t: ThesisConfig): string {
 - Risk iştahı: ${t.risk_appetite}
 - Anti-pattern'ler: ${t.anti_patterns.join("; ")}
 
+## Kritik netleştirme — "hedef pazar Türkiye" ne demektir
+Bu, sinyalin BUGÜN Türkiye'de faaliyet göstermesi gerektiği anlamına GELMEZ. Tezin çoğu
+sinyali arbitraj/uyarlama fırsatıdır: yurt dışında (UK/EU/US vb.) kanıtlanmış ama Türkiye'de
+henüz yapılmayan bir modeli buraya taşımak. Sinyalin kaynak pazarının Türkiye dışı olması
+TEK BAŞINA bir uyumsuzluk DEĞİLDİR — çoğu zaman fırsatın ta kendisidir. Asıl soru: Türkiye'de
+bunu ZATEN yapan biri var mı (varsa ve yerleşikse gerçek bir sorun; yoksa fırsat sağlam).
+Brief'te "Türkiye'de rakip" bulgusu verilmişse ona göre değerlendir, verilmemişse bunu
+"bilinmiyor" say, "sinyal Türkiye'de değil" diye TEK BAŞINA ele gerekçesi yapma.
+
 ## Kurallar (kritik, ihlal edilemez)
 - Rolünün dışına çıkamazsın — her zaman "${role.name}" bakış açısından konuş.
 - Söylediğin her olgu KAYNAK atfıyla gelir (evidence[].source); atıfsız olgu yazma.
@@ -120,6 +132,12 @@ const MODERATOR_SYSTEM = (t: ThesisConfig) => `Sen tartışmayı yöneten tarafs
 - Sermaye aralığı: ${t.capital_range}
 - Risk iştahı: ${t.risk_appetite}
 - Anti-pattern'ler: ${t.anti_patterns.join("; ")}
+
+## Kritik netleştirme
+"Hedef pazar Türkiye" sinyalin bugün Türkiye'de olması gerektiği anlamına gelmez — çoğu
+sinyal tanım gereği yurt dışında kanıtlanmış bir modelin Türkiye'ye uyarlanmasıdır. Bir
+konuşmacı YALNIZCA "sinyal Türkiye'de değil" gerekçesiyle ele diyorsa bunu zayıf bir argüman
+say, sentezde ağırlığını düşür — asıl belirleyici Türkiye'de yerleşik bir rakip olup olmadığı.
 
 Görevin: tartışmayı sentezlemek, en güçlü argümanları tartıp bu teze göre nihai bir
 kovala/izle/ele kararı vermek ve nedenini kısaca özetlemek. Çıktıyı YALNIZ verilen JSON
@@ -178,7 +196,10 @@ export async function runDebate(
   const provider = pickProvider(opts);
   const thesis = opts.thesis ?? defaultThesis;
   const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
-  const brief = buildSignalBrief(signal, enrParsed.success ? enrParsed.data : null);
+  const lc = opts.localCompetitor;
+  const brief =
+    buildSignalBrief(signal, enrParsed.success ? enrParsed.data : null) +
+    (lc ? `\n\nAnaliz bulgusu — Türkiye'de rakip (local_competitor): ${lc.value}${lc.note ? ` — ${lc.note}` : ""}` : "");
   const transcript: DebateTurn[] = [];
   // Operasyon bütçesi (FAZ6_PLAN.md §Faz 1.1): 7 tur × 2 deneme, çağrı başına timeout olsa
   // bile toplamda ~21dk edebilir. Tartışma artık Yorumcu kapısıyla tick'in kritik hattında —

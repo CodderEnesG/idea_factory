@@ -22,18 +22,23 @@ import {
  * İkinci tetikleyici korunuyor: bir insan fit<80 bir sinyale "Kovala" dediyse orada da
  * ikinci görüş değerli (kapı onu hiç seçmez).
  *
- * Tick sırası DEĞİŞMİYOR — `package.json` zaten `analyze && debate-auto && digest` koşuyor,
- * yani tick N'de analiz edilen sinyal tick N'de kapıdan geçer. Bunu "düzeltmeye" kalkma.
+ * Tick sırası: `analyze && backfill-lens(arbitrage) && backfill-lens(white_space) && debate-auto
+ * && digest` — 2026-09-04'te backfill ikisi arasına eklendi (bkz. `source-weight.ts`), yani hem
+ * tick N'de analiz edilen HEM backfill'lenen sinyal aynı tick'te kapıdan geçer. Sırayı bozma.
  */
 const BATCH_LIMIT = Number(process.env["DEBATE_AUTO_LIMIT"] ?? "8"); // TUR tavanı (sinyal değil)
 const AUTO_CREATED_BY = "otomatik (Yorumcu kapısı)";
 
-/** Sinyal başına analizleri toplayıp kompozit bandı hesapla. */
-async function loadGateCandidates(): Promise<GateCandidateRow[]> {
+/** Sinyal başına analizleri toplayıp kompozit bandı hesapla; analiz map'i de döner
+ *  (Yorumcu'ya local_competitor bulgusunu geçebilmek için — bkz. `runDebate` çağrısı). */
+async function loadGateCandidates(): Promise<{
+  rows: GateCandidateRow[];
+  analysesBySignal: Map<string, Record<string, BaseAnalysis>>;
+}> {
   const lensRegistry = await loadActiveCustomLenses();
   const { data, error } = await db
     .from("analyses")
-    .select("signal_id, lens, fit, confidence, recommended_action, created_at")
+    .select("signal_id, lens, fit, confidence, recommended_action, tags, rationale, created_at")
     .order("created_at", { ascending: false });
   if (error) throw new Error(`analyses sorgu hatası: ${error.message}`);
 
@@ -47,12 +52,31 @@ async function loadGateCandidates(): Promise<GateCandidateRow[]> {
     bySignal.set(signalId, entry);
   }
 
-  const out: GateCandidateRow[] = [];
+  const rows: GateCandidateRow[] = [];
+  const analysesBySignal = new Map<string, Record<string, BaseAnalysis>>();
   for (const [signalId, entry] of bySignal) {
     const comp = composite(entry.analyses, lensRegistry);
-    out.push({ signal_id: signalId, band: comp.band, fit: comp.fit, ts: entry.ts });
+    rows.push({ signal_id: signalId, band: comp.band, fit: comp.fit, ts: entry.ts });
+    analysesBySignal.set(signalId, entry.analyses);
   }
-  return out;
+  return { rows, analysesBySignal };
+}
+
+/** `local_competitor` kendi DB kolonu yok — `analyze-one.ts` onu `tags`'e
+ *  `local_competitor:<değer>` olarak yazıyor (bkz. o dosyadaki not). Birden çok mercek varsa
+ *  en bilgilendirici (unknown olmayan) tercih edilir. */
+function pickLocalCompetitor(
+  analyses: Record<string, BaseAnalysis> | undefined,
+): { value: string; note?: string } | undefined {
+  if (!analyses) return undefined;
+  const rows = Object.values(analyses) as (BaseAnalysis & { tags?: string[]; rationale?: string })[];
+  const extract = (r: (typeof rows)[number]) =>
+    r.tags?.find((t) => t.startsWith("local_competitor:"))?.slice("local_competitor:".length);
+  const withValue = rows.map((r) => ({ r, value: extract(r) })).filter((x) => x.value);
+  const known = withValue.find((x) => x.value !== "unknown");
+  const picked = known ?? withValue[0];
+  if (!picked?.value) return undefined;
+  return { value: picked.value, note: picked.r.rationale?.slice(0, 200) };
 }
 
 async function main(): Promise<void> {
@@ -78,7 +102,7 @@ async function main(): Promise<void> {
     if (r.kind === "auto") autoCount.set(r.signal_id, (autoCount.get(r.signal_id) ?? 0) + 1);
   }
 
-  const gateRows = await loadGateCandidates();
+  const { rows: gateRows, analysesBySignal } = await loadGateCandidates();
   const gateIds = selectGateCandidates(gateRows, autoCount);
 
   // İkincil: insan "kovala" demiş ama kapı kapsamına girmeyen sinyaller.
@@ -133,7 +157,8 @@ async function main(): Promise<void> {
     }
 
     try {
-      const result = await runDebate(signal as Signal, { thesis });
+      const localCompetitor = pickLocalCompetitor(analysesBySignal.get(signalId));
+      const result = await runDebate(signal as Signal, { thesis, localCompetitor });
       const { error: insErr } = await db.from("debates").insert({
         signal_id: signalId,
         created_by: `${AUTO_CREATED_BY} #${runNo}`,

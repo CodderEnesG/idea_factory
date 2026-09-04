@@ -20,6 +20,7 @@ import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
 import { analyzeOne } from "./lib/analyze-one.js";
+import { loadSourceWeights } from "./lib/source-weight.js";
 
 const BATCH_LIMIT = Number(process.env["ANALYZE_LIMIT"] ?? "10");
 // Tek kaynak partiyi domine etmesin: kaynak başına tavan (bir tick'te TLDR 10/10 alıp
@@ -49,13 +50,19 @@ async function fetchShortlist(
   if (error) throw new Error(`signals sorgu hatası: ${error.message}`);
   const window = (data ?? []) as Signal[];
 
+  // Kıt LLM bütçesini kaynağın tarihsel fit≥80 oranına göre önceliklendir (bkz. source-weight.ts) —
+  // ölçüm (2026-09-04): techcrunch fit≥80 oranı producthunt'ın ~5 katı, ycombinator 134 analizde
+  // hiç üretmedi. Sabit kaynak-tavanı bunu görmez, sıralama önceliği görür.
+  const sourceWeights = await loadSourceWeights();
+
   // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
   // signal_kind null = legacy satır (sınıf bilinmiyor) → elemeden geçir.
   const scored = window
     .map((s) => {
       const e = StoredEnrichmentSchema.safeParse(s.enrichment);
       const actionable = !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
-      const score = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
+      const base = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
+      const score = base * (sourceWeights.get(s.source) ?? 1);
       return { signal: s, actionable, score };
     })
     .filter((x) => x.actionable)

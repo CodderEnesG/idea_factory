@@ -13,6 +13,7 @@ import { supabaseKnowledgeLayer } from "./lib/knowledge-db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
 import { selectCandidates, type Candidate } from "./lib/backfill-select.js";
+import { loadSourceWeights } from "./lib/source-weight.js";
 
 /**
  * Geçmişe dönük mercek doldurma. `analyze.ts` yalnız EN YENİ pencereyi çeker
@@ -24,9 +25,13 @@ import { selectCandidates, type Candidate } from "./lib/backfill-select.js";
  * Resumable: "yapılmışlar" her koşuda yeniden hesaplanır, tekrar çalıştırmak kaldığı yerden
  * devam eder; cron aynı anda koşsa bile `analyze.ts` ile aynı `onConflict` upsert'i kullanır.
  */
-const LENS_ID = process.env["BACKFILL_LENS"] ?? "white_space";
+// CLI argüman env değişkeninden önce gelir — `tick` script'i kaynak-bağımsız (cross-env'siz)
+// iki merceği ard arda çağırabilsin diye: `tsx backfill-lens.ts arbitrage`.
+const LENS_ID = process.argv[2] ?? process.env["BACKFILL_LENS"] ?? "white_space";
 // Koşu başı tavan bilinçli düşük: 800+ sinyallik backfill'i kademeli harca, aradaki çıktıyı gör.
-const MAX = Number(process.env["BACKFILL_MAX"] ?? "50");
+// 2026-09-04'ten beri `tick`'in kendisi (2x/gün, otomatik) her iki merceği de çağırıyor —
+// tavan artık yalnız tek seferlik manuel koşuyu değil, GÖZETİMSİZ günlük maliyeti de sınırlıyor.
+const MAX = Number(process.env["BACKFILL_MAX"] ?? "15");
 const DRY = process.env["BACKFILL_DRY"] === "true";
 // Tek analiz dakikalar sürüyor (ağır şema + guard retry) — 840 sinyal sıralı ≈ günler.
 // Çağrılar I/O-bağlı, paralelleşir. AMA Vertex kotası dar: 5 paralelde 429 RESOURCE_EXHAUSTED
@@ -62,7 +67,10 @@ async function doneSet(lensId: string): Promise<Set<string>> {
 }
 
 /** Tüm sinyalleri sayfa sayfa tara (yeni-pencere DEĞİL); eleme+sıralama `selectCandidates`'ta. */
-async function findCandidates(done: Set<string>): Promise<{ candidates: Candidate[]; scanned: number }> {
+async function findCandidates(
+  done: Set<string>,
+  sourceWeights: Map<string, number>,
+): Promise<{ candidates: Candidate[]; scanned: number }> {
   const all: Signal[] = [];
 
   for (let from = 0; ; from += PAGE) {
@@ -77,13 +85,15 @@ async function findCandidates(done: Set<string>): Promise<{ candidates: Candidat
     if (rows.length < PAGE) break;
   }
 
-  return { candidates: selectCandidates(all, done), scanned: all.length };
+  return { candidates: selectCandidates(all, done, sourceWeights), scanned: all.length };
 }
 
 async function main(): Promise<void> {
   const lens = await resolveLens(LENS_ID);
   const done = await doneSet(lens.id);
-  const { candidates, scanned } = await findCandidates(done);
+  // Kıt LLM bütçesini kaynağın tarihsel fit≥80 oranına göre önceliklendir (bkz. source-weight.ts).
+  const sourceWeights = await loadSourceWeights();
+  const { candidates, scanned } = await findCandidates(done, sourceWeights);
 
   console.log(
     `[${lens.id}] ${scanned} sinyal tarandı → ${done.size} zaten analizli, ` +

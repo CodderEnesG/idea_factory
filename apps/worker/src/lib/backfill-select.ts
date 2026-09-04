@@ -15,16 +15,24 @@ export interface Candidate {
  *
  * `analyze.ts:fetchShortlist` ile aynı eleme kuralları: şema geçmeyen/`signal_kind` null olan
  * satır "sınıf bilinmiyor"dur, elemeden geçirilir (legacy satırları sessizce kaybetmemek için).
+ *
+ * `sourceWeights`: kaynağın tarihsel fit≥80 oranına göre çarpan (bkz. `source-weight.ts`) —
+ * verilmezse (test/eski çağrı) 1 varsayılır, davranış değişmez.
  */
-export function selectCandidates(signals: Signal[], done: Set<string>): Candidate[] {
+export function selectCandidates(
+  signals: Signal[],
+  done: Set<string>,
+  sourceWeights?: Map<string, number>,
+): Candidate[] {
   const candidates: Candidate[] = [];
   for (const signal of signals) {
     if (done.has(signal.id)) continue;
     const e = StoredEnrichmentSchema.safeParse(signal.enrichment);
     const actionable = !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
     if (!actionable) continue;
-    const score = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
-    candidates.push({ signal, score });
+    const base = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
+    const weight = sourceWeights?.get(signal.source) ?? 1;
+    candidates.push({ signal, score: base * weight });
   }
   return candidates.sort((a, b) => b.score - a.score);
 }
