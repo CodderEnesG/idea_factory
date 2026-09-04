@@ -16,6 +16,7 @@ import { euStartups } from "./sources/eu-startups.js";
 import { sifted } from "./sources/sifted.js";
 import { fintechtime } from "./sources/fintechtime.js";
 import { finberg } from "./sources/finberg.js";
+import { hackernews } from "./sources/hackernews.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 import { fetchAllSources } from "./lib/fetch-sources.js";
@@ -38,6 +39,7 @@ const ALL_SOURCES: Source[] = [
   sifted,
   fintechtime,
   finberg,
+  hackernews,
 ];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda

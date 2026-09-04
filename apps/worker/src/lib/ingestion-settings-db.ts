@@ -18,6 +18,7 @@ const KNOWN_SOURCES = [
   "sifted",
   "fintechtime",
   "finberg",
+  "hackernews",
 ];
 
 export interface IngestionSettings {

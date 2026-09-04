@@ -18,6 +18,7 @@ export const KNOWN_SOURCES = [
   "sifted",
   "fintechtime",
   "finberg",
+  "hackernews",
 ] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
