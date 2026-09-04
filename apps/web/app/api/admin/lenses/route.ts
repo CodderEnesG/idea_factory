@@ -27,7 +27,11 @@ export async function POST(req: Request) {
   const name = typeof body?.["name"] === "string" ? body["name"].trim() : "";
   const extraNoteLabel =
     typeof body?.["extra_note_label"] === "string" ? body["extra_note_label"].trim() : "";
-  const weight = typeof body?.["weight"] === "number" && body["weight"] >= 0 ? body["weight"] : 1;
+  const weight =
+    typeof body?.["weight"] === "number" && body["weight"] >= 0 && body["weight"] <= 10
+      ? body["weight"]
+      : 1;
+  const grounding = body?.["grounding"] === true;
   const questions = body?.["questions"];
   if (!name || !extraNoteLabel || !isStringArray(questions) || questions.length === 0) {
     return NextResponse.json({ ok: false, error: "geçersiz mercek gövdesi" }, { status: 400 });
@@ -50,6 +54,7 @@ export async function POST(req: Request) {
     weight,
     extra_note_label: extraNoteLabel,
     questions,
+    grounding,
     active: true,
     created_by: admin.username,
   });

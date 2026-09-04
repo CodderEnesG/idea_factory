@@ -4,7 +4,21 @@ import { loadItems } from "../../lib/load-items";
 import { loadLensRegistry } from "../../lib/load-lens-registry";
 import { loadActiveThesis } from "../../lib/active-thesis";
 import { loadActiveIngestionSettings } from "../../lib/active-ingestion-settings";
-import { weeklyQualified, noiseRatio, decisionRatio, latestDecisionPerSignal, finalizedPursueCount } from "../../lib/metrics";
+import {
+  weeklyQualified,
+  noiseRatio,
+  decisionRatio,
+  latestDecisionPerSignal,
+  finalizedPursueCount,
+  pursuePrecision,
+  debateVerdictMix,
+  groundingCoverage,
+  type PursuePrecisionInput,
+} from "../../lib/metrics";
+import { loadDebates } from "../../lib/load-debates";
+import { buildCompetitionView, resolveCardBands } from "../../lib/build-card-view";
+import { composite } from "@idea-factory/core";
+import { isMissingColumn } from "../../lib/pg-compat";
 import { loadFinalDecisions } from "../../lib/load-final-decisions";
 import { computeSourceHealth, type SourceHealth, type SourceStatus } from "../../lib/source-health";
 import { formatSource } from "../../lib/source-labels";
@@ -21,11 +35,20 @@ const WEEKS = 8;
 async function loadLenses(): Promise<LensRow[]> {
   const db = serverDb();
   if (!db) return [];
-  const { data } = await db
+  const BASE = "lens_id, name, weight, extra_note_label, questions, active, created_by, created_at";
+  let res = (await db
     .from("lenses")
-    .select("lens_id, name, weight, extra_note_label, questions, active, created_by, created_at")
-    .order("created_at", { ascending: true });
-  return (data ?? []) as LensRow[];
+    .select(`${BASE}, grounding`)
+    .order("created_at", { ascending: true })) as {
+    data: LensRow[] | null;
+    error: { code?: string; message: string } | null;
+  };
+  // 0015 uygulanmadıysa grounding'siz oku — yoksa mercek yönetimi sayfası tamamen boş kalır.
+  if (isMissingColumn(res.error)) {
+    res = (await db.from("lenses").select(BASE).order("created_at", { ascending: true })) as typeof res;
+  }
+  if (res.error) console.error("[admin/lenses] sorgu hatası:", res.error.message);
+  return res.data ?? [];
 }
 
 /** Karar/sinyal + "kovala" bağlamı için ham `decisions` satırları (created_at DESC). */
@@ -165,7 +188,7 @@ export default async function AdminPage({
     );
   }
 
-  const [thesis, customLenses, ingestionSettings, { items, demo }, decisionRows, sourceRows, lensRegistry, finalDecisions] =
+  const [thesis, customLenses, ingestionSettings, { items, demo, error: loadError }, decisionRows, sourceRows, lensRegistry, finalDecisions, debateRes] =
     await Promise.all([
       loadActiveThesis(),
       loadLenses(),
@@ -175,6 +198,7 @@ export default async function AdminPage({
       loadSourceRows(),
       loadLensRegistry(),
       loadFinalDecisions(),
+      loadDebates(),
     ]);
 
   const sourceHealth = computeSourceHealth(sourceRows);
@@ -187,6 +211,32 @@ export default async function AdminPage({
   const pursueCount = [...latest.values()].filter((d) => d === "pursue").length;
   const noise = noiseRatio(items, lensRegistry);
   const finalizedPursue = finalizedPursueCount([...finalDecisions.values()]);
+
+  // Kalibrasyon (FAZ6_PLAN.md §Faz 5.5) — kapının ve grounding'in işe yarayıp yaramadığı.
+  const precisionRows: PursuePrecisionInput[] = items.map((item) => {
+    const comp = composite(item.analyses, lensRegistry);
+    const bands = resolveCardBands({
+      comp,
+      mine: null,
+      final: finalDecisions.get(item.signal.id)?.decision ?? null,
+      debates: debateRes.map.get(item.signal.id) ?? [],
+      gateEnabled: !demo,
+    });
+    return {
+      signalId: item.signal.id,
+      gatedBand: bands.gatedBand,
+      gate: bands.gate,
+      competition: buildCompetitionView(item.analyses, lensRegistry)?.label ?? null,
+    };
+  });
+  const precision = pursuePrecision(precisionRows, latest);
+  const verdictMix = debateVerdictMix(
+    [...debateRes.map.values()].flat().map((d) => d.final_verdict),
+  );
+  const grounding = groundingCoverage(
+    items.flatMap((i) => Object.values(i.analyses).map((a) => ({ lens: a.lens, confidence: a.confidence }))),
+  );
+  const gatePending = precisionRows.filter((r) => r.gate === "pending").length;
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -245,6 +295,11 @@ export default async function AdminPage({
                   Demo modu — Supabase env yok. Gerçek sayılar için <code>.env</code>&apos;e key ekle.
                 </div>
               )}
+              {loadError && (
+                <div role="alert" className="mt-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-kill">
+                  Veriler yüklenemedi — {loadError}. Sayfayı yenile.
+                </div>
+              )}
 
               <div className="mt-6 grid grid-cols-2 gap-4 xl:grid-cols-5">
                 <StatTile
@@ -270,10 +325,65 @@ export default async function AdminPage({
                 <StatTile label="Toplam analiz edilmiş sinyal" value={String(items.length)} />
               </div>
 
+              <h2 className="mt-8 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Kalibrasyon — Yorumcu kapısı işe yarıyor mu
+              </h2>
+              <p className="mt-1 text-xs text-ink-muted">
+                İnsan kararlarına karşı ölçüm. Kapı öncesi taban: <strong>%22</strong> (79
+                AI-kovala sinyalin 17'sinde insan da kovala dedi, 36'sı ele edildi). Çekince:
+                bu <em>insan incelemesine</em> karşı kesinliktir ve kovala-bandı sinyallerinin
+                yalnız bir kısmı incelenmiştir — insanlar zaten ilginç görüneni inceliyor.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
+                <StatTile
+                  label="Kovala kesinliği (kapılı)"
+                  value={precision.overall.precision === null ? "—" : pct(precision.overall.precision)}
+                  hint={`${precision.overall.agreed}/${precision.overall.reviewed} incelenmiş · taban %22`}
+                />
+                <StatTile
+                  label="Yorumcu onayladı"
+                  value={precision.byGate.confirmed.precision === null ? "—" : pct(precision.byGate.confirmed.precision)}
+                  hint={`${precision.byGate.confirmed.agreed}/${precision.byGate.confirmed.reviewed} · hedef ≥%50`}
+                />
+                <StatTile
+                  label="Yorumcu çekinceli"
+                  value={precision.byGate.caveat.precision === null ? "—" : pct(precision.byGate.caveat.precision)}
+                  hint={`${precision.byGate.caveat.agreed}/${precision.byGate.caveat.reviewed} · ikisi de "izle" dedi`}
+                />
+                <StatTile
+                  label="Kapı kuyruğu"
+                  value={String(gatePending)}
+                  hint="AI kovala dedi, 2 tartışma tamamlanmadı — İzle bandında bekliyor"
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
+                <StatTile
+                  label="Yorumcu verdict karışımı"
+                  value={`${verdictMix.pursue}/${verdictMix.watch}/${verdictMix.kill}`}
+                  hint="kovala/izle/ele · taban 3/62/195 — 0/26/74'e çökerse kapı kuyruğu boğuyor"
+                />
+                <StatTile
+                  label="Beyaz-alan: boşluk gerçek"
+                  value={precision.byCompetition["boş"]?.precision === null ? "—" : pct(precision.byCompetition["boş"]!.precision!)}
+                  hint={`${precision.byCompetition["boş"]?.agreed ?? 0}/${precision.byCompetition["boş"]?.reviewed ?? 0} · ws≥60, taban %40 (n=10)`}
+                />
+                <StatTile
+                  label="Beyaz-alan: kalabalık"
+                  value={precision.byCompetition["kalabalık"]?.precision === null ? "—" : pct(precision.byCompetition["kalabalık"]!.precision!)}
+                  hint={`${precision.byCompetition["kalabalık"]?.agreed ?? 0}/${precision.byCompetition["kalabalık"]?.reviewed ?? 0} · ws<40, taban %7 (n=28)`}
+                />
+                <StatTile
+                  label="Beyaz-alan düşük güven"
+                  value={grounding.lowRatio === null ? "—" : pct(grounding.lowRatio)}
+                  hint={`${grounding.low}/${grounding.total} · taban %66 — grounding'in TEK ölçütü, düşmezse geri alınır`}
+                />
+              </div>
+
               <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <UnmeasuredTile
-                  label={`"Kovala" isabeti (North Star)`}
-                  why={`gerçek doğrulama/çıktı takibi henüz yok — şu an ${pursueCount} sinyalin son kararı "kovala", ama hangisinin gerçekten değer yarattığı ayrı bir outcome tablosu ister.`}
+                  label={`"Kovala" isabeti (gerçek dünya)`}
+                  why={`insan kararına karşı ölçüm yukarıda. Gerçek dünyada ne olduğu (geliştirildi mi, pazara çıktı mı) bilinçli olarak uygulamada takip EDİLMİYOR — şu an ${pursueCount} sinyalin son kararı "kovala".`}
                 />
                 <UnmeasuredTile
                   label="Bilgi-tabanı sorgu kullanımı"

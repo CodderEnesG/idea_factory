@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { serverDb } from "../../../../lib/supabase";
 import { getSession } from "../../../../lib/auth";
 import { authEnabled } from "../../../../lib/session";
-import { PURSUE_STARTER_TASKS } from "../../../../lib/task-templates";
+import { seedStarterTasks } from "../../../../lib/task-templates";
 
 const VALID = new Set(["pursue", "watch", "kill"]);
 const WATCH_REVIEW_DAYS = 30;
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   const { error } = await db.from("final_decisions").upsert({
     signal_id: body.signal_id,
     decision: body.decision,
-    reason: body.reason?.trim() || null,
+    reason: body.reason?.trim().slice(0, 600) || null, // üst sınır: serbest metin, kapaksız bırakılmamalı
     decided_by: decidedBy,
     decided_at: new Date().toISOString(),
   });
@@ -47,16 +47,7 @@ export async function POST(req: Request) {
   await db.from("signals").update({ watch_review_at: watchReviewAt }).eq("id", body.signal_id);
 
   if (body.decision === "pursue") {
-    const { count } = await db
-      .from("item_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("signal_id", body.signal_id)
-      .eq("owner", decidedBy);
-    if (!count) {
-      await db
-        .from("item_tasks")
-        .insert(PURSUE_STARTER_TASKS.map((task) => ({ signal_id: body.signal_id, owner: decidedBy, body: task })));
-    }
+    await seedStarterTasks(db, body.signal_id, decidedBy);
   }
 
   return NextResponse.json({ ok: true });

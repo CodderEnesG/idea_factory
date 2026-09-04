@@ -9,7 +9,7 @@ vi.mock("../../../../lib/auth", () => ({ getSession: getSessionMock }));
 vi.mock("../../../../lib/supabase", () => ({ serverDb: serverDbMock }));
 vi.mock("../../../../lib/session", () => ({ authEnabled: authEnabledMock }));
 
-import { PATCH } from "./route";
+import { PATCH, DELETE } from "./route";
 
 function req(body: unknown): Request {
   return new Request("http://localhost/api/tasks/t1", {
@@ -27,8 +27,9 @@ function chainDb(result: { data: unknown[] | null; error: { message: string } | 
   chain["eq"] = vi.fn().mockReturnValue(chain);
   chain["select"] = vi.fn().mockResolvedValue(result);
   const update = vi.fn().mockReturnValue(chain);
-  const from = vi.fn().mockReturnValue({ update });
-  return { from, update, chain };
+  const del = vi.fn().mockReturnValue(chain);
+  const from = vi.fn().mockReturnValue({ update, delete: del });
+  return { from, update, del, chain };
 }
 
 describe("PATCH /api/tasks/[taskId]", () => {
@@ -57,7 +58,10 @@ describe("PATCH /api/tasks/[taskId]", () => {
     expect(await res.json()).toEqual({ ok: true, demo: true });
   });
 
-  it("admin olmayan kullanıcı yalnız kendi görevini günceller (owner eq'ı eklenir)", async () => {
+  // KASITLI ASİMETRİ (FAZ6_PLAN.md §Faz 6.2): görevler artık ekipçe görünür ve 3 şablon görev
+  // Kovala'ya ilk basanın üstünde kalıyor — takım arkadaşı onları işaretleyemezse paylaşımlı
+  // liste işe yaramaz. Metni DEĞİŞTİRMEK ve SİLMEK ise sahibine (ya da admin'e) özel.
+  it("done toggle'ında owner kısıtı YOK — ekipten herkes işaretleyebilir", async () => {
     getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
     const { from, update, chain } = chainDb({ data: [{ id: "t1" }], error: null });
     serverDbMock.mockReturnValue({ from });
@@ -65,8 +69,44 @@ describe("PATCH /api/tasks/[taskId]", () => {
     const res = await PATCH(req({ done: true }), params);
     expect(from).toHaveBeenCalledWith("item_tasks");
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ done: true }));
-    expect(chain["eq"]).toHaveBeenCalledWith("id", "t1");
+    expect((chain["eq"] as ReturnType<typeof vi.fn>).mock.calls).toEqual([["id", "t1"]]);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("metin düzenlemede admin olmayan yalnız kendi görevini değiştirebilir", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const { update, chain, from } = chainDb({ data: [{ id: "t1" }], error: null });
+    serverDbMock.mockReturnValue({ from });
+
+    const res = await PATCH(req({ body: "  yeni metin  " }), params);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ body: "yeni metin" }));
     expect(chain["eq"]).toHaveBeenCalledWith("owner", "enes");
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("boş metin 400 döner", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const res = await PATCH(req({ body: "   " }), params);
+    expect(res.status).toBe(400);
+  });
+
+  it("DELETE: sahibi olmayan silemez (owner eq'ı eklenir), bulunamazsa 404", async () => {
+    getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
+    const { from, chain } = chainDb({ data: [], error: null });
+    serverDbMock.mockReturnValue({ from });
+
+    const res = await DELETE(new Request("http://x", { method: "DELETE" }), params);
+    expect(chain["eq"]).toHaveBeenCalledWith("owner", "enes");
+    expect(res.status).toBe(404);
+  });
+
+  it("DELETE: admin owner kısıtı olmadan siler", async () => {
+    getSessionMock.mockResolvedValue({ username: "admin1", display_name: "Admin", is_admin: true });
+    const { from, chain } = chainDb({ data: [{ id: "t1" }], error: null });
+    serverDbMock.mockReturnValue({ from });
+
+    const res = await DELETE(new Request("http://x", { method: "DELETE" }), params);
+    expect((chain["eq"] as ReturnType<typeof vi.fn>).mock.calls).toEqual([["id", "t1"]]);
     expect(await res.json()).toEqual({ ok: true });
   });
 

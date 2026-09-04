@@ -24,17 +24,16 @@ export default async function PanomPage() {
   const me = await getSession();
   const meName = me?.username ?? "web";
   const isAdmin = me?.is_admin ?? false;
-  // loadDebates yalnız isAdmin'e bağlı (session zaten çözüldü) — eskiden Promise.all'dan
-  // SONRA ayrı bir await'ti, sayfanın kritik yoluna gereksiz bir tam round-trip ekliyordu.
-  const [{ items }, decisions, finalDecisions, comments, tasks, lensRegistry, debates] = await Promise.all([
+  const [{ items, demo }, decisions, finalDecisions, comments, tasks, lensRegistry, debateRes] = await Promise.all([
     loadItems(),
     loadDecisions(),
     loadFinalDecisions(),
     loadComments(),
-    loadTasks(meName),
+    loadTasks(),
     loadLensRegistry(),
-    loadDebates(isAdmin),
+    loadDebates(),
   ]);
+  const debates = debateRes.map;
 
   const cards = rank(items, { lensRegistry })
     .map((item) => {
@@ -51,6 +50,7 @@ export default async function PanomPage() {
         isAdmin,
         debates.get(item.signal.id) ?? [],
         finalDecisions.get(item.signal.id) ?? null,
+        !demo, // demo kartlarda tartışma yok — kapı açık olsaydı hepsi "bekliyor" görünürdü
       );
     })
     // Panom eskiden yalnız BEN karar verdiysem ya da kilitliyse gösteriyordu — başka bir

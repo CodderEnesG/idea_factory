@@ -107,9 +107,14 @@ describe("POST /api/admin/debates", () => {
 
     expect(events[0]).toEqual({ type: "progress", index: 0, total: 7, speaker: null });
     expect(events[1]).toEqual({ type: "progress", index: 1, total: 7, speaker: "arbitrage" });
-    expect(events[2]).toEqual({ type: "done", debate: insertedDebate });
+    // 0014: elle tetiklenen tartışma `kind='manual'` — kapı turu DEĞİL (yalnız 'auto'
+    // satırları kapıyı kapatır, aksi halde tek bir manuel tetikleme kapıyı erken kapatırdı).
+    expect(events[2]).toEqual({
+      type: "done",
+      debate: { ...insertedDebate, kind: "manual", run_no: null, turn_count: 0 },
+    });
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ signal_id: "s1", created_by: "enes", final_verdict: "watch" }),
+      expect.objectContaining({ signal_id: "s1", created_by: "enes", final_verdict: "watch", kind: "manual" }),
     );
   });
 

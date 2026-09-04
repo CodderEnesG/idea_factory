@@ -9,6 +9,17 @@ vi.mock("../../../../lib/auth", () => ({ getSession: getSessionMock }));
 vi.mock("../../../../lib/supabase", () => ({ serverDb: serverDbMock }));
 vi.mock("../../../../lib/session", () => ({ authEnabled: authEnabledMock }));
 
+/** `seedStarterTasks` artık en yüksek fit'li analizin `validation_needed`'ini okuyor
+ *  (FAZ6_PLAN.md §Faz 6.4) — jenerik şablon yalnız son çare. Bu sahte tablo o sorguyu karşılar. */
+function analysesStub(validation: unknown[] | null = null) {
+  const obj: Record<string, unknown> = {};
+  obj.select = vi.fn(() => obj);
+  obj.eq = vi.fn(() => obj);
+  obj.order = vi.fn(() => obj);
+  obj.limit = vi.fn(() => Promise.resolve({ data: validation ? [{ validation_needed: validation, fit: 88 }] : [] }));
+  return obj;
+}
+
 import { POST, DELETE } from "./route";
 
 function req(method: string, body: unknown): Request {
@@ -92,7 +103,7 @@ describe("POST /api/decisions/final", () => {
     const signals = signalsTable();
     const tasks = itemTasksTable(0);
     serverDbMock.mockReturnValue({
-      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks })[t],
+      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks, analyses: analysesStub() })[t],
     });
 
     const res = await POST(req("POST", { signal_id: "s1", decision: "kill" }));
@@ -108,7 +119,7 @@ describe("POST /api/decisions/final", () => {
     const signals = signalsTable();
     const tasks = itemTasksTable(0);
     serverDbMock.mockReturnValue({
-      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks })[t],
+      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks, analyses: analysesStub() })[t],
     });
 
     await POST(req("POST", { signal_id: "s1", decision: "watch" }));
@@ -123,7 +134,7 @@ describe("POST /api/decisions/final", () => {
     const signals = signalsTable();
     const tasks = itemTasksTable(0);
     serverDbMock.mockReturnValue({
-      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks })[t],
+      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks, analyses: analysesStub() })[t],
     });
 
     await POST(req("POST", { signal_id: "s1", decision: "pursue" }));
@@ -136,7 +147,7 @@ describe("POST /api/decisions/final", () => {
     const signals = signalsTable();
     const tasks = itemTasksTable(0);
     serverDbMock.mockReturnValue({
-      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks })[t],
+      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks, analyses: analysesStub() })[t],
     });
 
     await POST(req("POST", { signal_id: "s1", decision: "pursue" }));
@@ -150,7 +161,7 @@ describe("POST /api/decisions/final", () => {
     const signals = signalsTable();
     const tasks = itemTasksTable(2);
     serverDbMock.mockReturnValue({
-      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks })[t],
+      from: (t: string) => ({ final_decisions: finalTable, signals, item_tasks: tasks, analyses: analysesStub() })[t],
     });
 
     await POST(req("POST", { signal_id: "s1", decision: "pursue" }));

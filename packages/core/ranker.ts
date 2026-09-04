@@ -1,5 +1,13 @@
 import type { Signal } from "./signal.js";
-import { fitBand, lenses, type BaseAnalysis, type Confidence, type FitBand, type Lens } from "./lenses.config.js";
+import {
+  fitBand,
+  lenses,
+  WHITE_SPACE_GAP_MIN,
+  type BaseAnalysis,
+  type Confidence,
+  type FitBand,
+  type Lens,
+} from "./lenses.config.js";
 
 /** Sinyal başına, mercek id'sine göre en fazla bir analiz (bkz. `unique(signal_id,lens)`). */
 export interface RankedItem {
@@ -44,9 +52,18 @@ export function composite(analyses: Record<string, BaseAnalysis>, lensRegistry?:
   const scored = totalWeight > 0 ? items.map((a) => [a.fit, weights[a.lens] ?? 1] as const) : items.map((a) => [a.fit, 1] as const);
   const divisor = scored.reduce((sum, [, w]) => sum + w, 0);
   const fit = Math.round(scored.reduce((sum, [f, w]) => sum + f * w, 0) / divisor);
-  const confidence = items.reduce<Confidence>(
+  // Confidence de AĞIRLIKLI mercekler üzerinden alınır (2026-08-26 düzeltmesi). Eskiden bu
+  // reduce TÜM analizleri geziyordu: `fit` ağırlığa saygı duyarken `confidence` duymuyordu.
+  // Sonuç canlıda ölçüldü — `arbitraj 88/high` + `beyaz-alan 25/low` → {fit:88, confidence:"low"}.
+  // 662 iki-mercekli sinyalin 354'ünde (%53) ağırlığı SIFIR olan mercek kompozit güveni
+  // belirliyordu; arbitrajı 80+&high olan 36 sinyalin 22'si bu yüzden bench rozetini
+  // (bench.ts: confidence==="high" şartı) kaybediyor ve kartta "KOVALA · güven: düşük" yazıyordu.
+  // Sıfır-ağırlıklı merceğin kendi güveni artık kendi çipinde gösteriliyor (build-card-view.ts).
+  // `fit`'teki sıfır-toplam fallback'inin aynısı: hiç ağırlıklı mercek yoksa hepsine düş.
+  const confItems = totalWeight > 0 ? items.filter((a) => (weights[a.lens] ?? 1) > 0) : items;
+  const confidence = confItems.reduce<Confidence>(
     (worst, a) => (CONF_RANK[a.confidence] < CONF_RANK[worst] ? a.confidence : worst),
-    items[0]?.confidence ?? "low",
+    confItems[0]?.confidence ?? "low",
   );
   return { fit, confidence, band: fitBand(fit) };
 }
@@ -68,6 +85,21 @@ export interface RankOptions {
   bandOverride?: (item: RankedItem) => FitBand | null | undefined;
   /** bkz. `composite()` — verilirse custom admin-mercek ağırlıkları da hesaba girer. */
   lensRegistry?: readonly Lens[];
+  /** Beyaz-alan rekabet tiebreak'i (bkz. `competitionRank`). Varsayılan açık; bant/güven
+   *  eşitliğinde çalışır, yani bir kartı ASLA başka banda taşıyamaz. */
+  competitionTiebreak?: boolean;
+}
+
+/**
+ * Beyaz-alan merceğinin "boşluk gerçek mi" okuması, sıralama için 3 kovaya indirgenmiş.
+ * Ağırlığı 0 olduğu için kompozit SKORA girmez — burada yalnız bant+güven eşitliğini bozar.
+ * Ölçüm (2026-08-26, arbitraj 80+ alt kümesi): ws≥60 → %40 insan-kovala, ws<60 → %7.
+ * Düşük güvenli okuma (satırların %66'sı) kasıtlı olarak ORTADA — bulgu gibi davranmasın.
+ */
+export function competitionRank(analyses: Record<string, BaseAnalysis>): 0 | 1 | 2 {
+  const ws = analyses["white_space"];
+  if (!ws || ws.confidence === "low") return 1;
+  return ws.fit >= WHITE_SPACE_GAP_MIN ? 0 : 2;
 }
 
 /**
@@ -86,6 +118,12 @@ export function rank(items: RankedItem[], opts: RankOptions = {}): RankedItem[] 
     // CONF_RANK: low=0, high=2 — yüksek güven önce gelsin diye ters (b-a) çıkarılıyor.
     const conf = CONF_RANK[cb.confidence] - CONF_RANK[ca.confidence];
     if (conf !== 0) return conf;
+    // Rekabet ortamı (beyaz-alan) — bant ve güven eşitse, boşluğu gerçek görünen önce.
+    // Bant kesişimini asla geçemez; yalnız daha önce tazeliğin karar verdiği yeri böler.
+    if (opts.competitionTiebreak !== false) {
+      const comp = competitionRank(a.analyses) - competitionRank(b.analyses);
+      if (comp !== 0) return comp;
+    }
     const fresh = freshnessTs(b.signal) - freshnessTs(a.signal);
     if (fresh !== 0) return fresh;
     return cb.fit - ca.fit;

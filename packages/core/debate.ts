@@ -2,6 +2,7 @@ import { z } from "zod";
 import { buildSignalBrief, EvidenceItem, RecommendedAction } from "./lenses.config.js";
 import { thesis as defaultThesis, type ThesisConfig } from "./thesis.config.js";
 import { StoredEnrichmentSchema } from "./enrichment.js";
+import { Deadline, debateDeadlineMs } from "./deadline.js";
 import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
@@ -179,6 +180,10 @@ export async function runDebate(
   const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
   const brief = buildSignalBrief(signal, enrParsed.success ? enrParsed.data : null);
   const transcript: DebateTurn[] = [];
+  // Operasyon bütçesi (FAZ6_PLAN.md §Faz 1.1): 7 tur × 2 deneme, çağrı başına timeout olsa
+  // bile toplamda ~21dk edebilir. Tartışma artık Yorumcu kapısıyla tick'in kritik hattında —
+  // bütçe aşılırsa FIRLAT, kısmi transkript `debates` tablosuna ASLA yazılmasın.
+  const deadline = new Deadline(debateDeadlineMs(), "tartışma");
 
   async function generateRoleTurn(system: string, user: string, isRebuttal: boolean): Promise<DebateTurnOutput> {
     let out = await generateTurn<DebateTurnOutput>(provider, system, user, DebateTurnSchema);
@@ -196,6 +201,7 @@ export async function runDebate(
 
   // açılış turu — sırayla, önceki rolün turunu görmez (bağımsız ilk izlenim).
   for (const role of DEBATE_ROSTER) {
+    deadline.check(`açılış turu: ${role.name}`);
     const system = buildRoleSystemPrompt(role, thesis);
     const user = `${brief}\n\nAçılış turun. Kendi rolünden bu sinyali değerlendir.`;
     const out = await generateRoleTurn(system, user, false);
@@ -205,6 +211,7 @@ export async function runDebate(
 
   // itiraz turu — o ana kadarki TAM transkripti görür, adıyla itiraz edebilir, pozisyon zorunlu.
   for (const role of DEBATE_ROSTER) {
+    deadline.check(`itiraz turu: ${role.name}`);
     const system = buildRoleSystemPrompt(role, thesis);
     const user = `${brief}\n\n## Şimdiye kadarki tartışma:\n${renderTranscript(transcript)}\n\nİtiraz turun. Diğer konuşmacılara adıyla atıfla itiraz et/katıl, ve kendi nihai kovala/izle/ele pozisyonunu netleştir.`;
     const out = await generateRoleTurn(system, user, true);
@@ -213,6 +220,7 @@ export async function runDebate(
   }
 
   // sentez turu — Moderatör, tam transkripti görür, nihai kararı verir.
+  deadline.check("sentez turu");
   const modSystem = MODERATOR_SYSTEM(thesis);
   const modUser = `${brief}\n\n## Tam tartışma:\n${renderTranscript(transcript)}\n\nSentez turun. Tartışmayı özetle, nihai kovala/izle/ele kararını ver ve nedenini kısaca açıkla.`;
   const mod = await generateTurn<ModeratorTurnOutput>(provider, modSystem, modUser, ModeratorTurnSchema);

@@ -18,8 +18,8 @@ import { fintechtime } from "./sources/fintechtime.js";
 import { finberg } from "./sources/finberg.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
+import { fetchAllSources } from "./lib/fetch-sources.js";
 import { loadActiveIngestionSettings, shouldSkipForInterval } from "./lib/ingestion-settings-db.js";
-import { limitPerSource } from "./lib/limit-per-source.js";
 
 const ALL_SOURCES: Source[] = [
   productHunt,
@@ -69,36 +69,6 @@ async function filterExisting(signals: Signal[]): Promise<Signal[]> {
   return signals.filter((s) => !existingUrl.has(s.url) && !existingHash.has(s.content_hash));
 }
 
-/** Sabit boyutlu havuz (bkz. backfill-lens.ts): `concurrency` kadar kaynak aynı anda çeker.
- *  concurrency=1 → eskisiyle birebir aynı, sıralı davranış. Bir kaynağın patlaması diğerlerini
- *  düşürmez (try/catch korunuyor). */
-async function fetchAll(
-  sources: Source[],
-  settings: { per_source_limit: number; concurrency: number },
-): Promise<Signal[]> {
-  let collected: Signal[] = [];
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    for (;;) {
-      const i = next++;
-      if (i >= sources.length) return;
-      const src = sources[i];
-      if (!src) return;
-      try {
-        const rows = limitPerSource(await src.fetch(), settings.per_source_limit);
-        console.log(`[${src.name}] ${rows.length} sinyal çekildi`);
-        collected = collected.concat(rows);
-      } catch (e) {
-        console.error(`[${src.name}] çekim hatası:`, e instanceof Error ? e.message : e);
-      }
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(settings.concurrency, sources.length) }, worker),
-  );
-  return collected;
-}
-
 async function main(): Promise<void> {
   const settings = await loadActiveIngestionSettings();
 
@@ -118,7 +88,24 @@ async function main(): Promise<void> {
   console.log(
     `toplama ayarları: kaynak başı limit=${settings.per_source_limit || "sınırsız"}, paralellik=${settings.concurrency}, aktif kaynaklar=${sources.map((s) => s.name).join(", ")}`,
   );
-  const collected = await fetchAll(sources, settings);
+  const { signals: collected, okSources, failedSources } = await fetchAllSources(sources, settings);
+
+  // Toplu başarısızlık guard'ı (FAZ6_PLAN.md §Faz 1.3). Eskiden tüm kaynaklar patlasa bile
+  // `collected` boş kalıp "yeni sinyal yok (idempotent)" yazılıyor ve süreç 0 ile çıkıyordu —
+  // yani cron YEŞİL görünüyordu. Diğer beş aşamanın hepsinde bu guard vardı (enrich/triage/
+  // analyze/debate-auto/backfill), yalnız ingest'te yoktu.
+  if (okSources === 0) {
+    throw new Error(
+      `toplu başarısızlık: 0/${sources.length} kaynak çekilebildi (ağ/kaynak şeması kontrol et) — ${failedSources.join(", ")}`,
+    );
+  }
+  // Kısmi hata UYARIDIR, throw değil: tek titrek bir RSS feed'i yüzünden cron kırmızıya
+  // dönmemeli. Ama yarıdan fazlası düştüyse bu görünür olmalı.
+  if (failedSources.length > sources.length / 2) {
+    console.warn(
+      `[ingest] uyarı: ${failedSources.length}/${sources.length} kaynak patladı — ${failedSources.join(", ")}`,
+    );
+  }
 
   const deduped = dedupeBatch(collected);
   const fresh = await filterExisting(deduped);

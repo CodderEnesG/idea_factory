@@ -83,7 +83,7 @@ function BucketList({ title, buckets }: { title: string; buckets: Bucket[] }) {
 }
 
 export default async function HaritaPage() {
-  const [{ items, demo }, me, lensRegistry] = await Promise.all([
+  const [{ items, demo, error: loadError }, me, lensRegistry] = await Promise.all([
     loadItems(),
     getSession(),
     loadLensRegistry(),
@@ -106,6 +106,11 @@ export default async function HaritaPage() {
           <BandLegend />
         </header>
 
+        {loadError && (
+          <div role="alert" className="mb-4 rounded-btn border border-strong bg-elevated px-4 py-2 text-sm text-kill">
+            Veriler yüklenemedi — {loadError}. Sayfayı yenile.
+          </div>
+        )}
         {demo && (
           <div className="mb-6 rounded-btn border border-strong bg-elevated px-4 py-3 text-sm text-brand">
             Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.

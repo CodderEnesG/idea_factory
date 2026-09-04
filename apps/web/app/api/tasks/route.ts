@@ -18,6 +18,9 @@ export async function POST(req: Request) {
   if (!body?.signal_id || !text) {
     return NextResponse.json({ ok: false, error: "signal_id ve görev metni gerekli" }, { status: 400 });
   }
+  if (text.length > 500) {
+    return NextResponse.json({ ok: false, error: "görev metni en fazla 500 karakter" }, { status: 400 });
+  }
 
   const db = serverDb();
   if (!db) {
@@ -25,14 +28,14 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       demo: true,
-      task: { id: `demo-${Date.now()}`, body: text, done: false, created_at: new Date().toISOString() },
+      task: { id: `demo-${Date.now()}`, body: text, done: false, owner, created_at: new Date().toISOString() },
     });
   }
 
   const { data, error } = await db
     .from("item_tasks")
     .insert({ signal_id: body.signal_id, owner, body: text })
-    .select("id, body, done, created_at")
+    .select("id, body, done, owner, created_at")
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, task: data });

@@ -8,7 +8,8 @@ import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
-import { groundSignal, lensNeedsGrounding } from "./grounding.js";
+import { groundSignal, shouldGround, type Grounder } from "./grounding.js";
+import { Deadline, analyzeDeadlineMs } from "./deadline.js";
 
 /** Golden few-shot çapası: bir sinyal + onun onaylı analizi. */
 export interface FewShotExample<TAnalysis extends BaseAnalysis = BaseAnalysis> {
@@ -27,7 +28,7 @@ export interface AnalyzeOptions {
   fewShot?: FewShotExample[];
   knowledge?: KnowledgeLayer;
   maxRetries?: number; // şema/guard ihlalinde yeniden deneme
-  grounder?: (signal: Signal) => Promise<string | null>; // test injection; varsayılan groundSignal
+  grounder?: Grounder; // test injection; varsayılan groundSignal
 }
 
 function pickProvider(opts: AnalyzeOptions): AnalystProvider {
@@ -68,11 +69,20 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
   const ctxText =
     ctx.notes.length > 0 ? `\n\nİlgili geçmiş bağlam:\n- ${ctx.notes.join("\n- ")}` : "";
 
-  // Grounding (PLAN.md §11 madde 2) — yalnız GROUNDING_ENABLED + rekabet ortamı sorusu
-  // döndüğü mercekler (arbitraj/beyaz-alan) için, tek sefer (retry döngüsü boyunca aynı
-  // bulgu tekrar kullanılır — grounding sonucu şema/guard ihlalinden etkilenmez).
+  // Zenginleştirme varsa prompt'a olgu bloğu olarak gir (yoksa bugünkü davranış).
+  // NOT: grounding çağrısından ÖNCE parse ediliyor — sorgular marka adı yerine kategori
+  // ifadesinden kuruluyor ve `project_summary` oradan geliyor (FAZ6_PLAN.md §Faz 4.2).
+  const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
+  const enrichment = enrParsed.success ? enrParsed.data : null;
+
+  // Grounding — yalnız `lens.grounding` + GROUNDING_ENABLED. TEK SEFER, retry döngüsünün
+  // DIŞINDA: retry'lar şema/guard ihlali içindir, arama bulgusu bunlar arasında değişmez.
+  // Artık sorgu başına ayrı çağrı yapıldığı için bu, 1× değil 3× maliyet hatası olurdu.
+  // Kapı BURADA da uygulanıyor (groundSignal kendi içinde de kontrol ediyor): enjekte edilen
+  // bir grounder da maliyet kuralına uymalı, yoksa "kapalı mercekte arama yapılmaz" garantisi
+  // yalnız varsayılan implementasyona bağlı kalırdı.
   const grounder = opts.grounder ?? groundSignal;
-  const groundingText = lensNeedsGrounding(lens.id) ? await grounder(signal) : null;
+  const groundingText = shouldGround(lens) ? await grounder(signal, lens, enrichment) : null;
   const groundingBlock = groundingText
     ? `\n\nGrounding bulgusu (canlı arama sonucu, olgu olarak kullan ama sorgula):\n${groundingText}`
     : "";
@@ -84,13 +94,14 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
   >;
   delete jsonSchema["$schema"];
 
-  // Zenginleştirme varsa prompt'a olgu bloğu olarak gir (yoksa bugünkü davranış).
-  const enrParsed = StoredEnrichmentSchema.safeParse(signal.enrichment);
-  const baseUser =
-    lens.buildUserPrompt(signal, enrParsed.success ? enrParsed.data : null) + ctxText + groundingBlock;
+  const baseUser = lens.buildUserPrompt(signal, enrichment) + ctxText + groundingBlock;
   let feedback = "";
 
+  // Operasyon bütçesi: 4 denemenin toplamı da sınırlı olmalı (FAZ6_PLAN.md §Faz 1.1).
+  const deadline = new Deadline(analyzeDeadlineMs(), `analiz (${lens.id})`);
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    deadline.check(feedback || `deneme ${attempt + 1}`);
     const user = feedback ? `${baseUser}\n\n${feedback}` : baseUser;
     const raw = await provider.generate({ system, user, jsonSchema });
 
@@ -109,13 +120,11 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
 
     const violations = checkAnalysisGuards(parsed.data, {
       // signal_kind null = legacy satır — ön kapı guard'ına sınıf bildirme.
-      ...(enrParsed.success && enrParsed.data.signal_kind
-        ? { signalKind: enrParsed.data.signal_kind }
-        : {}),
+      ...(enrichment?.signal_kind ? { signalKind: enrichment.signal_kind } : {}),
       lensId: lens.id,
-      traction: enrParsed.success ? enrParsed.data.traction : undefined,
-      markets: enrParsed.success ? enrParsed.data.markets : undefined,
-      capitalIntensity: enrParsed.success ? enrParsed.data.capital_intensity : undefined,
+      traction: enrichment?.traction,
+      markets: enrichment?.markets,
+      capitalIntensity: enrichment?.capital_intensity,
     });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;

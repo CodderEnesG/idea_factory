@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { composite, rank, type RankedItem } from "./ranker.js";
+import { competitionRank, composite, rank, type RankedItem } from "./ranker.js";
 import type { CustomAnalysis } from "./lenses.config.js";
 import type { Signal } from "./signal.js";
 
@@ -150,7 +150,7 @@ describe("composite", () => {
     expect(composite({ arbitrage: a })).toEqual({ fit: 72, confidence: "med", band: "watch" });
   });
 
-  it("sıfır ağırlıklı mercek kompozit skoru değiştirmez (beyaz-alan, grounding gelene kadar)", () => {
+  it("sıfır ağırlıklı mercek ne kompozit skoru NE DE confidence'ı değiştirir (beyaz-alan)", () => {
     // Artık builtin varsayılan ağırlık yok (arbitraj/beyaz-alan da admin-merceği) — gerçek
     // çağıranlar gibi (build-card-view.ts vb.) registry açıkça verilir.
     const c = composite(
@@ -164,7 +164,11 @@ describe("composite", () => {
       ],
     );
     expect(c.fit).toBe(90); // beyaz-alan ağırlığı 0 → skora karışmaz (bkz. lenses.config.ts)
-    expect(c.confidence).toBe("low"); // ama confidence'ta en temkinli hâlâ kazanır
+    // 2026-08-26 DÜZELTMESİ: confidence de artık AĞIRLIKLI mercekler üzerinden alınıyor.
+    // Eskiden ağırlığı 0 olan beyaz-alan kompozit güveni "low"a çekiyordu — canlıda 662
+    // iki-mercekli sinyalin 354'ünde (%53) oluyordu ve arbitrajı 80+&high olan 36 sinyalin
+    // 22'si bench rozetini (bench.ts: confidence==="high") bu yüzden kaybediyordu.
+    expect(c.confidence).toBe("high");
   });
 
   it("iki mercek ağırlıklı ortalanır (açık registry ile)", () => {
@@ -196,5 +200,63 @@ describe("composite", () => {
       white_space: { ...ana(85), lens: "white_space", confidence: "low" },
     });
     expect(c.confidence).toBe("low");
+  });
+});
+
+describe("competitionRank — beyaz-alan sıralama tiebreak'i", () => {
+  // Gerçek üretim kaydı: beyaz-alan ağırlığı 0 (kompozit skora girmez).
+  const REG = [
+    { id: "arbitrage", name: "Arbitraj", weight: 1 } as never,
+    { id: "white_space", name: "Beyaz-alan", weight: 0 } as never,
+  ];
+  const ws = (fit: number, confidence: "low" | "med" | "high") =>
+    ({ white_space: { lens: "white_space", fit, confidence } }) as never;
+
+  it("boşluk gerçek görünüyorsa (ws>=60, güven low değil) en öne", () => {
+    expect(competitionRank(ws(65, "high"))).toBe(0);
+  });
+
+  it("kalabalık görünüyorsa (ws<60) en arkaya", () => {
+    expect(competitionRank(ws(30, "med"))).toBe(2);
+  });
+
+  it("düşük güven ORTADA — satırların %66'sı burada, bulgu gibi davranmamalı", () => {
+    expect(competitionRank(ws(90, "low"))).toBe(1);
+    expect(competitionRank(ws(10, "low"))).toBe(1);
+  });
+
+  it("beyaz-alan analizi yoksa ortada", () => {
+    expect(competitionRank({} as never)).toBe(1);
+  });
+
+  it("bant kesişimini ASLA geçemez: kalabalık bir kovala, taze bir izleyi hâlâ yener", () => {
+    const mk = (id: string, fit: number, wsFit: number, ts: string) => ({
+      signal: sig(id, ts),
+      analyses: {
+        arbitrage: { lens: "arbitrage", fit, confidence: "high" },
+        white_space: { lens: "white_space", fit: wsFit, confidence: "high" },
+      } as never,
+    });
+    const crowdedPursue = mk("a", 90, 10, "2026-01-01T00:00:00.000Z");
+    const freshWatch = mk("b", 60, 90, "2026-08-01T00:00:00.000Z");
+    const out = rank([freshWatch, crowdedPursue], { lensRegistry: REG });
+    expect(out[0]!.signal.id).toBe("a");
+  });
+
+  it("bant+güven eşitse boşluğu gerçek olan öne geçer, tazelik ikinci plana düşer", () => {
+    const mk = (id: string, wsFit: number, ts: string) => ({
+      signal: sig(id, ts),
+      analyses: {
+        arbitrage: { lens: "arbitrage", fit: 85, confidence: "high" },
+        white_space: { lens: "white_space", fit: wsFit, confidence: "high" },
+      } as never,
+    });
+    const staleGap = mk("gap", 80, "2026-01-01T00:00:00.000Z");
+    const freshCrowded = mk("crowded", 20, "2026-08-01T00:00:00.000Z");
+    expect(rank([freshCrowded, staleGap], { lensRegistry: REG })[0]!.signal.id).toBe("gap");
+    // kapatılabilir olmalı — eski davranışa dönüş (tazelik kazanır)
+    expect(
+      rank([freshCrowded, staleGap], { lensRegistry: REG, competitionTiebreak: false })[0]!.signal.id,
+    ).toBe("crowded");
   });
 });

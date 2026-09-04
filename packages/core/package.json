@@ -15,7 +15,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "eval": "tsx eval/run.ts"
+    "eval": "tsx eval/run.ts",
+    "calibration": "tsx eval/calibration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

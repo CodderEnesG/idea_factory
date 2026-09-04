@@ -71,11 +71,18 @@ export function QueueBoard({
   meName,
   me,
   demo,
+  debatesDegraded,
+  loadError,
 }: {
   items: CardView[];
   meName: string;
   me: SessionUser | null;
   demo?: boolean;
+  /** Yorumcu verisi yüklenemedi — kapı bilgisi yok, kovala rozetleri beklemede görünüyor.
+   *  Sessiz bir loadDebates hatası HER fit≥80 sinyali `pending`e çevirir; bunu söylemek şart. */
+  debatesDegraded?: boolean;
+  /** DB hatası — uydurma demo verisi yerine dürüst hata durumu (FAZ6_PLAN.md §Faz 3). */
+  loadError?: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
@@ -85,6 +92,8 @@ export function QueueBoard({
   const [activity, setActivity] = useState<ActivityFilter>("all");
   const [benchOnly, setBenchOnly] = useState(false);
   const [undecidedOnly, setUndecidedOnly] = useState(false);
+  const [gatePendingOnly, setGatePendingOnly] = useState(false); // Yorumcu kapısı bekleyenler
+
   const [bandFilter, setBandFilter] = useState<Set<CardView["band"]>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -184,7 +193,10 @@ export function QueueBoard({
         finalDecidedBy: finalOv === undefined ? i.finalDecidedBy : (finalOv?.decidedBy ?? null),
         // Kararla birlikte anında güncellenmezse nokta rengi/sıralama sayfa yenilenene kadar
         // eski AI bandını gösterip dururdu (2026-08-19 bulgusu) — aynı hiyerarşiyi burada da uygula.
-        effectiveBand: resolveEffectiveBand(i.band, mine, finalDecision, i.debates[0]?.final_verdict ?? null),
+        // Kapılı bant (`gatedBand`) sunucuda hesaplandı ve kararla değişmez — insan kararı
+        // yalnız onun ÜSTÜNE biner. Eskiden burada ham `i.band` kullanılıyordu, yani
+        // istemci tarafı yeniden hesap kapıyı görmezden geliyordu.
+        effectiveBand: resolveEffectiveBand(i.gatedBand, mine, finalDecision),
       };
     });
   }, [items, localMine, localFinal]);
@@ -195,14 +207,21 @@ export function QueueBoard({
 
   const counts = useMemo(() => {
     let pursue = 0, watch = 0, kill = 0, bench = 0, undecided = 0;
+    // Kapı ayrımı: onaylı (Yorumcu kovala dedi) / çekinceli (ikisi de izle) / bekleyen
+    // (henüz 2 tartışma yok). Kovala sayısı çökerse bir bakışta görünsün.
+    let confirmed = 0, caveat = 0, pendingGate = 0, vetoed = 0;
     for (const i of resolved) {
       if (i.effectiveBand === "pursue") pursue++;
       else if (i.effectiveBand === "watch") watch++;
       else kill++;
       if (i.bench) bench++;
       if (i.mine === null) undecided++;
+      if (i.gate === "confirmed") confirmed++;
+      else if (i.gate === "caveat") caveat++;
+      else if (i.gate === "pending") pendingGate++;
+      else if (i.gate === "vetoed") vetoed++;
     }
-    return { pursue, watch, kill, bench, undecided };
+    return { pursue, watch, kill, bench, undecided, confirmed, caveat, pendingGate, vetoed };
   }, [resolved]);
 
   const newIds = useMemo(() => {
@@ -220,6 +239,7 @@ export function QueueBoard({
       if (benchOnly && !i.bench) return false;
       if (newOnly && !newIds.has(i.id)) return false;
       if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
+      if (gatePendingOnly && i.gate !== "pending") return false;
       if (bandFilter.size > 0 && !bandFilter.has(i.effectiveBand)) return false;
       if (activity !== "all") {
         const a = activityOf(i, meName);
@@ -236,7 +256,7 @@ export function QueueBoard({
       list = [...list].sort((a, b) => CONFIDENCE_RANK[a.confidence] - CONFIDENCE_RANK[b.confidence] || b.fit - a.fit);
     else if (sort === "comments") list = [...list].sort((a, b) => b.comments.length - a.comments.length || b.fit - a.fit);
     return list;
-  }, [resolved, search, sector, market, source, benchOnly, newOnly, newIds, undecidedOnly, bandFilter, skipped, activity, sort, meName]);
+  }, [resolved, search, sector, market, source, benchOnly, newOnly, newIds, undecidedOnly, gatePendingOnly, bandFilter, skipped, activity, sort, meName]);
 
   // Seçili öğe filtrelerin dışına düşerse (ör. "yalnız kararsızlar"da karar verilince)
   // listedeki ilk öğeye düş — bu aynı zamanda oto-ilerlemenin tamamı: ekstra state gerekmez.
@@ -256,6 +276,7 @@ export function QueueBoard({
     (newOnly ? 1 : 0) +
     (activity !== "all" ? 1 : 0) +
     (undecidedOnly ? 1 : 0) +
+    (gatePendingOnly ? 1 : 0) +
     bandFilter.size;
 
   function clearFilters() {
@@ -280,6 +301,7 @@ export function QueueBoard({
     ...(undecidedOnly ? [{ key: "undecided", label: "Kararsızlar", onClear: () => setUndecidedOnly(false) }] : []),
     ...(benchOnly ? [{ key: "bench", label: "Bench", onClear: () => setBenchOnly(false) }] : []),
     ...(newOnly ? [{ key: "new", label: "Yeni", onClear: () => setNewOnly(false) }] : []),
+    ...(gatePendingOnly ? [{ key: "gate", label: "Yorumcu bekleyenler", onClear: () => setGatePendingOnly(false) }] : []),
   ];
 
   const pillBtn = (active: boolean) =>
@@ -442,6 +464,13 @@ export function QueueBoard({
                     <button onClick={() => setNewOnly((v) => !v)} className={`${pillBtn(newOnly)} justify-center`}>
                       <IconSparkle className="h-3.5 w-3.5" /> Yeni ({newIds.size})
                     </button>
+                    <button
+                      onClick={() => setGatePendingOnly((v) => !v)}
+                      className={`${pillBtn(gatePendingOnly)} justify-center`}
+                      title="AI kovala dedi ama Yorumcu'nun iki turu henüz tamamlanmadı — kart o zamana kadar İzle bandında durur"
+                    >
+                      Yorumcu bekleyenler ({counts.pendingGate})
+                    </button>
                   </div>
                 </div>
 
@@ -587,6 +616,23 @@ export function QueueBoard({
         {demo && (
           <div className="shrink-0 border-b border-strong bg-elevated py-2 pl-14 pr-5 text-sm text-brand md:pl-5">
             Demo modu — Supabase env yok. Gerçek analizler için <code>.env</code>&apos;e key ekle.
+          </div>
+        )}
+        {loadError && (
+          <div
+            role="alert"
+            className="shrink-0 border-b border-strong bg-elevated py-2 pl-14 pr-5 text-sm text-kill md:pl-5"
+          >
+            Veriler yüklenemedi — {loadError}. Sayfayı yenile.
+          </div>
+        )}
+        {debatesDegraded && (
+          <div
+            role="alert"
+            className="shrink-0 border-b border-strong bg-elevated py-2 pl-14 pr-5 text-sm text-kill md:pl-5"
+          >
+            Yorumcu verisi yüklenemedi — kovala rozetleri geçici olarak beklemede. Bu bir veri
+            hatası, kararların değişmedi.
           </div>
         )}
         <div className="min-h-0 flex-1">

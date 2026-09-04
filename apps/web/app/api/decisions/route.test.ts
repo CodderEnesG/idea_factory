@@ -9,6 +9,17 @@ vi.mock("../../../lib/auth", () => ({ getSession: getSessionMock }));
 vi.mock("../../../lib/supabase", () => ({ serverDb: serverDbMock }));
 vi.mock("../../../lib/session", () => ({ authEnabled: authEnabledMock }));
 
+/** `seedStarterTasks` artık en yüksek fit'li analizin `validation_needed`'ini okuyor
+ *  (FAZ6_PLAN.md §Faz 6.4) — jenerik şablon yalnız son çare. Bu sahte tablo o sorguyu karşılar. */
+function analysesStub(validation: unknown[] | null = null) {
+  const obj: Record<string, unknown> = {};
+  obj.select = vi.fn(() => obj);
+  obj.eq = vi.fn(() => obj);
+  obj.order = vi.fn(() => obj);
+  obj.limit = vi.fn(() => Promise.resolve({ data: validation ? [{ validation_needed: validation, fit: 88 }] : [] }));
+  return obj;
+}
+
 import { POST } from "./route";
 
 function req(body: unknown): Request {
@@ -97,7 +108,8 @@ describe("POST /api/decisions", () => {
     (tasksObj as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
       Promise.resolve(taskMode === "count" ? { count: 0 } : { error: null }).then(resolve);
 
-    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj })[t]);
+    const analysesObj = analysesStub();
+    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj, analyses: analysesObj })[t]);
     serverDbMock.mockReturnValue({ from });
 
     await POST(req({ signal_id: "s1", decision: "pursue" }));
@@ -116,7 +128,8 @@ describe("POST /api/decisions", () => {
     (tasksObj as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
       Promise.resolve({ count: 3 }).then(resolve);
 
-    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj })[t]);
+    const analysesObj = analysesStub();
+    const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: tasksObj, analyses: analysesObj })[t]);
     serverDbMock.mockReturnValue({ from });
 
     await POST(req({ signal_id: "s1", decision: "pursue" }));
@@ -127,6 +140,7 @@ describe("POST /api/decisions", () => {
     getSessionMock.mockResolvedValue({ username: "enes", display_name: "Enes", is_admin: false });
     const decisionsInsert = vi.fn().mockResolvedValue({ error: null });
     const tasksSelect = vi.fn();
+    const analysesObj = analysesStub();
     const from = vi.fn((t: string) => ({ decisions: { insert: decisionsInsert }, item_tasks: { select: tasksSelect } })[t]);
     serverDbMock.mockReturnValue({ from });
 

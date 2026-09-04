@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CardView } from "../lib/card-view";
+import { resolvePanomBand, type CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
 import { AppSidebar } from "./AppSidebar";
@@ -72,13 +72,11 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
       // `others[0]` en son karar (loadDecisions created_at DESC sıralar, bkz. card-view.ts).
       const latestOther = c.others[0] ?? null;
       if (mine === null && !finalOv && !latestOther) continue;
-      // Final > kişisel > başka birinin en son kararı (2026-08-24: herkesin gerçek "Kovala"
-      // kararı panoda görünsün istendi — eskiden yalnız BEN karar verdiysem ya da kilitliyse
-      // gösterirdi, takım arkadaşının/eski "web" hesabının kararı hiç görünmezdi).
-      // resolveEffectiveBand (card-view.ts) ile Kuyruk/rozet mantığından KASITLI farklı: o
-      // dördüncü basamakta ham AI bandına düşer, burada düşmez — Panom yalnız gerçekten karar
-      // verilmiş sinyalleri gösterir.
-      const effective = finalOv?.decision ?? mine ?? latestOther!.decision;
+      // Final > kişisel > başka birinin en son kararı. Kuyruk'un hiyerarşisinden KASITLI
+      // farklı (bkz. card-view.ts::resolvePanomBand — ayrım orada belgeli): Panom = "ne karar
+      // verdik", Kuyruk = "sistem şu an ne düşünüyor". Panom AI bandına ya da Yorumcu kapısına
+      // HİÇ düşmez; buna karşılık 4. katmanı (başkasının kararı) Kuyruk'ta OLMAMALI.
+      const effective = resolvePanomBand(mine, finalOv?.decision ?? null, latestOther?.decision ?? null)!;
       const effectiveUser = finalOv || mine !== null ? null : latestOther!.user;
       out.push({ ...c, mine, effective, effectiveUser, locked: finalOv !== null, lockedBy: finalOv?.decidedBy ?? null });
     }
@@ -280,6 +278,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
                 onLoadMore={() => setVisibleCount((v) => ({ ...v, pursue: v.pursue + PAGE_SIZE }))}
                 onLock={(id) => lock(id, "pursue")}
                 onUnlock={unlock}
+                meName={meName}
               />
             </KanbanColumn>
 
@@ -312,6 +311,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
                         lockedBy={item.lockedBy}
                         onLock={() => lock(item.id, "watch")}
                         onUnlock={() => unlock(item.id)}
+                        meName={meName}
                       />
                     ))}
                   </div>
@@ -334,6 +334,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
                       onLoadMore={() => setVisibleCount((v) => ({ ...v, watch: v.watch + PAGE_SIZE }))}
                       onLock={(id) => lock(id, "watch")}
                       onUnlock={unlock}
+                      meName={meName}
                     />
                   )}
                 </div>
@@ -379,6 +380,7 @@ export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: Sessi
                     onLoadMore={() => setVisibleCount((v) => ({ ...v, kill: v.kill + PAGE_SIZE }))}
                     onLock={(id) => lock(id, "kill")}
                     onUnlock={unlock}
+                    meName={meName}
                   />
                 </>
               )}
@@ -435,12 +437,14 @@ function CardList({
   onLoadMore,
   onLock,
   onUnlock,
+  meName,
 }: {
   items: Resolved[];
   visible: number;
   onLoadMore: () => void;
   onLock: (id: string) => void;
   onUnlock: (id: string) => void;
+  meName: string;
 }) {
   if (items.length === 0) {
     return <p className="text-xs text-ink-muted">Boş — buraya bir kart sürükle.</p>;
@@ -458,6 +462,7 @@ function CardList({
           lockedBy={item.lockedBy}
           onLock={() => onLock(item.id)}
           onUnlock={() => onUnlock(item.id)}
+          meName={meName}
         />
       ))}
       {items.length > shown.length && (

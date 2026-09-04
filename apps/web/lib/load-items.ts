@@ -20,18 +20,39 @@ const MAX_PAGES = 20;
 const SIGNAL_COLUMNS =
   "id, source, title, url, market, sector, posted_at, fetched_at, enrichment, watch_review_at";
 
-/** Tüm merceklerin analiz satırlarını çeker, sinyal başına `analyses` haritasında gruplar.
- *  `/queue`, `/harita`, `/trend` paylaşır — Supabase env yoksa DEMO_ITEMS'a düşer. */
-export async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean }> {
+export interface LoadItemsResult {
+  items: RankedItem[];
+  /** SADECE Supabase env yokken true — uydurma veri gösterildiğinin dürüst işareti. */
+  demo: boolean;
+  /** DB hatası mesajı; varsa UI hata durumu göstermeli, veri göstermemeli. */
+  error: string | null;
+}
+
+/**
+ * Tüm merceklerin analiz satırlarını çeker, sinyal başına `analyses` haritasında gruplar.
+ * `/queue`, `/harita`, `/trend` paylaşır.
+ *
+ * ÜÇ AYRI DURUM (FAZ6_PLAN.md §Faz 3). Eskiden üçü de `DEMO_ITEMS` döndürüyordu ve banner
+ * "Demo modu — Supabase env yok" diyordu:
+ *   - env yok            -> demo veri (tek meşru kullanım)
+ *   - DB hatası          -> HATA durumu; uydurma fırsatlar üstünde gerçek karar verilemez
+ *   - sıfır satır, DB ok -> BOŞ durum; taze kurulmuş doğru yapılandırılmış bir DB
+ *                           "env yok" diye suçlanmamalı
+ */
+export async function loadItems(): Promise<LoadItemsResult> {
   const db = serverDb();
-  if (!db) return { items: DEMO_ITEMS, demo: true };
+  if (!db) return { items: DEMO_ITEMS, demo: true, error: null };
 
   // Önce sayım (ucuz HEAD isteği), sonra sayfaları PARALEL çek — sıralı sayfalamanın toplam
   // gecikmeyi sayfa sayısıyla çarpmasını önler (bkz. commit mesajı: ölçüm notları).
   const { count, error: countError } = await db
     .from("analyses")
     .select("id", { count: "exact", head: true });
-  if (countError || !count) return { items: DEMO_ITEMS, demo: true };
+  if (countError) {
+    console.error("[load-items] sayım hatası:", countError.message);
+    return { items: [], demo: false, error: countError.message };
+  }
+  if (!count) return { items: [], demo: false, error: null }; // gerçekten boş
 
   const pageCount = Math.min(Math.ceil(count / PAGE_SIZE), MAX_PAGES);
   const pages = await Promise.all(
@@ -42,9 +63,13 @@ export async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean 
         .range(i * PAGE_SIZE, i * PAGE_SIZE + PAGE_SIZE - 1),
     ),
   );
-  if (pages.some((p) => p.error)) return { items: DEMO_ITEMS, demo: true };
+  const pageErr = pages.find((p) => p.error)?.error;
+  if (pageErr) {
+    console.error("[load-items] sayfa hatası:", pageErr.message);
+    return { items: [], demo: false, error: pageErr.message };
+  }
   const rows = pages.flatMap((p) => (p.data ?? []) as Record<string, unknown>[]);
-  if (rows.length === 0) return { items: DEMO_ITEMS, demo: true };
+  if (rows.length === 0) return { items: [], demo: false, error: null };
 
   const bySignal = new Map<string, RankedItem>();
   for (const r of rows) {
@@ -55,5 +80,5 @@ export async function loadItems(): Promise<{ items: RankedItem[]; demo: boolean 
     if (item) item.analyses[analysis.lens] = analysis;
     else bySignal.set(signals.id, { signal: signals, analyses: { [analysis.lens]: analysis } });
   }
-  return { items: [...bySignal.values()], demo: false };
+  return { items: [...bySignal.values()], demo: false, error: null };
 }
