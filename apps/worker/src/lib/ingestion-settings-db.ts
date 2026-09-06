@@ -19,6 +19,13 @@ const KNOWN_SOURCES = [
   "fintechtime",
   "finberg",
   "hackernews",
+  "tech_eu",
+  "wamda",
+  "egirisim",
+  "inc42",
+  "contxto",
+  "crunchbase_news",
+  "restofworld",
 ];
 
 export interface IngestionSettings {

@@ -17,6 +17,13 @@ import { sifted } from "./sources/sifted.js";
 import { fintechtime } from "./sources/fintechtime.js";
 import { finberg } from "./sources/finberg.js";
 import { hackernews } from "./sources/hackernews.js";
+import { techEu } from "./sources/tech-eu.js";
+import { wamda } from "./sources/wamda.js";
+import { egirisim } from "./sources/egirisim.js";
+import { inc42 } from "./sources/inc42.js";
+import { contxto } from "./sources/contxto.js";
+import { crunchbaseNews } from "./sources/crunchbase-news.js";
+import { restOfWorld } from "./sources/restofworld.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 import { fetchAllSources } from "./lib/fetch-sources.js";
@@ -40,6 +47,13 @@ const ALL_SOURCES: Source[] = [
   fintechtime,
   finberg,
   hackernews,
+  techEu,
+  wamda,
+  egirisim,
+  inc42,
+  contxto,
+  crunchbaseNews,
+  restOfWorld,
 ];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
