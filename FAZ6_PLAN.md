@@ -207,7 +207,7 @@ export function resolveEffectiveBand(gatedBand, mine, finalDecision): Band
 | pursue | **< 2 tur** | **watch** | `pending` | "Yorumcu bekleniyor" |
 | pursue | biri "ele" | **kill** | `vetoed` | "Yorumcu veto etti" |
 | pursue | en az biri "kovala", ele yok | pursue | `confirmed` | "Kovala · Yorumcu onayladı" |
-| pursue | ikisi de "izle" | pursue | `caveat` | "Kovala · Yorumcu çekinceli" |
+| pursue | ikisi de "izle" | ~~pursue~~ **watch** (2026-09-06) | `caveat` | "İzle · Yorumcu çekinceli" |
 
 **İki tasarım kararı, ikisi de ölçüme dayalı:**
 

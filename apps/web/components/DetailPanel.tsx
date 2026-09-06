@@ -244,7 +244,7 @@ export function DetailPanel({
                 </span>
               )}
               {item.gate === "caveat" && (
-                <span className="inline-flex items-center gap-1 text-watch" title="İki tur da 'izle' dedi — kovala kalıyor ama çekinceli">
+                <span className="inline-flex items-center gap-1 text-watch" title="İki tur da 'izle' dedi — AI kovala demişti, Yorumcu ikna olmadı, kart İzle bandında">
                   · Yorumcu: çekinceli
                 </span>
               )}

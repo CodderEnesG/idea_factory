@@ -21,6 +21,16 @@
  *   ws>=60 → insan-kovala               %40 (n=10)  ·  ws<60 → %7 (n=28)
  */
 
+import { config } from "dotenv";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+
+const here = dirname(fileURLToPath(import.meta.url));
+// .env.local öncelikli (dotenv array: ilk dosya kazanır), .env fallback — run.ts ile aynı kalıp.
+// Bu satır olmadan başlıktaki "repo kökündeki .env.local'den okunur" vaadi boştu: script
+// yalnız shell'e elle source edilmiş env ile çalışıyordu.
+config({ path: [resolve(here, "../../../.env.local"), resolve(here, "../../../.env")] });
+
 type Band = "pursue" | "watch" | "kill";
 
 const TR: Record<Band, string> = { pursue: "kovala", watch: "izle", kill: "ele" };
@@ -73,13 +83,14 @@ function pct(n: number, d: number): string {
   return d === 0 ? "—" : `%${Math.round((n / d) * 100)} (${n}/${d})`;
 }
 
-/** Kapı: 2 otomatik tur gerekli; biri "ele" derse veto, en az biri "kovala" ise onaylı. */
+/** Kapı: 2 otomatik tur gerekli; biri "ele" derse veto, en az biri "kovala" ise onaylı,
+ *  ikisi de "izle" ise caveat → İZLE (2026-09-06, card-view.ts DEBATE_WATCH_DEMOTES ile aynı). */
 function gateOf(aiBand: Band, autoVerdicts: Band[]): { band: Band; gate: string } {
   if (aiBand !== "pursue") return { band: aiBand, gate: "n/a" };
   if (autoVerdicts.length < GATE_REQUIRED) return { band: "watch", gate: "pending" };
   if (autoVerdicts.includes("kill")) return { band: "kill", gate: "vetoed" };
   if (autoVerdicts.includes("pursue")) return { band: "pursue", gate: "confirmed" };
-  return { band: "pursue", gate: "caveat" };
+  return { band: "watch", gate: "caveat" };
 }
 
 async function main(): Promise<void> {
@@ -155,14 +166,16 @@ async function main(): Promise<void> {
     const a = arb.get(d.signal_id);
     if (!a) continue;
     const g = gateOf(band(a.fit), autoBySignal.get(d.signal_id) ?? []);
-    if (g.band !== "pursue") continue;
+    // caveat artık izle bandında; yine de ayrı ölçülür ki karar geri alınacaksa veri olsun.
+    if (g.band !== "pursue" && g.gate !== "caveat") continue;
     buckets[g.gate] ??= { agreed: 0, total: 0 };
     buckets[g.gate]!.total++;
     if (d.decision === "pursue") buckets[g.gate]!.agreed++;
   }
-  const all = Object.values(buckets).reduce((acc, b) => ({ agreed: acc.agreed + b.agreed, total: acc.total + b.total }), { agreed: 0, total: 0 });
+  const all = Object.entries(buckets).filter(([g]) => g !== "caveat").map(([, b]) => b).reduce((acc, b) => ({ agreed: acc.agreed + b.agreed, total: acc.total + b.total }), { agreed: 0, total: 0 });
   console.log(`kapılı kovala kesinliği: ${pct(all.agreed, all.total)}`);
-  for (const [gate, b] of Object.entries(buckets)) console.log(`  ${gate.padEnd(10)}: ${pct(b.agreed, b.total)}`);
+  for (const [gate, b] of Object.entries(buckets))
+    console.log(`  ${gate.padEnd(10)}: ${pct(b.agreed, b.total)}${gate === "caveat" ? "  (izle bandında, kesinliğe dahil değil)" : ""}`);
   const pending = [...arb.values()].filter(
     (a) => a.fit >= 80 && (autoBySignal.get(a.signal_id)?.length ?? 0) < GATE_REQUIRED,
   ).length;

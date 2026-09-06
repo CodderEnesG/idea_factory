@@ -32,10 +32,11 @@ describe("resolveGatedBand — Yorumcu kapısı", () => {
     });
   });
 
-  it("kovala + ikisi de izle → kovala kalır ama ÇEKİNCELİ (ölçülen veto kuralı)", () => {
-    // fit>=80 AND "ele DEMEDİ" -> %53 kesinlik. "izle" düşürmez, görünür çekince koyar.
+  it("kovala + ikisi de izle → İZLE'ye düşer, gate ÇEKİNCELİ (2026-09-06 kalibrasyonu)", () => {
+    // caveat kesinliği %25 (3/12) vs confirmed %60 (3/5) → sıkı okuma. Etiket korunur ki
+    // UI "bekleniyor" ile karıştırmasın: turlar tamamlandı, Yorumcu ikna olmadı.
     expect(resolveGatedBand("pursue", ["watch", "watch"])).toEqual({
-      band: "pursue",
+      band: "watch",
       gate: "caveat",
     });
   });
