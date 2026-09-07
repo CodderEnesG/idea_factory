@@ -3,8 +3,7 @@
 import { useState } from "react";
 import type { IngestionSettings } from "../lib/active-ingestion-settings";
 import { formatSource } from "../lib/source-labels";
-
-const KNOWN_SOURCES = ["producthunt", "tldr", "webrazzi", "techcrunch", "ycombinator"];
+import { KNOWN_SOURCES } from "../lib/source-health";
 
 export function IngestionSettingsForm({
   initial,
