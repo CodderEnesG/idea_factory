@@ -101,6 +101,13 @@ export function PanomCard({
         </div>
       </div>
 
+      {item.pitch && (
+        <p className="mt-1.5 text-xs leading-snug text-ink">
+          {item.pitch}
+          {item.audienceLabel === "dar" && <span className="ml-1.5 text-[10px] text-ink-muted">· dar kitle</span>}
+        </p>
+      )}
+
       <div className="mt-2 flex flex-wrap items-center gap-1 font-mono text-[10.5px]">
         {/* Döküm satırı eskiden çözülmüş kararı HİÇ söylemiyordu: kart insan kararıyla "Ele"
             sütununda dururken satır yeşil "Kovala" (ham AI) ile başlıyordu. Artık önce karar. */}

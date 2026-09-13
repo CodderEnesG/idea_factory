@@ -29,9 +29,16 @@ const KIND_LABEL: Record<string, string> = {
   venture: "girişim",
   product: "ürün",
   funding: "yatırım turu",
+  incumbent_feature: "yerleşik oyuncu özelliği",
   essay: "görüş yazısı",
   research: "araştırma",
   other: "sınıflanmadı",
+};
+
+const AUDIENCE_LABEL: Record<"broad" | "medium" | "narrow", string> = {
+  broad: "geniş",
+  medium: "orta",
+  narrow: "dar",
 };
 
 const BAND_ORDER: Record<Band, number> = { pursue: 0, watch: 1, kill: 2 };
@@ -182,6 +189,8 @@ export function buildCardView(
     noData,
     fetchOk: enr?.fetch_ok ?? true,
     summary: enr?.project_summary ?? null,
+    pitch: enr?.one_liner ?? null,
+    audienceLabel: enr?.audience_breadth ? AUDIENCE_LABEL[enr.audience_breadth] : null,
     facts,
     pending: lensViews.some((l) => l.validation_needed.length > 0),
     lensViews,

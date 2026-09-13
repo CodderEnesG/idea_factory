@@ -19,6 +19,12 @@
  *   beyaz-alan confidence:low           %66   (434/662)
  *   beyaz-alan ↔ arbitraj korelasyonu   r=0.01
  *   ws>=60 → insan-kovala               %40 (n=10)  ·  ws<60 → %7 (n=28)
+ *
+ * ── KİTLE KARIŞIMI TABANI (2026-09-13, kitle kapısı + tez v2 + reassess ÖNCESİ) ──
+ *   arbitraj fit>=80                     102/1937
+ *   B2B hedef kullanıcı                  %80   · consumer %3   · başlıkta AI %53
+ *   incumbent duyurusu 88 alan örnekler  Grok 4.5, Copilot app, Nemotron, MAI, Anthropic Conway
+ *   hedef: consumer ≥%10 · narrow %0 · incumbent %0 · AI-başlık belirgin düşüş
  */
 
 import { config } from "dotenv";
@@ -217,7 +223,38 @@ async function main(): Promise<void> {
   const crowded = hi.filter((d) => ws.get(d.signal_id)!.fit < 60);
   console.log(`arbitraj 80+ & ws≥60 → insan-kovala: ${pct(gap.filter((d) => d.decision === "pursue").length, gap.length)}`);
   console.log(`arbitraj 80+ & ws<60 → insan-kovala: ${pct(crowded.filter((d) => d.decision === "pursue").length, crowded.length)}`);
+
+  // ── 5. Kitle karışımı (2026-09-13) ───────────────────────────────
+  console.log("\n=== KİTLE KARIŞIMI — arbitraj fit≥80 (taban: B2B %80, consumer %3, AI %53) ===");
+  const signals = await fetchAll<SignalMixRow>(
+    "signals",
+    "id,title,kind:enrichment->>signal_kind,segment:enrichment->>target_segment,breadth:enrichment->>audience_breadth,users:enrichment->>target_users",
+  );
+  const sig = new Map(signals.map((s) => [s.id, s]));
+  const top = [...arb.values()].filter((a) => a.fit >= 80).map((a) => sig.get(a.signal_id)).filter((s): s is SignalMixRow => !!s);
+  const n = top.length;
+  // Eski satırlarda target_segment yok → serbest metin target_users'tan kaba sınıflandırma.
+  const isConsumer = (s: SignalMixRow) =>
+    s.segment ? s.segment === "consumer" : /consumer|tüketici|bireysel|b2c/i.test(s.users ?? "");
+  const isB2B = (s: SignalMixRow) =>
+    s.segment ? s.segment === "smb" || s.segment === "enterprise" : /kobi|smb|enterprise|b2b|işletme|şirket|kurum/i.test(s.users ?? "");
+  console.log(`arbitraj fit≥80: ${n}/${arb.size}`);
+  console.log(`B2B (smb+enterprise):  ${pct(top.filter(isB2B).length, n)}`);
+  console.log(`consumer:              ${pct(top.filter(isConsumer).length, n)}   <- hedef ≥%10`);
+  console.log(`başlıkta AI:           ${pct(top.filter((s) => /\bAI\b|yapay zeka/i.test(s.title)).length, n)}`);
+  console.log(`narrow kitle:          ${pct(top.filter((s) => s.breadth === "narrow").length, n)}   <- hedef %0 (guard j)`);
+  console.log(`incumbent_feature:     ${pct(top.filter((s) => s.kind === "incumbent_feature").length, n)}   <- hedef %0`);
+  console.log(`yeni alanlı (reassess): ${pct(top.filter((s) => s.breadth !== null).length, n)}`);
   console.log("");
+}
+
+interface SignalMixRow {
+  id: string;
+  title: string;
+  kind: string | null;
+  segment: string | null;
+  breadth: string | null;
+  users: string | null;
 }
 
 main().catch((e) => {

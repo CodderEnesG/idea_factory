@@ -13,6 +13,8 @@ export interface AnalyzeOneDeps {
   fewShot: FewShotExample[];
   knowledge: KnowledgeLayer;
   thesis: ThesisConfig;
+  /** Satıra eklenecek ek tag'ler — ör. `reassess.ts`'in devam işareti (analyses'ta updated_at yok). */
+  extraTags?: string[];
 }
 
 /**
@@ -44,7 +46,7 @@ export async function analyzeOne(signal: Signal, lens: Lens, deps: AnalyzeOneDep
         recommended_action: a.recommended_action,
         // local_competitor'ın kendi DB kolonu yok (migration'a değmez) — audit/görünürlük için
         // tags'e ekleniyor; guard zaten üretim anında (analyst.ts) bu alanı zorunlu kılıyor.
-        tags: [...a.tags, `local_competitor:${a.local_competitor}`],
+        tags: [...a.tags, `local_competitor:${a.local_competitor}`, ...(deps.extraTags ?? [])],
         model: env.analysisModel(),
       },
       { onConflict: "signal_id,lens" },

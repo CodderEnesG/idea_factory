@@ -359,8 +359,19 @@ export function DetailPanel({
               </div>
             )}
 
+            {item.pitch && (
+              <p className={`text-base font-medium leading-snug text-ink ${item.facts.length > 0 || item.notActionable || item.noData ? "mt-3" : ""}`}>
+                {item.pitch}
+                {item.audienceLabel && (
+                  <span className="ml-2 inline-block rounded border border-hair px-1.5 py-0.5 align-middle text-[10px] font-normal text-ink-secondary">
+                    Kitle: {item.audienceLabel}
+                  </span>
+                )}
+              </p>
+            )}
+
             {item.summary && (
-              <p className={`text-sm leading-relaxed text-ink ${item.facts.length > 0 || item.notActionable || item.noData ? "mt-3" : ""}`}>
+              <p className={`text-sm leading-relaxed ${item.pitch ? "mt-2 text-ink-secondary" : "text-ink"} ${!item.pitch && (item.facts.length > 0 || item.notActionable || item.noData) ? "mt-3" : ""}`}>
                 {item.summary}
               </p>
             )}

@@ -9,6 +9,7 @@ import { makeSignal } from "./types.js";
  * Kotalar: ✓ ≥2 anti-pattern (MeshGrid, Fora, AId Core, Wise&Rise, Muzica)
  *          ✓ ≥2 sınırda-izle (Join, DBTalk, Caretta) · ✓ 1 tez-dışı-ama-ilginç (Dronbul)
  *          ✓ mükerrer-çift (InScope ×2) · ✓ 1 halüsinasyon probu (Caretta — traksiyon verisi yok)
+ * 2026-09-13: +4 vaka (2 incumbent ele, 1 LLM-sarmalayıcı izle, 1 geniş B2C kovala) → 24 (8/7/9).
  */
 export const evalCases: EvalCase[] = [
   // ── KOVALA (beklenen: pursue) ───────────────────────────────────────────
@@ -334,6 +335,71 @@ export const evalCases: EvalCase[] = [
       sector: "consumer",
     }),
     expected: "kill",
-    note: "Sektör dışı B2C içerik; abone/fiyat verisi yok (WTP belirsiz) + ünlü eğitmenli içerik prodüksiyonu sermaye ister",
+    note: "Abone/fiyat verisi yok (WTP belirsiz) + ünlü eğitmenli içerik prodüksiyonu sermaye ister (B2C olması ele sebebi değil — tez v2)",
+  },
+
+  // ── 2026-09-13 ek: kitle/incumbent kalibrasyonu (gerçek DB sinyalleri) ─────────
+  // Dördü de canlıda arbitraj fit 88 almıştı. Beklentiler kullanıcı onaylı.
+  {
+    signal: makeSignal({
+      title: "Anthropic set to end Conway test as wider rollout expected",
+      summary_raw:
+        "Anthropic will discontinue its Conway experiment by July 24, prompting users to export data. " +
+        "Conway, Claude Code çalıştırabilen, tarayıcı kullanan, her zaman açık dahili bir ajan; testin bitişi " +
+        "Claude kullanıcıları için daha geniş önizleme beklentisi doğuruyor.",
+      source: "tldr:ai",
+      type: "company",
+      url: "https://www.testingcatalog.com/anthropic-set-to-end-conway-test-as-wider-preview-expected-soon/",
+      sector: "AI/ML",
+    }),
+    expected: "kill",
+    note: "incumbent_feature: frontier model lab'ın kendi ürün testi — kopyalanacak bağımsız teşebbüs yok (canlıda 88 almıştı)",
+  },
+  {
+    signal: makeSignal({
+      title: "Microsoft's New MAI-Image and MAI-Voice",
+      summary_raw:
+        "Microsoft introduced MAI-Image-2.5-Pro for high-fidelity image generation and editing, alongside " +
+        "MAI-Voice-2-Flash for faster, lower-cost voice applications. Both models entered public preview and " +
+        "joined Microsoft's broader production model lineup.",
+      source: "tldr:ai",
+      type: "company",
+      url: "https://microsoft.ai/news/introducing-mai-image-2-5-pro-and-mai-voice-2-flash/",
+      market: "Global",
+    }),
+    expected: "kill",
+    note: "incumbent_feature: dev şirketin model sürüm duyurusu (canlıda 88 almıştı)",
+  },
+  {
+    signal: makeSignal({
+      title: "Show HN: I built an AI Agent that sell itself",
+      summary_raw:
+        "SendRoq, LinkedIn profillerini analiz edip niyet sinyali veren kişilere kişiselleştirilmiş mesaj ve " +
+        "otomatik takip gönderen bir yapay zeka satış aracı. Pazarlama ajansının iç aracından SaaS'a dönüştü. " +
+        "300+ satış ekibi/ajans, 1.200+ ayarlanmış toplantı; $59-249/ay abonelik.",
+      source: "hackernews",
+      type: "launch",
+      url: "https://www.sendroq.com/",
+      sector: "B2B SaaS",
+    }),
+    expected: "watch",
+    note: "İnce LLM sarmalayıcı: WTP var ama değer model + LinkedIn erişimi; platform/kalabalık rakipler özellik olarak ekler (canlıda 88)",
+  },
+  {
+    signal: makeSignal({
+      title: "Robbie Williams-backed Tickets for Good raises €4.5 million for international expansion",
+      summary_raw:
+        "Tickets for Good, sağlık çalışanları, öğretmenler, hayır kurumu çalışanları ve yaşam maliyeti desteği " +
+        "alanlara canlı etkinlikler için düşük maliyetli bilet sunan İngiliz platform. Mekanların satılmayan " +
+        "biletlerini dağıtıyor; alıcı ücretsiz kaydolup küçük işlem ücreti ödüyor. ~750.000 doğrulanmış üye, " +
+        "€4,5M yeni yatırım, uluslararası genişleme.",
+      source: "eu_startups",
+      type: "funding",
+      url: "https://www.eu-startups.com/2026/09/robbie-williams-backed-tickets-for-good-raises-e4-5-million-for-international-expansion/",
+      market: "Europe",
+      sector: "B2C platform",
+    }),
+    expected: "pursue",
+    note: "Geniş B2C kitle + tek cümlede anlatılır + sermaye-hafif marketplace + başka pazarda kanıtlı; TR'de öğretmen/sağlıkçı kitlesi (tez v2)",
   },
 ];
