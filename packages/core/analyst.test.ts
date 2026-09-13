@@ -85,6 +85,56 @@ describe("analyzeSignal — lens id normalizasyonu", () => {
   });
 });
 
+describe("analyzeSignal — niş/netlik kapısı (j) retry", () => {
+  it("narrow zenginleştirmede 85 verilirse guard feedback'iyle yeniden dener, 79'da kabul eder", async () => {
+    const narrowSignal = {
+      ...signal,
+      enrichment: {
+        signal_kind: "product",
+        project_summary: "Kurumsal sponsorluk ekipleri için etkinlik ROI ölçümü.",
+        one_liner: "Sponsorluk ekiplerinin etkinlik getirisini ölçer",
+        target_segment: "enterprise",
+        audience_breadth: "narrow",
+        pitch_clarity: "clear",
+        hq_country: "TR",
+        markets: ["Türkiye"],
+        funding: { stage: null, amount: null, total_raised: null, investors: [] },
+        target_users: "enterprise",
+        traction: "10+ kurumsal marka",
+        capital_intensity: "low",
+        regulation_flags: [],
+        wtp_signals: null,
+        sector: "vertical SaaS",
+        market: "TR",
+        fetch_ok: true,
+        model: "test",
+        page_chars: 100,
+      },
+    } as Signal;
+    const pursue = {
+      ...validBody(),
+      fit: 85,
+      confidence: "high",
+      validation_needed: [],
+      recommended_action: "pursue",
+    };
+    const users: string[] = [];
+    let n = 0;
+    const p: AnalystProvider = {
+      name: "fake",
+      async generate({ user }) {
+        users.push(user);
+        return n++ === 0 ? pursue : { ...validBody(), fit: 79 };
+      },
+    };
+    const out = await analyzeSignal(narrowSignal, whiteSpaceLens, { provider: p });
+    expect(out.fit).toBe(79);
+    expect(users.length).toBe(2);
+    expect(users[0]).toContain("niş/netlik kapısı");
+    expect(users[1]).toContain("mantık ihlali: niş/netlik kapısı");
+  });
+});
+
 describe("analyzeSignal — grounding (mercek özelliği, 0015)", () => {
   afterEach(() => {
     delete process.env["GROUNDING_ENABLED"];

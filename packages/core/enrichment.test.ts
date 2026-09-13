@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildEnrichmentSystemPrompt,
   enrichSignal,
   isActionableKind,
+  SignalEnrichmentSchema,
   StoredEnrichmentSchema,
   type SignalEnrichment,
 } from "./enrichment.js";
+import { thesis } from "./thesis.config.js";
 import { buildSignalBrief } from "./lenses.config.js";
 import type { AnalystProvider, GenerateArgs } from "./providers/types.js";
 import type { Signal } from "./signal.js";
@@ -26,6 +29,10 @@ const signal: Signal = {
 const validExtraction: SignalEnrichment = {
   signal_kind: "venture",
   project_summary: "Restoranlar için AI ile stok ve israf yönetimi yapan B2B SaaS.",
+  one_liner: "Restoranların stok israfını tahminle azaltır",
+  target_segment: "smb",
+  audience_breadth: "medium",
+  pitch_clarity: "clear",
   hq_country: "US",
   markets: ["US"],
   funding: { stage: "seed", amount: "$2M", total_raised: null, investors: ["Foo VC"] },
@@ -184,6 +191,67 @@ describe("triage_score (StoredEnrichmentSchema)", () => {
     });
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data.triage_score).toBe(85);
+  });
+});
+
+describe("kitle alanları (one_liner / segment / breadth / clarity)", () => {
+  it("eski satırlarda yeni alanlar yoksa null'a düşer, parse patlamaz", () => {
+    const { one_liner: _a, target_segment: _b, audience_breadth: _c, pitch_clarity: _d, ...legacy } =
+      validExtraction;
+    const parsed = StoredEnrichmentSchema.safeParse({ ...legacy, fetch_ok: true, model: "test", page_chars: 10 });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.one_liner).toBe(null);
+    expect(parsed.data.target_segment).toBe(null);
+    expect(parsed.data.audience_breadth).toBe(null);
+    expect(parsed.data.pitch_clarity).toBe(null);
+  });
+
+  it("160 karakteri aşan one_liner şemadan düşer (enrich retry tetiklenir)", () => {
+    const parsed = SignalEnrichmentSchema.safeParse({ ...validExtraction, one_liner: "x".repeat(161) });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("incumbent kuralı liste değil ölçüt: frontier lab + yan kuruluş + sürüm duyurusu", () => {
+    const p = buildEnrichmentSystemPrompt(thesis);
+    expect(p).toContain("frontier model laboratuvarı");
+    expect(p).toContain("GitHub → Microsoft");
+    expect(p).toContain("sürüm duyuruları");
+    expect(p).toContain("audience_breadth");
+  });
+});
+
+describe("buildSignalBrief — niş/netlik ipucu", () => {
+  const stored = {
+    ...validExtraction,
+    fetch_ok: true,
+    model: "test",
+    page_chars: 100,
+    triage_score: null,
+    triage_reason: null,
+  };
+
+  it("tek cümle + kitle satırını gösterir, geniş+net iken uyarı düşmez", () => {
+    const p = buildSignalBrief(signal, stored);
+    expect(p).toContain("Tek cümle: Restoranların stok israfını tahminle azaltır");
+    expect(p).toContain("Kitle: smb/medium");
+    expect(p).not.toContain("niş/netlik kapısı");
+  });
+
+  it("narrow veya vague iken fit ≤ 79 uyarısı düşer", () => {
+    expect(buildSignalBrief(signal, { ...stored, audience_breadth: "narrow" })).toContain("niş/netlik kapısı");
+    expect(buildSignalBrief(signal, { ...stored, pitch_clarity: "vague" })).toContain("niş/netlik kapısı");
+  });
+
+  it("eski satırda (alanlar null) satır hiç eklenmez", () => {
+    const p = buildSignalBrief(signal, {
+      ...stored,
+      one_liner: null,
+      target_segment: null,
+      audience_breadth: null,
+      pitch_clarity: null,
+    });
+    expect(p).not.toContain("Tek cümle:");
   });
 });
 

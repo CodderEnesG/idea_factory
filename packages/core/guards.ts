@@ -1,6 +1,6 @@
 import type { BaseAnalysis } from "./lenses.config.js";
 import { fitBand } from "./lenses.config.js";
-import { isActionableKind, type SignalKind } from "./enrichment.js";
+import { isActionableKind, type AudienceBreadth, type PitchClarity, type SignalKind } from "./enrichment.js";
 
 /** Guard'ların analiz dışında bakabildiği bağlam (zenginleştirmeden gelir). */
 export interface GuardContext {
@@ -11,6 +11,8 @@ export interface GuardContext {
   traction?: string | null;
   markets?: string[];
   capitalIntensity?: "low" | "medium" | "high" | "unknown";
+  audienceBreadth?: AudienceBreadth | null;
+  pitchClarity?: PitchClarity | null;
 }
 
 /** Kovalanamaz sinyal için fit tavanı — üstü "meta-öğrenme" rasyonalizasyonudur. */
@@ -106,6 +108,15 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
   if (ctx.lensId === "arbitrage" && a.fit >= 80 && a.local_competitor === "established") {
     v.push(
       "yerleşik rakip guard'ı: local_competitor=established (hedef pazarda olgun bir rakip var) ama fit 80+ — savunulabilir boşluk yok",
+    );
+  }
+
+  // (j) niş/netlik kapısı: 2026-09-13 ölçümü — fit≥80'in %80'i B2B, çoğu tek-rol niş ve tek
+  // cümlede anlatılamayan ürünlerdi. Kitle fikrin özelliği, merceğin değil → tüm merceklere.
+  // null (2026-09 öncesi zenginleştirme) bloklamaz.
+  if (a.fit >= 80 && (ctx.audienceBreadth === "narrow" || ctx.pitchClarity === "vague")) {
+    v.push(
+      `niş/netlik kapısı: audience_breadth=${ctx.audienceBreadth ?? "?"} pitch_clarity=${ctx.pitchClarity ?? "?"} ama fit ${a.fit} ≥ 80 — dar kitle veya belirsiz pitch en fazla izle (≤79)`,
     );
   }
 

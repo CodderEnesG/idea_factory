@@ -259,3 +259,42 @@ describe("yerleşik rakip guard'ı (i) — 2026-09-04, AI odası bulgusu (130 si
     expect(checkAnalysisGuards(a).some((x) => x.includes("yerleşik rakip guard'ı"))).toBe(false);
   });
 });
+
+describe("niş/netlik kapısı (j) — 2026-09-13, fit≥80'in %80'i niş B2B", () => {
+  const watch: CustomAnalysis = {
+    ...base,
+    fit: 79,
+    recommended_action: "watch",
+    confidence: "med",
+    validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }],
+  };
+  const hit = (v: string[]) => v.some((x) => x.includes("niş/netlik kapısı"));
+
+  it("audience_breadth=narrow iken 80+ reddedilir", () => {
+    expect(hit(checkAnalysisGuards(base, { audienceBreadth: "narrow", pitchClarity: "clear" }))).toBe(true);
+  });
+
+  it("pitch_clarity=vague iken 80+ reddedilir", () => {
+    expect(hit(checkAnalysisGuards(base, { audienceBreadth: "broad", pitchClarity: "vague" }))).toBe(true);
+  });
+
+  it("broad/medium + clear iken 80+ geçer", () => {
+    for (const b of ["broad", "medium"] as const) {
+      expect(checkAnalysisGuards(base, { audienceBreadth: b, pitchClarity: "clear" })).toEqual([]);
+    }
+  });
+
+  it("narrow + vague olsa da fit 79 (izle) geçer", () => {
+    expect(checkAnalysisGuards(watch, { audienceBreadth: "narrow", pitchClarity: "vague" })).toEqual([]);
+  });
+
+  it("null (eski zenginleştirme) veya bağlamsız bloklamaz", () => {
+    expect(checkAnalysisGuards(base, { audienceBreadth: null, pitchClarity: null })).toEqual([]);
+    expect(checkAnalysisGuards(base)).toEqual([]);
+  });
+
+  it("merceğe bağlı değil — white_space'te de uygulanır", () => {
+    const ws: CustomAnalysis = { ...base, lens: "white_space" };
+    expect(hit(checkAnalysisGuards(ws, { lensId: "white_space", audienceBreadth: "narrow" }))).toBe(true);
+  });
+});

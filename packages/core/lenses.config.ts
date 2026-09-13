@@ -86,7 +86,14 @@ export function buildSignalBrief(s: Signal, enrichment?: StoredEnrichment | null
 
 Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayfada yoktu, UYDURMA):
 - Sinyal tipi: ${e.signal_kind ?? "bilinmiyor"}${e.signal_kind && !isActionableKind(e.signal_kind) ? " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)" : ""}
-- Proje: ${e.project_summary}
+- Proje: ${e.project_summary}${
+    e.one_liner || e.audience_breadth || e.pitch_clarity
+      ? `\n- Tek cümle: ${e.one_liner ?? "yok"} · Kitle: ${e.target_segment ?? "bilinmiyor"}/${e.audience_breadth ?? "bilinmiyor"} · Netlik: ${e.pitch_clarity ?? "bilinmiyor"}` +
+        (e.audience_breadth === "narrow" || e.pitch_clarity === "vague"
+          ? " ← dar kitle / belirsiz pitch: fit ≤ 79 (niş/netlik kapısı)"
+          : "")
+      : ""
+  }
 - Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
 - Fonlama: ${funding}
 - Hedef kullanıcı: ${e.target_users ?? "bilinmiyor"} · Traction: ${e.traction ?? "yok"}
@@ -189,6 +196,9 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy.
   olgun rakip var) / unknown (araştırmadım). BOŞ GEÇME ama UYDURMA — bilmiyorsan unknown yaz.
   established iken fit 80+ ver YASAK (guard reddeder) — "yerleşik rakip var ama biz daha iyi
   yaparız" bir kovala gerekçesi DEĞİLDİR, bu tam olarak "savunulabilir boşluk yok" demektir.
+- Kitle ve netlik: zenginleştirmede audience_breadth=narrow (tek niş rol/alt-dikey) veya
+  pitch_clarity=vague (tek cümlede anlatılamıyor) ise fit 80+ YASAK (guard reddeder). Kovala
+  adayı; geniş bir kitlenin somut acısını çözen, tek cümlede anlatılabilen fikirdir.
 
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
@@ -232,8 +242,14 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
       "ihtiyacıyla ölçülür: uyarlama düşük sermayeyle kurulabiliyorsa, kaynak şirketin büyük " +
       "fonlaması fit'i DÜŞÜRMEZ, yükseltir.",
     "Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon.",
-    "Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?",
-    "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame.",
+    // 2026-09-13: eski metin "hangi dar segment" diyerek darlığı ödüllendiriyordu (fit≥80'in
+    // çoğu tek-rol niş B2B). Canlı DB'ye scripts/migrate-2026-09-thesis-b2c.ts taşır.
+    "Yerel wedge + kitle: Türkiye'de somut giriş noktası ve acı ne, bu ürünü kaç kişi/işletme " +
+      "kullanabilir? Giriş segmenti dar olabilir ama ürün o nişe hapsolmuşsa ya da tek cümlede " +
+      "anlatılamıyorsa kovala-adayı değildir.",
+    "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame. " +
+      "B2C'de ödeme isteği kanıtı = abonelik/uygulama-içi gelir veya başka pazarda kanıtlı " +
+      "monetizasyon; B2C olmak tek başına 'WTP belirsiz' değildir.",
     "Zamanlama: neden şimdi? Yeni yetenek/maliyet eğrisi/regülasyon mümkün mü kıldı?",
     "Kim deniyor: Türkiye'de zaten kovalayan var mı? Cevabını local_competitor alanına da " +
       "yaz (none_found/early_stage/established/unknown) — bu soruyu sormakla YETİNME, cevabı " +

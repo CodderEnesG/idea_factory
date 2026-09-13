@@ -108,7 +108,8 @@ export const golden: GoldenCase[] = [
       rationale:
         "Teze uyum sinyali güçlü: küresel emsal kanıtlı (SponsorUnited ~$35M topladı), vertical SaaS, sermaye-hafif, " +
         "erken kurumsal kullanım var. AMA kullanım ≠ gelir — ödeme/yenileme verisi gelmeden kovala denemez. " +
-        "Kanıt gelirse kovala, gelmezse ele.",
+        "Üstelik kitle dar (yalnız kurumsal sponsorluk/etkinlik ekipleri): kanıt gelse de niş tavanı 80 altında " +
+        "kalır. Kanıt gelirse güçlü izle, gelmezse ele.",
       evidence: [
         {
           fact: "~10 ayda TR+İspanya'da 10+ kurumsal marka, 75+ etkinlik; yıllık paket modeli",
@@ -234,9 +235,10 @@ export const golden: GoldenCase[] = [
       lens: "arbitrage",
       fit: 22,
       rationale:
-        "Sektör dışı (B2C sağlık — mandate B2B SaaS/fintech/e-ticaret altyapısı/vertical SaaS) ve WTP belirsiz " +
-        "anti-pattern'ı tam tetikleniyor: makalede fiyat da gelir modeli de yok. Üstüne hassas sağlık verisi " +
-        "(KVKK özel nitelikli veri) yükü biner. İzlemeye alacak spesifik veri de tanımlanamıyor → ele.",
+        "B2C tüketici uygulaması mandate içinde — ele sebebi B2C olması DEĞİL. WTP belirsiz anti-pattern'ı tam " +
+        "tetikleniyor: makalede fiyat da gelir modeli de yok, başka pazarda kanıtlı monetizasyon da gösterilmemiş. " +
+        "Üstüne hassas sağlık verisi (KVKK özel nitelikli veri) yükü biner. İzlemeye alacak spesifik veri de " +
+        "tanımlanamıyor → ele.",
       evidence: [
         {
           fact: "B2C mobil uygulama; makalede fiyatlandırma, gelir modeli ve traksiyon verisi yok",
@@ -244,11 +246,11 @@ export const golden: GoldenCase[] = [
         },
       ],
       extra_note: "TR'de B2C sağlık aboneliğinde ödeme isteği kanıtsız; hassas veri yükümlülükleri ek maliyet.",
-      risks: ["WTP belirsiz (fiyat/model açıklanmamış)", "sektör dışı B2C", "hassas sağlık verisi yükümlülükleri"],
+      risks: ["WTP belirsiz (fiyat/model açıklanmamış)", "hassas sağlık verisi yükümlülükleri"],
       confidence: "high",
       validation_needed: [],
       recommended_action: "kill",
-      tags: ["b2c", "healthtech", "wtp-belirsiz"],
+      tags: ["healthtech", "wtp-belirsiz", "saglik-verisi"],
       local_competitor: "unknown",
     },
   },

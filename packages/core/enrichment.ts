@@ -32,6 +32,17 @@ export function isActionableKind(k: SignalKind): boolean {
   return k === "venture" || k === "product" || k === "funding";
 }
 
+export const TargetSegment = z.enum(["consumer", "smb", "enterprise", "developer", "mixed", "unknown"]);
+export type TargetSegment = z.infer<typeof TargetSegment>;
+
+/** Kitle genişliği — guard (j): narrow iken fit 80+ yasak (niş tek-rol ürünler tepeyi dolduruyordu). */
+export const AudienceBreadth = z.enum(["broad", "medium", "narrow"]);
+export type AudienceBreadth = z.infer<typeof AudienceBreadth>;
+
+/** Tek cümlede anlaşılır mı — guard (j): vague iken fit 80+ yasak. */
+export const PitchClarity = z.enum(["clear", "vague"]);
+export type PitchClarity = z.infer<typeof PitchClarity>;
+
 export const EnrichmentFundingSchema = z.object({
   stage: z.string().nullable(), // "seed", "Series B"… null = sayfada yok
   amount: z.string().nullable(), // "$5M"
@@ -43,6 +54,10 @@ export const EnrichmentFundingSchema = z.object({
 export const SignalEnrichmentSchema = z.object({
   signal_kind: SignalKind, // arkasında teşebbüs var mı — essay/research analiz kuyruğuna girmez
   project_summary: z.string().min(1), // 2-3 cümle: ne yapıyor, problem/çözüm, iş modeli
+  one_liner: z.string().min(1).max(160),
+  target_segment: TargetSegment,
+  audience_breadth: AudienceBreadth,
+  pitch_clarity: PitchClarity,
   hq_country: z.string().nullable(),
   markets: z.array(z.string()).default([]), // aktif/hedef pazarlar
   funding: EnrichmentFundingSchema,
@@ -64,6 +79,11 @@ export type SignalEnrichment = z.infer<typeof SignalEnrichmentSchema>;
  */
 export const StoredEnrichmentSchema = SignalEnrichmentSchema.extend({
   signal_kind: SignalKind.nullable().catch(null),
+  // 2026-09 öncesi satırlarda yok → null; guard (j) null'da bloklamaz.
+  one_liner: z.string().nullable().catch(null),
+  target_segment: TargetSegment.nullable().catch(null),
+  audience_breadth: AudienceBreadth.nullable().catch(null),
+  pitch_clarity: PitchClarity.nullable().catch(null),
   fetch_ok: z.boolean(),
   model: z.string(),
   page_chars: z.number().int().nullable(),
@@ -89,13 +109,18 @@ Alan rehberi:
     kovalanabilir: bu şirketin TR versiyonu kurulabilir).
   · product            — bağımsız bir girişimin belirli bir ürünü/aracı (lansman, launch sayfası).
   · funding            — bağımsız bir şirketin aldığı somut yatırım turu.
-  · incumbent_feature  — sinyal ASLINDA halihazırda büyük/yerleşik bir oyuncunun (Meta, Google,
-    Apple, Amazon, OpenAI, Microsoft, Shopify, Stripe, Slack vb. — zaten dev bir platform/şirket)
-    kendi ürününe eklediği YENİ BİR ÖZELLİK veya güncelleme duyurusu. Ortada kopyalanacak
-    BAĞIMSIZ bir teşebbüs yok — TR'de "bu şirketi kur" değil, olsa olsa "bu platforma entegre
-    ol" sorusu var, o da ayrı bir teşebbüs değil. venture/product ile KARIŞTIRMA: kritik ayrım
-    "bu haberin öznesi kendi başına kurulabilecek bağımsız bir şirket mi, yoksa zaten dev olan
-    birinin bir özelliği mi?" — ikincisiyse incumbent_feature.
+  · incumbent_feature  — haberin öznesi zaten BÜYÜK/YERLEŞİK bir oyuncu ve duyurduğu şey onun
+    yeni ürünü, özelliği, modeli veya sürümü. Liste ezberleme — ölçüte bak. Yerleşik oyuncu:
+      - halka açık şirket, milyar dolar+ değerlemeli platform veya geniş kullanıcı tabanlı dev
+        yazılım/donanım şirketi (ör. NVIDIA, Adobe, Salesforce, Shopify, Stripe);
+      - frontier model laboratuvarı (ör. OpenAI, Anthropic, xAI, Google DeepMind, Meta, Mistral);
+      - bunlardan birinin yan kuruluşu veya ürün markası (ör. GitHub → Microsoft, YouTube →
+        Google, AWS → Amazon, Instagram → Meta).
+    Model/SDK/API sürüm duyuruları ("X 4.5 çıktı", "Y Embed 3") ve bu şirketlerin kendi
+    uygulamaları/araçları da incumbent_feature'dır. Ortada kopyalanacak BAĞIMSIZ bir teşebbüs
+    yok — TR'de "bu şirketi kur" değil, olsa olsa "bu platforma entegre ol" sorusu var.
+    Karar sorusu: "haberin öznesi bağımsız, erken/orta aşama bir girişim mi?" Hayırsa
+    incumbent_feature. Dev şirketin mühendislik blog yazısı ("X şirketi Y'yi nasıl yapıyor") → essay.
   · essay              — görüş/deneme/tavsiye yazısı, ilke anlatımı, "şu dersi çıkarın" içeriği.
   · research           — araştırma, veri/rapor, pazar analizi.
   · other              — hiçbirine uymayan.
@@ -105,6 +130,17 @@ Alan rehberi:
   signal_kind essay/research/other ise: yazının ne savunduğunu 1-2 cümlede özetle, ürün uydurma.
 - hq_country / markets: merkez ülke; aktif veya hedeflenen pazarlar.
 - funding: tur, miktar, yatırımcılar, toplam — yalnız metinde açıkça geçiyorsa.
+- one_liner: fikrin TEK cümlesi, en fazla ~15 kelime, Türkçe: "[kime] [hangi acıyı] [nasıl] çözer".
+  Jargon, kısaltma ve marka adı yok — teknik bilmeyen biri okuyunca neyi kime sattığını anlamalı.
+- target_segment: consumer (bireysel son kullanıcı) / smb (KOBİ, esnaf, freelancer) / enterprise /
+  developer / mixed / unknown.
+- audience_breadth: bu acıyı yaşayan kitle ne kadar geniş?
+  · broad  — milyonlarca kişi veya yüz binlerce işletme (ör. KOBİ ön-muhasebesi, kişisel finans).
+  · medium — bir sektörün geniş kesimi veya büyük bir meslek grubu (ör. tüm e-ticaret satıcıları).
+  · narrow — tek bir niş rol, alt-dikey veya özel iş akışı; TR'de ~10 binden az potansiyel müşteri
+    (ör. kurumsal sponsorluk ölçümü, raylı sistem operatörleri, belirli bir ML ekibinin aracı).
+- pitch_clarity: clear — one_liner tek başına anlaşılır, problem somut; vague — fikir ancak
+  teknik bağlam/jargonla anlatılabiliyor veya ne sattığı belirsiz.
 - target_users: segment (KOBİ / enterprise / consumer / developer). traction: somut sayılar.
 - capital_intensity: donanım/envanter/fiziksel operasyon → high; saf yazılım → low; emin değilsen unknown.
 - regulation_flags: lisans/regülasyon gerektiren alanlar (bankacılık, sağlık, sigorta…); yoksa boş liste.
