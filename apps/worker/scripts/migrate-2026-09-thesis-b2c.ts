@@ -20,7 +20,13 @@ const ADD_ANTI_PATTERNS = [
   "İnce LLM sarmalayıcısı — değerin çoğu modelde; model sağlayıcı/platform bunu özellik olarak ekleyebilir (AI kullanmak tek başına sorun değil)",
 ];
 
-const OLD_Q3 = "Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?";
+// Soru 3'ün bilinen eski hâlleri: v1 seed + 2026-09-13'ün ilk "tek cümlede" sürümü (canlıya yazılmıştı).
+const OLD_Q3S = [
+  "Yerel wedge: Türkiye'de somut giriş noktası — hangi dar segment, hangi acı?",
+  "Yerel wedge + kitle: Türkiye'de somut giriş noktası ve acı ne, bu ürünü kaç kişi/işletme " +
+    "kullanabilir? Giriş segmenti dar olabilir ama ürün o nişe hapsolmuşsa ya da tek cümlede " +
+    "anlatılamıyorsa kovala-adayı değildir.",
+];
 const OLD_Q4 =
   "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame.";
 const NEW_Q3 = ARBITRAGE_SEED_LENS.questions[2]!;
@@ -97,8 +103,8 @@ async function migrateArbitrageQuestions(): Promise<void> {
   }
 
   let next: string[];
-  if (current.includes(OLD_Q3) || current.includes(OLD_Q4)) {
-    next = current.map((q) => (q === OLD_Q3 ? NEW_Q3 : q === OLD_Q4 ? NEW_Q4 : q));
+  if (current.some((q) => OLD_Q3S.includes(q)) || current.includes(OLD_Q4)) {
+    next = current.map((q) => (OLD_Q3S.includes(q) ? NEW_Q3 : q === OLD_Q4 ? NEW_Q4 : q));
   } else if (FORCE) {
     next = [...ARBITRAGE_SEED_LENS.questions];
   } else {

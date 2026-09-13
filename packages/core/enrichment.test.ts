@@ -207,8 +207,8 @@ describe("kitle alanları (one_liner / segment / breadth / clarity)", () => {
     expect(parsed.data.pitch_clarity).toBe(null);
   });
 
-  it("160 karakteri aşan one_liner şemadan düşer (enrich retry tetiklenir)", () => {
-    const parsed = SignalEnrichmentSchema.safeParse({ ...validExtraction, one_liner: "x".repeat(161) });
+  it("400 karakteri aşan one_liner şemadan düşer (enrich retry tetiklenir)", () => {
+    const parsed = SignalEnrichmentSchema.safeParse({ ...validExtraction, one_liner: "x".repeat(401) });
     expect(parsed.success).toBe(false);
   });
 
@@ -233,7 +233,7 @@ describe("buildSignalBrief — niş/netlik ipucu", () => {
 
   it("tek cümle + kitle satırını gösterir, geniş+net iken uyarı düşmez", () => {
     const p = buildSignalBrief(signal, { ...stored, audience_breadth: "broad" });
-    expect(p).toContain("Tek cümle: Restoranların stok israfını tahminle azaltır");
+    expect(p).toContain("Sade anlatım: Restoranların stok israfını tahminle azaltır");
     expect(p).toContain("Kitle: smb/broad");
     expect(p).not.toContain("niş/netlik kapısı");
   });
@@ -254,7 +254,7 @@ describe("buildSignalBrief — niş/netlik ipucu", () => {
       audience_breadth: null,
       pitch_clarity: null,
     });
-    expect(p).not.toContain("Tek cümle:");
+    expect(p).not.toContain("Sade anlatım:");
   });
 });
 

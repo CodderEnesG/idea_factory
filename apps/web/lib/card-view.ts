@@ -100,7 +100,7 @@ export interface CardView {
   noData: boolean;
   fetchOk: boolean;
   summary: string | null;
-  /** Zenginleştirmenin tek cümlelik pitch'i — 2026-09 öncesi satırlarda null (summary'ye düşülür). */
+  /** Zenginleştirmenin kısa, sade pitch paragrafı — 2026-09 öncesi satırlarda null (summary'ye düşülür). */
   pitch: string | null;
   /** "geniş" / "orta" / "dar" — audience_breadth; yoksa null. */
   audienceLabel: string | null;

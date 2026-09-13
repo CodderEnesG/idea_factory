@@ -88,7 +88,7 @@ Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayf
 - Sinyal tipi: ${e.signal_kind ?? "bilinmiyor"}${e.signal_kind && !isActionableKind(e.signal_kind) ? " ← kovalanabilir teşebbüs YOK: fit ≤ 20 + kill (ön kapı kuralı)" : ""}
 - Proje: ${e.project_summary}${
     e.one_liner || e.audience_breadth || e.pitch_clarity
-      ? `\n- Tek cümle: ${e.one_liner ?? "yok"} · Kitle: ${e.target_segment ?? "bilinmiyor"}/${e.audience_breadth ?? "bilinmiyor"} · Netlik: ${e.pitch_clarity ?? "bilinmiyor"}` +
+      ? `\n- Sade anlatım: ${e.one_liner ?? "yok"} · Kitle: ${e.target_segment ?? "bilinmiyor"}/${e.audience_breadth ?? "bilinmiyor"} · Netlik: ${e.pitch_clarity ?? "bilinmiyor"}` +
         ((e.audience_breadth && e.audience_breadth !== "broad") || e.pitch_clarity === "vague"
           ? " ← kitle geniş değil / belirsiz pitch: fit ≤ 79 (niş/netlik kapısı)"
           : "")
@@ -198,7 +198,7 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy.
   yaparız" bir kovala gerekçesi DEĞİLDİR, bu tam olarak "savunulabilir boşluk yok" demektir.
 - Kitle ve netlik: fit 80+ YALNIZ audience_breadth=broad VE pitch_clarity=clear iken verilebilir.
   medium/narrow kitle veya vague pitch ile 80+ YASAK (guard reddeder). Kovala adayı; geniş bir
-  kitlenin somut acısını çözen, tek cümlede anlatılabilen fikirdir.
+  kitlenin somut acısını çözen, kısa bir paragrafta sade dille anlatılabilen fikirdir.
 
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }
@@ -245,8 +245,8 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
     // 2026-09-13: eski metin "hangi dar segment" diyerek darlığı ödüllendiriyordu (fit≥80'in
     // çoğu tek-rol niş B2B). Canlı DB'ye scripts/migrate-2026-09-thesis-b2c.ts taşır.
     "Yerel wedge + kitle: Türkiye'de somut giriş noktası ve acı ne, bu ürünü kaç kişi/işletme " +
-      "kullanabilir? Giriş segmenti dar olabilir ama ürün o nişe hapsolmuşsa ya da tek cümlede " +
-      "anlatılamıyorsa kovala-adayı değildir.",
+      "kullanabilir? Giriş segmenti dar olabilir ama ürün o nişe hapsolmuşsa ya da kısa bir " +
+      "paragrafta sade dille anlatılamıyorsa kovala-adayı değildir.",
     "Uyarlamada ne kırılır: regülasyon / ödeme altyapısı / kültür / dağıtım / ödeme isteği / yerel ikame. " +
       "B2C'de ödeme isteği kanıtı = abonelik/uygulama-içi gelir veya başka pazarda kanıtlı " +
       "monetizasyon; B2C olmak tek başına 'WTP belirsiz' değildir.",

@@ -400,6 +400,6 @@ export const evalCases: EvalCase[] = [
       sector: "B2C platform",
     }),
     expected: "pursue",
-    note: "Geniş B2C kitle + tek cümlede anlatılır + sermaye-hafif marketplace + başka pazarda kanıtlı; TR'de öğretmen/sağlıkçı kitlesi (tez v2)",
+    note: "Geniş B2C kitle + sade dille anlatılır + sermaye-hafif marketplace + başka pazarda kanıtlı; TR'de öğretmen/sağlıkçı kitlesi (tez v2)",
   },
 ];

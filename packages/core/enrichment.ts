@@ -54,7 +54,7 @@ export const EnrichmentFundingSchema = z.object({
 export const SignalEnrichmentSchema = z.object({
   signal_kind: SignalKind, // arkasında teşebbüs var mı — essay/research analiz kuyruğuna girmez
   project_summary: z.string().min(1), // 2-3 cümle: ne yapıyor, problem/çözüm, iş modeli
-  one_liner: z.string().min(1).max(160),
+  one_liner: z.string().min(1).max(400), // alan adı tarihsel — içerik 1-3 cümlelik sade pitch
   target_segment: TargetSegment,
   audience_breadth: AudienceBreadth,
   pitch_clarity: PitchClarity,
@@ -130,8 +130,9 @@ Alan rehberi:
   signal_kind essay/research/other ise: yazının ne savunduğunu 1-2 cümlede özetle, ürün uydurma.
 - hq_country / markets: merkez ülke; aktif veya hedeflenen pazarlar.
 - funding: tur, miktar, yatırımcılar, toplam — yalnız metinde açıkça geçiyorsa.
-- one_liner: fikrin TEK cümlesi, en fazla ~15 kelime, Türkçe: "[kime] [hangi acıyı] [nasıl] çözer".
-  Jargon, kısaltma ve marka adı yok — teknik bilmeyen biri okuyunca neyi kime sattığını anlamalı.
+- one_liner: fikrin sade anlatımı — 1-3 kısa cümlelik küçük bir paragraf, Türkçe: kime, hangi acıyı,
+  nasıl çözüyor. Jargon, kısaltma ve marka adı yok — teknik bilmeyen biri okuyunca neyi kime
+  sattığını anlamalı. project_summary'nin kopyası değil: olgu değil, anlaşılır pitch.
 - target_segment: consumer (bireysel son kullanıcı) / smb (KOBİ, esnaf, freelancer) / enterprise /
   developer / mixed / unknown.
 - audience_breadth: bu acıyı yaşayan kitle ne kadar geniş? Cömert olma — emin değilsen dar olanı seç.
@@ -142,8 +143,8 @@ Alan rehberi:
   · narrow — bir sektörün içinde tek bir rol, alt-dikey veya özel iş akışı; TR'de ~10 binden az
     potansiyel müşteri (ör. kurumsal sponsorluk ölçümü, petrol-gaz operatörleri, inşaat ihalesi
     bulma, araç filosu hasar denetimi, AI laboratuvarlarına veri/uzman sağlama, raylı sistemler).
-- pitch_clarity: clear — one_liner tek başına anlaşılır, problem somut; vague — fikir ancak
-  teknik bağlam/jargonla anlatılabiliyor veya ne sattığı belirsiz.
+- pitch_clarity: clear — one_liner kısa bir paragrafta sade dille anlaşılır, problem somut;
+  vague — fikir ancak teknik bağlam/jargonla anlatılabiliyor veya ne sattığı belirsiz.
 - target_users: segment (KOBİ / enterprise / consumer / developer). traction: somut sayılar.
 - capital_intensity: donanım/envanter/fiziksel operasyon → high; saf yazılım → low; emin değilsen unknown.
 - regulation_flags: lisans/regülasyon gerektiren alanlar (bankacılık, sağlık, sigorta…); yoksa boş liste.
