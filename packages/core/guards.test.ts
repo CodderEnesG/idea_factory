@@ -270,18 +270,18 @@ describe("niş/netlik kapısı (j) — 2026-09-13, fit≥80'in %80'i niş B2B", 
   };
   const hit = (v: string[]) => v.some((x) => x.includes("niş/netlik kapısı"));
 
-  it("audience_breadth=narrow iken 80+ reddedilir", () => {
-    expect(hit(checkAnalysisGuards(base, { audienceBreadth: "narrow", pitchClarity: "clear" }))).toBe(true);
+  it("audience_breadth=narrow veya medium iken 80+ reddedilir", () => {
+    for (const b of ["narrow", "medium"] as const) {
+      expect(hit(checkAnalysisGuards(base, { audienceBreadth: b, pitchClarity: "clear" }))).toBe(true);
+    }
   });
 
   it("pitch_clarity=vague iken 80+ reddedilir", () => {
     expect(hit(checkAnalysisGuards(base, { audienceBreadth: "broad", pitchClarity: "vague" }))).toBe(true);
   });
 
-  it("broad/medium + clear iken 80+ geçer", () => {
-    for (const b of ["broad", "medium"] as const) {
-      expect(checkAnalysisGuards(base, { audienceBreadth: b, pitchClarity: "clear" })).toEqual([]);
-    }
+  it("yalnız broad + clear iken 80+ geçer", () => {
+    expect(checkAnalysisGuards(base, { audienceBreadth: "broad", pitchClarity: "clear" })).toEqual([]);
   });
 
   it("narrow + vague olsa da fit 79 (izle) geçer", () => {

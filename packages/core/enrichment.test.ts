@@ -232,15 +232,18 @@ describe("buildSignalBrief — niş/netlik ipucu", () => {
   };
 
   it("tek cümle + kitle satırını gösterir, geniş+net iken uyarı düşmez", () => {
-    const p = buildSignalBrief(signal, stored);
+    const p = buildSignalBrief(signal, { ...stored, audience_breadth: "broad" });
     expect(p).toContain("Tek cümle: Restoranların stok israfını tahminle azaltır");
-    expect(p).toContain("Kitle: smb/medium");
+    expect(p).toContain("Kitle: smb/broad");
     expect(p).not.toContain("niş/netlik kapısı");
   });
 
-  it("narrow veya vague iken fit ≤ 79 uyarısı düşer", () => {
+  it("medium, narrow veya vague iken fit ≤ 79 uyarısı düşer", () => {
+    expect(buildSignalBrief(signal, stored)).toContain("niş/netlik kapısı");
     expect(buildSignalBrief(signal, { ...stored, audience_breadth: "narrow" })).toContain("niş/netlik kapısı");
-    expect(buildSignalBrief(signal, { ...stored, pitch_clarity: "vague" })).toContain("niş/netlik kapısı");
+    expect(
+      buildSignalBrief(signal, { ...stored, audience_breadth: "broad", pitch_clarity: "vague" }),
+    ).toContain("niş/netlik kapısı");
   });
 
   it("eski satırda (alanlar null) satır hiç eklenmez", () => {

@@ -134,11 +134,14 @@ Alan rehberi:
   Jargon, kısaltma ve marka adı yok — teknik bilmeyen biri okuyunca neyi kime sattığını anlamalı.
 - target_segment: consumer (bireysel son kullanıcı) / smb (KOBİ, esnaf, freelancer) / enterprise /
   developer / mixed / unknown.
-- audience_breadth: bu acıyı yaşayan kitle ne kadar geniş?
-  · broad  — milyonlarca kişi veya yüz binlerce işletme (ör. KOBİ ön-muhasebesi, kişisel finans).
-  · medium — bir sektörün geniş kesimi veya büyük bir meslek grubu (ör. tüm e-ticaret satıcıları).
-  · narrow — tek bir niş rol, alt-dikey veya özel iş akışı; TR'de ~10 binden az potansiyel müşteri
-    (ör. kurumsal sponsorluk ölçümü, raylı sistem operatörleri, belirli bir ML ekibinin aracı).
+- audience_breadth: bu acıyı yaşayan kitle ne kadar geniş? Cömert olma — emin değilsen dar olanı seç.
+  · broad  — milyonlarca kişi veya yüz binlerce işletme, sektörden bağımsız (ör. KOBİ ön-muhasebesi,
+    kişisel finans, bireysel video düzenleme, tüm çalışanların not/yazı aracı).
+  · medium — tek bir sektör veya meslek grubu (ör. restoranlar, e-ticaret satıcıları, yazılım
+    ekipleri, finans kurumları, film/dizi yapımcıları, sigorta şirketleri).
+  · narrow — bir sektörün içinde tek bir rol, alt-dikey veya özel iş akışı; TR'de ~10 binden az
+    potansiyel müşteri (ör. kurumsal sponsorluk ölçümü, petrol-gaz operatörleri, inşaat ihalesi
+    bulma, araç filosu hasar denetimi, AI laboratuvarlarına veri/uzman sağlama, raylı sistemler).
 - pitch_clarity: clear — one_liner tek başına anlaşılır, problem somut; vague — fikir ancak
   teknik bağlam/jargonla anlatılabiliyor veya ne sattığı belirsiz.
 - target_users: segment (KOBİ / enterprise / consumer / developer). traction: somut sayılar.

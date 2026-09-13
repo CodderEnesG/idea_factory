@@ -1,5 +1,6 @@
 /** `reassess.ts` devam işareti — `analyses`'ta updated_at yok, işlenen satır bu tag'i taşır. */
-export const REASSESS_TAG = "reassess:2026-09";
+// "b": guard (j) broad-şartına sıkılaştırıldı — ilk pilotun 20 satırı eski kuralla işlendi, yeniden işlenmeli.
+export const REASSESS_TAG = "reassess:2026-09b";
 export const REASSESS_MIN_FIT = 50;
 
 export interface AnalysisRow {

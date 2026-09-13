@@ -113,10 +113,13 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
 
   // (j) niş/netlik kapısı: 2026-09-13 ölçümü — fit≥80'in %80'i B2B, çoğu tek-rol niş ve tek
   // cümlede anlatılamayan ürünlerdi. Kitle fikrin özelliği, merceğin değil → tüm merceklere.
+  // 80+ için kitle GENİŞ olmalı: ilk sürüm yalnız "narrow"u bloklıyordu ama 20 sinyallik pilotta
+  // model hiç "narrow" demedi (petrol-gaz operatörleri, film post-prodüksiyonu "medium" oldu).
   // null (2026-09 öncesi zenginleştirme) bloklamaz.
-  if (a.fit >= 80 && (ctx.audienceBreadth === "narrow" || ctx.pitchClarity === "vague")) {
+  const breadthBlocks = ctx.audienceBreadth === "narrow" || ctx.audienceBreadth === "medium";
+  if (a.fit >= 80 && (breadthBlocks || ctx.pitchClarity === "vague")) {
     v.push(
-      `niş/netlik kapısı: audience_breadth=${ctx.audienceBreadth ?? "?"} pitch_clarity=${ctx.pitchClarity ?? "?"} ama fit ${a.fit} ≥ 80 — dar kitle veya belirsiz pitch en fazla izle (≤79)`,
+      `niş/netlik kapısı: audience_breadth=${ctx.audienceBreadth ?? "?"} pitch_clarity=${ctx.pitchClarity ?? "?"} ama fit ${a.fit} ≥ 80 — 80+ yalnız geniş kitle + net pitch; aksi halde en fazla izle (≤79)`,
     );
   }
 
