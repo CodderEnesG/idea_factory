@@ -127,6 +127,8 @@ Alan rehberi:
   · other              — hiçbirine uymayan.
   Uyarı: newsletter başlıkları çoğu zaman essay'dir. "Şirketinizi şöyle yönetin", "X neden
   başarısız olur", "Y hakkında düşünceler" → essay. Bir şirket ADI geçmiyorsa venture DEĞİL.
+  AMA kurucunun KENDİ bağımsız şirketini adıyla ve somut gelir/kullanıcı rakamıyla anlattığı yazı
+  ("X'i kurdum, bir yılda $4M ARR") essay değil venture'dır — ortada kopyalanabilir bir teşebbüs var.
 - project_summary: ne yapıyor, hangi problemi nasıl çözüyor, iş modeli (2-3 cümle, Türkçe).
   signal_kind essay/research/other ise: yazının ne savunduğunu 1-2 cümlede özetle, ürün uydurma.
 - hq_country / markets: merkez ülke; aktif veya hedeflenen pazarlar.

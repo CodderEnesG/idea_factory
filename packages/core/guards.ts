@@ -1,6 +1,12 @@
 import type { BaseAnalysis } from "./lenses.config.js";
 import { fitBand } from "./lenses.config.js";
-import { isActionableKind, type AudienceBreadth, type PitchClarity, type SignalKind } from "./enrichment.js";
+import {
+  isActionableKind,
+  type AudienceBreadth,
+  type PitchClarity,
+  type SignalKind,
+  type TargetSegment,
+} from "./enrichment.js";
 
 /** Guard'ların analiz dışında bakabildiği bağlam (zenginleştirmeden gelir). */
 export interface GuardContext {
@@ -13,6 +19,7 @@ export interface GuardContext {
   capitalIntensity?: "low" | "medium" | "high" | "unknown";
   audienceBreadth?: AudienceBreadth | null;
   pitchClarity?: PitchClarity | null;
+  targetSegment?: TargetSegment | null;
 }
 
 /** Kovalanamaz sinyal için fit tavanı — üstü "meta-öğrenme" rasyonalizasyonudur. */
@@ -113,13 +120,21 @@ export function checkAnalysisGuards(a: BaseAnalysis, ctx: GuardContext = {}): st
 
   // (j) niş/netlik kapısı: 2026-09-13 ölçümü — fit≥80'in %80'i B2B, çoğu tek-rol niş ve tek
   // cümlede anlatılamayan ürünlerdi. Kitle fikrin özelliği, merceğin değil → tüm merceklere.
-  // 80+ için kitle GENİŞ olmalı: ilk sürüm yalnız "narrow"u bloklıyordu ama 20 sinyallik pilotta
-  // model hiç "narrow" demedi (petrol-gaz operatörleri, film post-prodüksiyonu "medium" oldu).
-  // null (2026-09 öncesi zenginleştirme) bloklamaz.
-  const breadthBlocks = ctx.audienceBreadth === "narrow" || ctx.audienceBreadth === "medium";
-  if (a.fit >= 80 && (breadthBlocks || ctx.pitchClarity === "vague")) {
+  // Yalnız "narrow": 2026-09-14'te "medium"u da kesen sürüm denendi, ama insan kararlarında
+  // kovala oranı medium %5 (12/256) ≈ broad %6 (7/114), narrow %0 (0/30) — medium kesmek
+  // kesinlik kazandırmadan insan-kovalalarını eliyordu. null (eski zenginleştirme) bloklamaz.
+  if (a.fit >= 80 && (ctx.audienceBreadth === "narrow" || ctx.pitchClarity === "vague")) {
     v.push(
-      `niş/netlik kapısı: audience_breadth=${ctx.audienceBreadth ?? "?"} pitch_clarity=${ctx.pitchClarity ?? "?"} ama fit ${a.fit} ≥ 80 — 80+ yalnız geniş kitle + net pitch; aksi halde en fazla izle (≤79)`,
+      `niş/netlik kapısı: audience_breadth=${ctx.audienceBreadth ?? "?"} pitch_clarity=${ctx.pitchClarity ?? "?"} ama fit ${a.fit} ≥ 80 — dar kitle veya belirsiz anlatım en fazla izle (≤79)`,
+    );
+  }
+
+  // (k) geliştirici aracı tavanı: 2026-09-14 insan kararları — target_segment=developer olan
+  // 111 kararın 0'ı kovala, 99'u ele. "Gerçek hayatta karşılığı olmayan AI B2B" şikayetinin
+  // büyük kısmı bu segment (kod yardımcıları, model router, AI altyapısı). Tüm merceklere.
+  if (a.fit >= 80 && ctx.targetSegment === "developer") {
+    v.push(
+      `geliştirici aracı tavanı: target_segment=developer ama fit ${a.fit} ≥ 80 — geliştirici araçları en fazla izle (≤79)`,
     );
   }
 

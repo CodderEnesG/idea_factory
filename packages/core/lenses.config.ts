@@ -89,9 +89,11 @@ Zenginleştirme (kaynak sayfadan çıkarılmış olgular; null/bilinmiyor = sayf
 - Proje: ${e.project_summary}${
     e.one_liner || e.audience_breadth || e.pitch_clarity
       ? `\n- Sade anlatım: ${e.one_liner ?? "yok"} · Kitle: ${e.target_segment ?? "bilinmiyor"}/${e.audience_breadth ?? "bilinmiyor"} · Netlik: ${e.pitch_clarity ?? "bilinmiyor"}` +
-        ((e.audience_breadth && e.audience_breadth !== "broad") || e.pitch_clarity === "vague"
-          ? " ← kitle geniş değil / belirsiz pitch: fit ≤ 79 (niş/netlik kapısı)"
-          : "")
+        (e.audience_breadth === "narrow" || e.pitch_clarity === "vague"
+          ? " ← dar kitle / belirsiz anlatım: fit ≤ 79 (niş/netlik kapısı)"
+          : e.target_segment === "developer"
+            ? " ← geliştirici aracı: fit ≤ 79 (geliştirici aracı tavanı)"
+            : "")
       : ""
   }
 - Merkez: ${e.hq_country ?? "bilinmiyor"} · Pazarlar: ${e.markets.join(", ") || "bilinmiyor"}
@@ -196,9 +198,11 @@ Zenginleştirme bloğunda signal_kind verilmişse ona uy.
   olgun rakip var) / unknown (araştırmadım). BOŞ GEÇME ama UYDURMA — bilmiyorsan unknown yaz.
   established iken fit 80+ ver YASAK (guard reddeder) — "yerleşik rakip var ama biz daha iyi
   yaparız" bir kovala gerekçesi DEĞİLDİR, bu tam olarak "savunulabilir boşluk yok" demektir.
-- Kitle ve netlik: fit 80+ YALNIZ audience_breadth=broad VE pitch_clarity=clear iken verilebilir.
-  medium/narrow kitle veya vague pitch ile 80+ YASAK (guard reddeder). Kovala adayı; geniş bir
-  kitlenin somut acısını çözen, kısa bir paragrafta sade dille anlatılabilen fikirdir.
+- Kitle ve netlik: audience_breadth=narrow (tek niş rol/alt-dikey) veya pitch_clarity=vague ise
+  fit 80+ YASAK (guard reddeder). Kovala adayı; yeterince geniş bir kitlenin somut acısını çözen,
+  kısa bir paragrafta sade dille anlatılabilen fikirdir.
+- Geliştirici araçları: target_segment=developer (kod yardımcısı, AI altyapısı, model/API aracı)
+  ise fit 80+ YASAK (guard reddeder) — en fazla izle.
 
 Çıktıyı YALNIZ verilen JSON şemasına uygun üret.`;
 }

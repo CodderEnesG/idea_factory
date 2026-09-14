@@ -128,6 +128,7 @@ export async function analyzeSignal<TAnalysis extends BaseAnalysis>(
       capitalIntensity: enrichment?.capital_intensity,
       audienceBreadth: enrichment?.audience_breadth,
       pitchClarity: enrichment?.pitch_clarity,
+      targetSegment: enrichment?.target_segment,
     });
     if (violations.length > 0) {
       feedback = `Önceki çıktıda mantık ihlali: ${violations.join("; ")}. Düzelt.`;

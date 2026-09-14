@@ -270,18 +270,18 @@ describe("niş/netlik kapısı (j) — 2026-09-13, fit≥80'in %80'i niş B2B", 
   };
   const hit = (v: string[]) => v.some((x) => x.includes("niş/netlik kapısı"));
 
-  it("audience_breadth=narrow veya medium iken 80+ reddedilir", () => {
-    for (const b of ["narrow", "medium"] as const) {
-      expect(hit(checkAnalysisGuards(base, { audienceBreadth: b, pitchClarity: "clear" }))).toBe(true);
-    }
+  it("audience_breadth=narrow iken 80+ reddedilir", () => {
+    expect(hit(checkAnalysisGuards(base, { audienceBreadth: "narrow", pitchClarity: "clear" }))).toBe(true);
   });
 
   it("pitch_clarity=vague iken 80+ reddedilir", () => {
     expect(hit(checkAnalysisGuards(base, { audienceBreadth: "broad", pitchClarity: "vague" }))).toBe(true);
   });
 
-  it("yalnız broad + clear iken 80+ geçer", () => {
-    expect(checkAnalysisGuards(base, { audienceBreadth: "broad", pitchClarity: "clear" })).toEqual([]);
+  it("broad veya medium + clear iken 80+ geçer (medium insan kararlarında broad kadar kovala alıyor)", () => {
+    for (const b of ["broad", "medium"] as const) {
+      expect(checkAnalysisGuards(base, { audienceBreadth: b, pitchClarity: "clear" })).toEqual([]);
+    }
   });
 
   it("narrow + vague olsa da fit 79 (izle) geçer", () => {
@@ -296,5 +296,30 @@ describe("niş/netlik kapısı (j) — 2026-09-13, fit≥80'in %80'i niş B2B", 
   it("merceğe bağlı değil — white_space'te de uygulanır", () => {
     const ws: CustomAnalysis = { ...base, lens: "white_space" };
     expect(hit(checkAnalysisGuards(ws, { lensId: "white_space", audienceBreadth: "narrow" }))).toBe(true);
+  });
+});
+
+describe("geliştirici aracı tavanı (k) — 2026-09-14, 111 developer kararının 0'ı kovala", () => {
+  const hit = (v: string[]) => v.some((x) => x.includes("geliştirici aracı tavanı"));
+  const watch: CustomAnalysis = {
+    ...base,
+    fit: 79,
+    recommended_action: "watch",
+    confidence: "med",
+    validation_needed: [{ data: "x", why: "y", how_to_verify: "z" }],
+  };
+
+  it("target_segment=developer iken 80+ reddedilir", () => {
+    expect(hit(checkAnalysisGuards(base, { targetSegment: "developer" }))).toBe(true);
+  });
+
+  it("developer iken 79 (izle) geçer", () => {
+    expect(checkAnalysisGuards(watch, { targetSegment: "developer" })).toEqual([]);
+  });
+
+  it("diğer segmentler ve null engellenmez", () => {
+    for (const s of ["consumer", "smb", "enterprise", "mixed", "unknown", null] as const) {
+      expect(hit(checkAnalysisGuards(base, { targetSegment: s }))).toBe(false);
+    }
   });
 });
