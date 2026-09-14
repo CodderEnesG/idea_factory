@@ -23,9 +23,10 @@ function sig(
 }
 
 /** enrich.ts'in yazdığı geçerli StoredEnrichment şekli (yalnız test için gereken alanlar). */
-function enr(kind: SignalKind | null, triage: number | null): Record<string, unknown> {
+function enr(kind: SignalKind | null, triage: number | null, segment: string | null = null): Record<string, unknown> {
   return {
     signal_kind: kind,
+    target_segment: segment,
     project_summary: "özet",
     hq_country: null,
     markets: [],
@@ -60,6 +61,14 @@ describe("selectCandidates", () => {
       new Set(),
     );
     expect(out.map((c) => c.signal.id)).toEqual(["urun"]);
+  });
+
+  it("geliştirici aracı segmentini eler (guard k — analiz bütçesi boşa gitmesin)", () => {
+    const out = selectCandidates(
+      [sig("devtool", enr("product", 95, "developer")), sig("kobi", enr("product", 40, "smb"))],
+      new Set(),
+    );
+    expect(out.map((c) => c.signal.id)).toEqual(["kobi"]);
   });
 
   it("triage_score'a göre azalan sıralar", () => {

@@ -113,6 +113,15 @@ async function killRows(signalId: string, kind: string): Promise<void> {
   }
 }
 
+async function tagRows(signalId: string, add: string[]): Promise<void> {
+  const { data, error } = await db.from("analyses").select("id, tags").eq("signal_id", signalId);
+  if (error) throw new Error(error.message);
+  for (const r of data ?? []) {
+    const { error: upErr } = await db.from("analyses").update({ tags: addTags(r.tags, add) }).eq("id", r.id);
+    if (upErr) throw new Error(upErr.message);
+  }
+}
+
 /** Arbitraj yeniden analizi 4 denemede patladıysa eski (ör. 88) satır kovala'da kalmasın. */
 async function capFailed(signalId: string, lensId: string): Promise<void> {
   const { data, error } = await db
@@ -187,6 +196,14 @@ async function main(): Promise<void> {
           await killRows(item.signal.id, stored.signal_kind);
           console.log(`  ⊘ ${stored.signal_kind} → ele — ${item.signal.title.slice(0, 60)}`);
           killed++;
+          ok++;
+          continue;
+        }
+        if (stored.target_segment === "developer") {
+          // Analiz kuyruğuna girmez (isAnalyzable); mevcut satırlar guard (k) ile zaten ≤79.
+          // Tag'lenmezse fit≥50 satırı her koşuda yeniden seçilir.
+          await tagRows(item.signal.id, [TAG, "reassess:developer_skip"]);
+          console.log(`  ⊘ developer → analiz atlandı — ${item.signal.title.slice(0, 60)}`);
           ok++;
           continue;
         }

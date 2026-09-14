@@ -5,6 +5,9 @@ import type { Source } from "./types.js";
 
 // Tez için en değerli TLDR feed'leri.
 const CATEGORIES = (process.env["TLDR_CATEGORIES"] ?? "founders,ai,tech,product").split(",");
+// Kategori başı haber tavanı (2026-09-14): tldr:ai sinyallerinin %51'i developer segmenti
+// (guard k — hiç kovala olamıyor). Kategoriyi kapatmıyoruz, sayı başına hacmini kısıyoruz.
+const CATEGORY_CAP: Record<string, number> = { ai: 5 };
 const UA = "Mozilla/5.0 (compatible; IdeaFactory/1.0)";
 
 function inferType(title: string): SignalType {
@@ -82,8 +85,12 @@ export const tldr: Source = {
       try {
         const issue = await latestIssueUrl(parser, cat.trim());
         if (!issue) continue;
-        const rows = await parseIssue(issue, cat.trim(), now);
-        console.log(`[tldr:${cat}] ${issue} → ${rows.length} haber`);
+        const parsed = await parseIssue(issue, cat.trim(), now);
+        const cap = CATEGORY_CAP[cat.trim()];
+        const rows = cap !== undefined ? parsed.slice(0, cap) : parsed;
+        console.log(
+          `[tldr:${cat}] ${issue} → ${rows.length} haber${rows.length < parsed.length ? ` (tavan ${cap}, ${parsed.length} içinden)` : ""}`,
+        );
         all.push(...rows);
       } catch (e) {
         console.error(`[tldr:${cat}] hata:`, e instanceof Error ? e.message : e);

@@ -1,7 +1,7 @@
 import {
   ARBITRAGE_SEED_LENS,
   golden,
-  isActionableKind,
+  isAnalyzable,
   lenses,
   StoredEnrichmentSchema,
   type FewShotExample,
@@ -55,12 +55,12 @@ async function fetchShortlist(
   // hiç üretmedi. Sabit kaynak-tavanı bunu görmez, sıralama önceliği görür.
   const sourceWeights = await loadSourceWeights();
 
-  // Zenginleştirme essay/research dediyse analiz etme — LLM çağrısı boşa gider, kuyruğu kirletir.
+  // Zenginleştirme kovalanamaz tip veya geliştirici aracı dediyse analiz etme (bkz. isAnalyzable).
   // signal_kind null = legacy satır (sınıf bilinmiyor) → elemeden geçir.
   const scored = window
     .map((s) => {
       const e = StoredEnrichmentSchema.safeParse(s.enrichment);
-      const actionable = !e.success || e.data.signal_kind === null || isActionableKind(e.data.signal_kind);
+      const actionable = !e.success || isAnalyzable(e.data);
       const base = e.success ? (e.data.triage_score ?? NEUTRAL_TRIAGE_SCORE) : NEUTRAL_TRIAGE_SCORE;
       const score = base * (sourceWeights.get(s.source) ?? 1);
       return { signal: s, actionable, score };

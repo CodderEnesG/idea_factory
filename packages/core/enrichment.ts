@@ -33,6 +33,16 @@ export function isActionableKind(k: SignalKind): boolean {
   return k === "venture" || k === "product" || k === "funding";
 }
 
+/**
+ * Pahalı mercek analizine girmeli mi. Kovalanamaz tipler ve geliştirici araçları girmez:
+ * 2026-09-14 insan kararları — developer segmentinde 111 kararın 0'ı kovala, guard (k) zaten
+ * 79'a kırpıyor, analiz bütçesinin ~üçte biri boşa gidiyordu. null (legacy) elemeden geçer.
+ */
+export function isAnalyzable(e: { signal_kind: SignalKind | null; target_segment?: TargetSegment | null }): boolean {
+  if (e.signal_kind !== null && !isActionableKind(e.signal_kind)) return false;
+  return e.target_segment !== "developer";
+}
+
 export const TargetSegment = z.enum(["consumer", "smb", "enterprise", "developer", "mixed", "unknown"]);
 export type TargetSegment = z.infer<typeof TargetSegment>;
 

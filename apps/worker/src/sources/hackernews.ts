@@ -5,7 +5,9 @@ import type { Source } from "./types.js";
 // kendi ürününü/projesini tanıtan kurucu gönderileri — GojiberryAI'ı bulan tldr:founders'a en
 // yakın HN karşılığı (kanıtlanmış, küçük ekip, "ben yaptım" hikayeleri), ürün-lansmanı gürültüsü
 // (producthunt'ın düşük isabet sorunu) yerine kurucunun kendi metniyle (story_text) geliyor.
-const API_URL = "http://hn.algolia.com/api/v1/search_by_date?tags=show_hn&hitsPerPage=30";
+// 30 → 10 (2026-09-14): zenginleştirilmiş HN sinyallerinin %58'i developer segmenti — guard (k)
+// ile hiç kovala olamıyor ve analiz kuyruğuna girmiyor; hacmi kısıp consumer kaynaklara yer açıyoruz.
+const API_URL = "http://hn.algolia.com/api/v1/search_by_date?tags=show_hn&hitsPerPage=10";
 
 interface HnHit {
   objectID?: string;
