@@ -22,4 +22,7 @@ export const env = {
     env.provider() === "anthropic"
       ? (process.env["ANALYSIS_MODEL"] ?? "claude-opus-4-8")
       : (process.env["GEMINI_MODEL"] ?? "gemini-3.5-flash"),
+  /** DB'ye yazılan `model` — core'daki stage-model.ts ile aynı env adları (ENRICH_MODEL / ANALYZE_MODEL…). */
+  modelFor: (stage: "enrich" | "triage" | "analyze" | "debate") =>
+    process.env[`${stage.toUpperCase()}_MODEL`]?.trim() || env.analysisModel(),
 };

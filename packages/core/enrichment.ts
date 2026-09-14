@@ -5,6 +5,7 @@ import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
+import { stageModel } from "./providers/stage-model.js";
 
 /* ── Şema — tez boyutlarına hizalı olgu çıkarımı ────────────────────────── */
 
@@ -182,7 +183,7 @@ export interface EnrichOptions {
 function pickProvider(opts: EnrichOptions): AnalystProvider {
   if (opts.provider) return opts.provider;
   const name = opts.providerName ?? (process.env["ANALYSIS_PROVIDER"] as "gemini" | "anthropic") ?? "gemini";
-  const cfg = { apiKey: opts.apiKey, model: opts.model };
+  const cfg = { apiKey: opts.apiKey, model: opts.model ?? stageModel("enrich") };
   return name === "anthropic" ? new AnthropicProvider(cfg) : new GeminiProvider(cfg);
 }
 

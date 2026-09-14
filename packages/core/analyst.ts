@@ -8,6 +8,7 @@ import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
+import { stageModel } from "./providers/stage-model.js";
 import { groundSignal, shouldGround, type Grounder } from "./grounding.js";
 import { Deadline, analyzeDeadlineMs } from "./deadline.js";
 
@@ -34,7 +35,7 @@ export interface AnalyzeOptions {
 function pickProvider(opts: AnalyzeOptions): AnalystProvider {
   if (opts.provider) return opts.provider;
   const name = opts.providerName ?? (process.env["ANALYSIS_PROVIDER"] as ProviderName) ?? "gemini";
-  const cfg = { apiKey: opts.apiKey, model: opts.model };
+  const cfg = { apiKey: opts.apiKey, model: opts.model ?? stageModel("analyze") };
   return name === "anthropic" ? new AnthropicProvider(cfg) : new GeminiProvider(cfg);
 }
 

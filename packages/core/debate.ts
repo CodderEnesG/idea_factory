@@ -7,6 +7,7 @@ import type { Signal } from "./signal.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
+import { stageModel } from "./providers/stage-model.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 /**
@@ -92,7 +93,7 @@ export const DEBATE_TOTAL_TURNS = DEBATE_ROSTER.length * 2 + 1;
 function pickProvider(opts: DebateOptions): AnalystProvider {
   if (opts.provider) return opts.provider;
   const name = opts.providerName ?? (process.env["ANALYSIS_PROVIDER"] as "gemini" | "anthropic") ?? "gemini";
-  const cfg = { apiKey: opts.apiKey, model: opts.model };
+  const cfg = { apiKey: opts.apiKey, model: opts.model ?? stageModel("debate") };
   return name === "anthropic" ? new AnthropicProvider(cfg) : new GeminiProvider(cfg);
 }
 

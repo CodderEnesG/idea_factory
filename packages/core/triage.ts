@@ -7,6 +7,7 @@ import type { StoredEnrichment } from "./enrichment.js";
 import type { AnalystProvider } from "./providers/types.js";
 import { GeminiProvider } from "./providers/gemini.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
+import { stageModel } from "./providers/stage-model.js";
 
 /**
  * Ön-eleme (triage): sinyal ARBİTRAJ/BEYAZ-ALAN gibi pahalı, çok-mercekli tam analize
@@ -63,7 +64,7 @@ export interface TriageOptions {
 function pickProvider(opts: TriageOptions): AnalystProvider {
   if (opts.provider) return opts.provider;
   const name = opts.providerName ?? (process.env["ANALYSIS_PROVIDER"] as "gemini" | "anthropic") ?? "gemini";
-  const cfg = { apiKey: opts.apiKey, model: opts.model };
+  const cfg = { apiKey: opts.apiKey, model: opts.model ?? stageModel("triage") };
   return name === "anthropic" ? new AnthropicProvider(cfg) : new GeminiProvider(cfg);
 }
 

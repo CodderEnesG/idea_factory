@@ -55,7 +55,7 @@ export async function enrichOne(
     const stored: StoredEnrichment = {
       ...extraction,
       fetch_ok: text !== null,
-      model: env.analysisModel(),
+      model: env.modelFor("enrich"),
       page_chars: text?.length ?? null,
       triage_score: prev.success ? prev.data.triage_score : null,
       triage_reason: prev.success ? prev.data.triage_reason : null,
