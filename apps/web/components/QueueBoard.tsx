@@ -202,7 +202,7 @@ export function QueueBoard({
 
   const counts = useMemo(() => {
     let pursue = 0, watch = 0, kill = 0, bench = 0, undecided = 0;
-    // Kapı ayrımı: onaylı (Yorumcu kovala dedi) / çekinceli (ikisi de izle) / bekleyen
+    // Kapı ayrımı: onaylı (Yorumcu kovala dedi) / çekinceli (kovala demedi, çift ele de değil) / bekleyen
     // (henüz 2 tartışma yok). Kovala sayısı çökerse bir bakışta görünsün.
     let confirmed = 0, caveat = 0, pendingGate = 0, vetoed = 0;
     for (const i of resolved) {

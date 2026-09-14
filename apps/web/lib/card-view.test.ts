@@ -15,13 +15,16 @@ describe("resolveGatedBand — Yorumcu kapısı", () => {
     expect(resolveGatedBand("pursue", ["pursue"])).toEqual({ band: "watch", gate: "pending" });
   });
 
-  it("kovala + iki tur, biri ele → VETO", () => {
-    expect(resolveGatedBand("pursue", ["pursue", "kill"])).toEqual({ band: "kill", gate: "vetoed" });
-    expect(resolveGatedBand("pursue", ["kill", "watch"])).toEqual({ band: "kill", gate: "vetoed" });
+  it("kovala + iki tur da ele → VETO (2026-09-14: yalnız çift ele düşürür)", () => {
     expect(resolveGatedBand("pursue", ["kill", "kill"])).toEqual({ band: "kill", gate: "vetoed" });
   });
 
-  it("kovala + en az biri kovala, ele yok → ONAYLI", () => {
+  it("tek ele oyu kartı YAKMAZ — diğer tur kovala ise onaylı, izle ise çekinceli ama kovala", () => {
+    expect(resolveGatedBand("pursue", ["pursue", "kill"])).toEqual({ band: "pursue", gate: "confirmed" });
+    expect(resolveGatedBand("pursue", ["kill", "watch"])).toEqual({ band: "pursue", gate: "caveat" });
+  });
+
+  it("kovala + en az biri kovala → ONAYLI", () => {
     expect(resolveGatedBand("pursue", ["pursue", "watch"])).toEqual({
       band: "pursue",
       gate: "confirmed",
@@ -32,17 +35,16 @@ describe("resolveGatedBand — Yorumcu kapısı", () => {
     });
   });
 
-  it("kovala + ikisi de izle → İZLE'ye düşer, gate ÇEKİNCELİ (2026-09-06 kalibrasyonu)", () => {
-    // caveat kesinliği %25 (3/12) vs confirmed %60 (3/5) → sıkı okuma. Etiket korunur ki
-    // UI "bekleniyor" ile karıştırmasın: turlar tamamlandı, Yorumcu ikna olmadı.
+  it("kovala + ikisi de izle → KOVALA'da kalır, gate ÇEKİNCELİ", () => {
+    // 2026-09-14 gevşetme: sıkı okuma 101 AI-kovalanın ~7'sini bırakıyordu (oyların %74'ü ele).
     expect(resolveGatedBand("pursue", ["watch", "watch"])).toEqual({
-      band: "watch",
+      band: "pursue",
       gate: "caveat",
     });
   });
 
-  it("üçüncü tur da varsa (mükerrer kayıt) kural değişmez", () => {
-    expect(resolveGatedBand("pursue", ["watch", "watch", "kill"])).toEqual({
+  it("üçüncü tur da varsa (mükerrer kayıt) iki ele yine veto sayılır", () => {
+    expect(resolveGatedBand("pursue", ["watch", "kill", "kill"])).toEqual({
       band: "kill",
       gate: "vetoed",
     });

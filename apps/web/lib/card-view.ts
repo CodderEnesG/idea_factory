@@ -141,12 +141,11 @@ export type GateState = "n/a" | "pending" | "confirmed" | "caveat" | "vetoed";
  *  tutarlılığı %67 (27 mükerrer tartışmanın 9'u farklı sonuç verdi) — tek koşu şansa açık. */
 export const GATE_REQUIRED_DEBATES = 2;
 
-/** `true`: "ikisi de izle" kovaladan İZLE'ye düşürür (gate etiketi `caveat` kalır, UI
- *  "Yorumcu çekinceli" der). 2026-08-26'da `false` açıldı (veto formu). 2026-09-06 kalibrasyonu:
- *  kapılı kovala kesinliği %35 (6/17) — hedef ≥%50'nin altında; kırılım confirmed %60 (3/5),
- *  caveat %25 (3/12). Caveat kovala sütununu dolduruyor ama insan 4'te 3'ünü reddediyor →
- *  sıkı okumaya geçildi. Verdict karışımı değişirse tek satırla geri alınır. */
-export const DEBATE_WATCH_DEMOTES = true;
+/* 2026-09-14 kapı gevşetildi (kullanıcı kararı): yalnız İKİ tur da "ele" derse kart kovaladan
+ * düşer. Eski kural (tek "ele" = veto, iki "izle" = izle) yeniden analiz sonrası 101 AI-kovalanın
+ * ~7'sini bırakıyordu: tartışma oylarının %74'ü "ele". Vekil ölçüm (56 kart): tek-veto kuralı
+ * ~7 kovala / insan-kesinliği 0/1, çift-veto ~38 / %29 (4/14), kapısız 101 / %27 (9/33) —
+ * sıkı kapı kesinliği artırmadan kovalayı bitiriyordu. Yorumcu görüşü kartta etiket olarak kalır. */
 
 const BAND_RANK: Record<Band, number> = { pursue: 0, watch: 1, kill: 2 };
 
@@ -168,9 +167,9 @@ export interface GateResult {
  * | ≠ pursue | yok                 | aiBand    | n/a       |
  * | ≠ pursue | var                 | temkinli  | n/a       |
  * | pursue   | < 2 tur             | **watch** | pending   |
- * | pursue   | biri "ele"          | kill      | vetoed    |
- * | pursue   | ≥1 "kovala", ele yok| pursue    | confirmed |
- * | pursue   | ikisi de "izle"     | **watch** | caveat    |
+ * | pursue   | ikisi de "ele"      | kill      | vetoed    |
+ * | pursue   | ≥1 "kovala"         | pursue    | confirmed |
+ * | pursue   | kovala yok, 2×ele değil | pursue | caveat    |
  *
  * `pending -> watch` satırı flicker sorununun tam cevabı: fit≥80 bir sinyal, iki tartışma
  * yazılana kadar HİÇBİR tick'te kovala bandında olmaz. Tartışma bütçesi aşılırsa fazlası
@@ -191,11 +190,10 @@ export function resolveGatedBand(
   }
 
   if (debateVerdicts.length < GATE_REQUIRED_DEBATES) return { band: "watch", gate: "pending" };
-  if (debateVerdicts.includes("kill")) return { band: "kill", gate: "vetoed" };
+  const kills = debateVerdicts.filter((v) => v === "kill").length;
+  if (kills >= GATE_REQUIRED_DEBATES) return { band: "kill", gate: "vetoed" };
   if (debateVerdicts.includes("pursue")) return { band: "pursue", gate: "confirmed" };
-  return DEBATE_WATCH_DEMOTES
-    ? { band: "watch", gate: "caveat" }
-    : { band: "pursue", gate: "caveat" };
+  return { band: "pursue", gate: "caveat" };
 }
 
 /*

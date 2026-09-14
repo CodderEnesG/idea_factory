@@ -238,12 +238,12 @@ export function DetailPanel({
                 </span>
               )}
               {item.gate === "vetoed" && (
-                <span className="inline-flex items-center gap-1 text-kill" title="Yorumcu turlarından biri 'ele' dedi — kovala rozeti verilmedi">
+                <span className="inline-flex items-center gap-1 text-kill" title="Yorumcu'nun iki turu da 'ele' dedi — kart kovaladan düştü">
                   · Yorumcu: VETO
                 </span>
               )}
               {item.gate === "caveat" && (
-                <span className="inline-flex items-center gap-1 text-watch" title="İki tur da 'izle' dedi — AI kovala demişti, Yorumcu ikna olmadı, kart İzle bandında">
+                <span className="inline-flex items-center gap-1 text-watch" title="Yorumcu kovala demedi ama iki turun ikisi birden 'ele' de demedi — kart Kovala'da, çekinceyle">
                   · Yorumcu: çekinceli
                 </span>
               )}
