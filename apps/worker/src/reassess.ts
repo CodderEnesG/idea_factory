@@ -4,6 +4,7 @@ import {
   isActionableKind,
   lenses,
   SignalSchema,
+  StoredEnrichmentSchema,
   type FewShotExample,
   type Lens,
   type Signal,
@@ -33,6 +34,11 @@ import { loadActiveThesis } from "./lib/thesis-db.js";
  *
  * kullanım: pnpm --filter @idea-factory/worker reassess [--apply]
  *   REASSESS_MAX=20 · REASSESS_CONCURRENCY=2 · REASSESS_LENSES=arbitrage[,white_space]
+ *
+ * Yalnız-analiz geçişi (ör. golden few-shot değişince zenginleştirmeyi tekrar ödememek için):
+ *   REASSESS_ANALYZE_ONLY=true — mevcut zenginleştirmeyi kullanır; yeni alanları (one_liner) olmayan atlanır
+ *   REASSESS_SEGMENTS=consumer,mixed — yalnız bu target_segment'teki sinyaller
+ *   REASSESS_TAG=reassess:2026-09-b2c — önceki geçişin tag'inden bağımsız devam işareti
  */
 const APPLY = process.argv.includes("--apply");
 const MAX = Number(process.env["REASSESS_MAX"] ?? "20");
@@ -40,6 +46,9 @@ const MAX = Number(process.env["REASSESS_MAX"] ?? "20");
 const CONCURRENCY = Math.max(1, Number(process.env["REASSESS_CONCURRENCY"] ?? "2"));
 // Varsayılan yalnız arbitraj: kompozit skoru o belirliyor (beyaz-alan ağırlık 0 + grounding maliyeti).
 const LENS_IDS = (process.env["REASSESS_LENSES"] ?? ARBITRAGE_SEED_LENS.id).split(",").map((s) => s.trim());
+const ANALYZE_ONLY = process.env["REASSESS_ANALYZE_ONLY"] === "true";
+const SEGMENTS = process.env["REASSESS_SEGMENTS"]?.split(",").map((s) => s.trim()).filter(Boolean) ?? null;
+const TAG = process.env["REASSESS_TAG"] ?? REASSESS_TAG;
 const PAGE = 1000;
 const CHUNK = 200;
 const FAILED_CAP = 79;
@@ -97,7 +106,7 @@ async function killRows(signalId: string, kind: string): Promise<void> {
         fit: Math.min(r.fit as number, NON_ACTIONABLE_CAP),
         recommended_action: "kill",
         rationale: (r.rationale as string).startsWith(prefix) ? r.rationale : `${prefix}${r.rationale}`,
-        tags: addTags(r.tags, [REASSESS_TAG, `reassess:non_actionable:${kind}`]),
+        tags: addTags(r.tags, [TAG, `reassess:non_actionable:${kind}`]),
       })
       .eq("id", r.id);
     if (upErr) throw new Error(upErr.message);
@@ -123,11 +132,27 @@ async function capFailed(signalId: string, lensId: string): Promise<void> {
 
 async function main(): Promise<void> {
   const rows = await loadAnalysisRows();
-  const { todo, done } = selectReassessIds(rows, LENS_IDS);
-  const perSignalCalls = 1 + LENS_IDS.length * 1.3 + (LENS_IDS.includes("white_space") ? 3 : 0);
+  const selected = selectReassessIds(rows, LENS_IDS, REASSESS_MIN_FIT, TAG);
+  let todo = selected.todo;
+  const { done } = selected;
 
+  // Segment filtresi zenginleştirmeye bakar → önce sinyalleri yükle, sonra süz (MAX'tan ÖNCE).
+  let preloaded: { signal: Signal; prev: unknown }[] | null = null;
+  if (SEGMENTS || ANALYZE_ONLY) {
+    preloaded = (await loadSignals(todo)).filter(({ prev }) => {
+      const e = StoredEnrichmentSchema.safeParse(prev);
+      if (!e.success) return false;
+      if (ANALYZE_ONLY && e.data.one_liner === null) return false;
+      return !SEGMENTS || (e.data.target_segment !== null && SEGMENTS.includes(e.data.target_segment));
+    });
+    todo = preloaded.map((p) => p.signal.id);
+  }
+
+  const perSignalCalls =
+    (ANALYZE_ONLY ? 0 : 1) + LENS_IDS.length * 1.3 + (LENS_IDS.includes("white_space") ? 3 : 0);
   console.log(
-    `[reassess] ${rows.length} analiz satırı · mercekler=${LENS_IDS.join(",")} · fit≥${REASSESS_MIN_FIT}: ` +
+    `[reassess] ${rows.length} analiz satırı · mercekler=${LENS_IDS.join(",")} · tag=${TAG}` +
+      `${ANALYZE_ONLY ? " · YALNIZ-ANALİZ" : ""}${SEGMENTS ? ` · segment=${SEGMENTS.join(",")}` : ""} · fit≥${REASSESS_MIN_FIT}: ` +
       `${todo.length} bekleyen, ${done} tamam · tahmini ~${Math.round(todo.length * perSignalCalls)} LLM çağrısı ` +
       `(sinyal başı ~${perSignalCalls.toFixed(1)}; provider=${env.provider()}, model=${env.analysisModel()})`,
   );
@@ -136,7 +161,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const batch = await loadSignals(todo.slice(0, MAX));
+  const batch = preloaded ? preloaded.slice(0, MAX) : await loadSignals(todo.slice(0, MAX));
   const thesis = await loadActiveThesis();
   const targetLenses = await resolveLenses();
   const knowledge = supabaseKnowledgeLayer();
@@ -151,7 +176,9 @@ async function main(): Promise<void> {
       const item = batch[next++];
       if (!item) return;
       try {
-        const stored = await enrichOne(item.signal, item.prev, thesis);
+        const stored = ANALYZE_ONLY
+          ? StoredEnrichmentSchema.parse(item.prev)
+          : await enrichOne(item.signal, item.prev, thesis);
         if (!stored) {
           failed++;
           continue;
@@ -171,7 +198,7 @@ async function main(): Promise<void> {
             fewShot: FEW_SHOT_BY_LENS[lens.id] ?? [],
             knowledge,
             thesis,
-            extraTags: [REASSESS_TAG],
+            extraTags: [TAG],
           });
           if (!written) {
             allOk = false;

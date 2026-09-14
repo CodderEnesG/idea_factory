@@ -34,6 +34,12 @@ describe("selectReassessIds", () => {
     expect(todo).toEqual(["a"]);
   });
 
+  it("özel tag verilirse önceki geçişin tag'i 'tamam' sayılmaz", () => {
+    const rows = [row("a", "arbitrage", 70, [REASSESS_TAG])];
+    expect(selectReassessIds(rows, ["arbitrage"]).todo).toEqual([]);
+    expect(selectReassessIds(rows, ["arbitrage"], 50, "reassess:b2c").todo).toEqual(["a"]);
+  });
+
   it("hedef dışı mercek seçime ve done kararına girmez", () => {
     const { todo } = selectReassessIds(
       [row("a", "arbitrage", 40), row("a", "white_space", 90)],

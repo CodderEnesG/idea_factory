@@ -26,6 +26,7 @@ export function selectReassessIds(
   rows: AnalysisRow[],
   lensIds: string[],
   minFit = REASSESS_MIN_FIT,
+  tag = REASSESS_TAG,
 ): { todo: string[]; done: number } {
   const bySignal = new Map<string, AnalysisRow[]>();
   for (const r of rows) {
@@ -38,7 +39,7 @@ export function selectReassessIds(
   for (const [id, rs] of bySignal) {
     const maxFit = Math.max(...rs.map((r) => r.fit));
     if (maxFit < minFit) continue;
-    if (rs.every((r) => hasTag(r.tags, REASSESS_TAG))) {
+    if (rs.every((r) => hasTag(r.tags, tag))) {
       done++;
       continue;
     }
