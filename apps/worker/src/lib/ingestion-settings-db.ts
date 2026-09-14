@@ -26,6 +26,8 @@ const KNOWN_SOURCES = [
   "contxto",
   "crunchbase_news",
   "restofworld",
+  "techcrunch_apps",
+  "gcc_startup_news",
 ];
 
 export interface IngestionSettings {

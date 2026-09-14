@@ -24,6 +24,8 @@ import { inc42 } from "./sources/inc42.js";
 import { contxto } from "./sources/contxto.js";
 import { crunchbaseNews } from "./sources/crunchbase-news.js";
 import { restOfWorld } from "./sources/restofworld.js";
+import { techcrunchApps } from "./sources/techcrunch-apps.js";
+import { gccStartupNews } from "./sources/gcc-startup-news.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 import { fetchAllSources } from "./lib/fetch-sources.js";
@@ -54,6 +56,8 @@ const ALL_SOURCES: Source[] = [
   contxto,
   crunchbaseNews,
   restOfWorld,
+  techcrunchApps,
+  gccStartupNews,
 ];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
