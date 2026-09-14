@@ -27,6 +27,7 @@ import {
  * tick N'de analiz edilen HEM backfill'lenen sinyal aynı tick'te kapıdan geçer. Sırayı bozma.
  */
 const BATCH_LIMIT = Number(process.env["DEBATE_AUTO_LIMIT"] ?? "8"); // TUR tavanı (sinyal değil)
+const CONCURRENCY = Math.max(1, Number(process.env["DEBATE_AUTO_CONCURRENCY"] ?? "1"));
 const AUTO_CREATED_BY = "otomatik (Yorumcu kapısı)";
 
 /** Sinyal başına analizleri toplayıp kompozit bandı hesapla; analiz map'i de döner
@@ -136,7 +137,8 @@ async function main(): Promise<void> {
   const thesis = await loadActiveThesis();
   let ok = 0;
   let duplicates = 0;
-  for (const { signalId, runNo } of todo) {
+
+  async function runOne({ signalId, runNo }: { signalId: string; runNo: number }): Promise<void> {
     const { data: signal, error: sigErr } = await db
       .from("signals")
       .select("*")
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
       .maybeSingle();
     if (sigErr || !signal) {
       console.error(`[debate-auto] sinyal bulunamadı: ${signalId}`, sigErr?.message);
-      continue;
+      return;
     }
 
     try {
@@ -165,10 +167,10 @@ async function main(): Promise<void> {
         if (insErr.code === "23505") {
           duplicates++;
           console.log(`[debate-auto] ~ ${signalId} tur ${runNo} zaten yazılmış (eşzamanlı koşu), atlandı`);
-          continue;
+          return;
         }
         console.error(`[debate-auto] kayıt hatası (${signalId}):`, insErr.message);
-        continue;
+        return;
       }
       ok++;
       console.log(`[debate-auto] ✓ ${signalId} tur ${runNo} — nihai karar: ${result.final_verdict}`);
@@ -176,6 +178,19 @@ async function main(): Promise<void> {
       console.error(`[debate-auto] tartışma başarısız (${signalId}):`, e instanceof Error ? e.message : e);
     }
   }
+
+  // Tartışma başına 7 sıralı LLM çağrısı (~4 dk) — toplu kuyrukta sıralı koşu saatler sürüyordu.
+  // Plan öğeleri (sinyal, tur) çiftleri benzersiz, paralel koşu çakışmaz. Varsayılan 1: cron'un
+  // Vertex kotası davranışı değişmesin; toplu koşuda DEBATE_AUTO_CONCURRENCY ile açılır.
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const item = todo[next++];
+      if (!item) return;
+      await runOne(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, worker));
   console.log(`[debate-auto] bitti: ${ok}/${todo.length} tur yazıldı${duplicates ? ` (${duplicates} mükerrer atlandı)` : ""}`);
 
   // Hepsi patladıysa (kota/anahtar/ağ) sessiz yeşil kalma — cron kırmızı görsün (analyze.ts deseni).
