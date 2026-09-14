@@ -14,7 +14,6 @@ import type { Comment } from "../components/Comments";
 import type { TaskItem } from "../components/TaskList";
 import type { FinalDecision } from "./load-final-decisions";
 import {
-  resolveEffectiveBand,
   resolveGatedBand,
   type Band,
   type CardView,
@@ -59,8 +58,8 @@ export function resolveCardBands(args: {
   final: Decision | null;
   debates: DebateView[];
   gateEnabled?: boolean;
-}): { aiBand: Band; gatedBand: Band; gate: GateState; effectiveBand: Band } {
-  const { comp, mine, final, debates, gateEnabled = true } = args;
+}): { aiBand: Band; gatedBand: Band; gate: GateState } {
+  const { comp, debates, gateEnabled = true } = args;
   const autoVerdicts = debates.filter((d) => d.kind === "auto").map((d) => d.final_verdict);
   const manualVerdicts = debates.filter((d) => d.kind !== "auto").map((d) => d.final_verdict);
   const gated = resolveGatedBand(comp.band, autoVerdicts, gateEnabled);
@@ -75,7 +74,6 @@ export function resolveCardBands(args: {
     aiBand: comp.band,
     gatedBand: withManual,
     gate: gated.gate,
-    effectiveBand: resolveEffectiveBand(withManual, mine, final),
   };
 }
 
@@ -182,7 +180,6 @@ export function buildCardView(
     band: comp.band,
     gatedBand: bands.gatedBand,
     gate: bands.gate,
-    effectiveBand: bands.effectiveBand,
     competition: buildCompetitionView(analyses, lensRegistry),
     bench: isBench(comp),
     notActionable,

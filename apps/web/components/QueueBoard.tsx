@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { resolveEffectiveBand, type CardView } from "../lib/card-view";
+import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
 import { QueueRow } from "./QueueRow";
@@ -191,12 +191,7 @@ export function QueueBoard({
         mine,
         finalDecision,
         finalDecidedBy: finalOv === undefined ? i.finalDecidedBy : (finalOv?.decidedBy ?? null),
-        // Kararla birlikte anında güncellenmezse nokta rengi/sıralama sayfa yenilenene kadar
-        // eski AI bandını gösterip dururdu (2026-08-19 bulgusu) — aynı hiyerarşiyi burada da uygula.
-        // Kapılı bant (`gatedBand`) sunucuda hesaplandı ve kararla değişmez — insan kararı
-        // yalnız onun ÜSTÜNE biner. Eskiden burada ham `i.band` kullanılıyordu, yani
-        // istemci tarafı yeniden hesap kapıyı görmezden geliyordu.
-        effectiveBand: resolveEffectiveBand(i.gatedBand, mine, finalDecision),
+        // Bant (`gatedBand`) sistemindir ve kararla DEĞİŞMEZ — karar yalnız "Sen:" etiketini günceller.
       };
     });
   }, [items, localMine, localFinal]);
@@ -211,8 +206,8 @@ export function QueueBoard({
     // (henüz 2 tartışma yok). Kovala sayısı çökerse bir bakışta görünsün.
     let confirmed = 0, caveat = 0, pendingGate = 0, vetoed = 0;
     for (const i of resolved) {
-      if (i.effectiveBand === "pursue") pursue++;
-      else if (i.effectiveBand === "watch") watch++;
+      if (i.gatedBand === "pursue") pursue++;
+      else if (i.gatedBand === "watch") watch++;
       else kill++;
       if (i.bench) bench++;
       if (i.mine === null) undecided++;
@@ -240,7 +235,7 @@ export function QueueBoard({
       if (newOnly && !newIds.has(i.id)) return false;
       if (undecidedOnly && (i.mine !== null || skipped.has(i.id))) return false;
       if (gatePendingOnly && i.gate !== "pending") return false;
-      if (bandFilter.size > 0 && !bandFilter.has(i.effectiveBand)) return false;
+      if (bandFilter.size > 0 && !bandFilter.has(i.gatedBand)) return false;
       if (activity !== "all") {
         const a = activityOf(i, meName);
         if (activity === "mine" && !a.mine) return false;
@@ -251,7 +246,7 @@ export function QueueBoard({
     });
     if (sort === "recent") list = [...list].sort((a, b) => freshness(b) - freshness(a));
     else if (sort === "band")
-      list = [...list].sort((a, b) => BAND_RANK[a.effectiveBand] - BAND_RANK[b.effectiveBand] || b.fit - a.fit);
+      list = [...list].sort((a, b) => BAND_RANK[a.gatedBand] - BAND_RANK[b.gatedBand] || b.fit - a.fit);
     else if (sort === "confidence")
       list = [...list].sort((a, b) => CONFIDENCE_RANK[a.confidence] - CONFIDENCE_RANK[b.confidence] || b.fit - a.fit);
     else if (sort === "comments") list = [...list].sort((a, b) => b.comments.length - a.comments.length || b.fit - a.fit);

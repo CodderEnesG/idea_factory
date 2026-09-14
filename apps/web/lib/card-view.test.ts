@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveEffectiveBand, resolveGatedBand, resolvePanomBand } from "./card-view";
+import { resolveGatedBand, resolvePanomBand } from "./card-view";
 
 describe("resolveGatedBand — Yorumcu kapısı", () => {
   it("kapı kapalıysa AI bandı olduğu gibi geçer", () => {
@@ -53,21 +53,6 @@ describe("resolveGatedBand — Yorumcu kapısı", () => {
     expect(resolveGatedBand("watch", ["pursue", "pursue"])).toEqual({ band: "watch", gate: "n/a" });
     expect(resolveGatedBand("watch", ["kill"])).toEqual({ band: "kill", gate: "n/a" });
     expect(resolveGatedBand("kill", ["pursue", "pursue"])).toEqual({ band: "kill", gate: "n/a" });
-  });
-});
-
-describe("resolveEffectiveBand — insan kararı kapının üstünde", () => {
-  it("hiçbir karar yoksa kapılı bant kalır", () => {
-    expect(resolveEffectiveBand("watch", null, null)).toBe("watch");
-  });
-
-  it("kişisel karar kapılı bandı ezer (veto edilmiş kartı bile)", () => {
-    expect(resolveEffectiveBand("kill", "pursue", null)).toBe("pursue");
-  });
-
-  it("kesinleşmiş karar her şeyin üstünde", () => {
-    expect(resolveEffectiveBand("pursue", "kill", "watch")).toBe("watch");
-    expect(resolveEffectiveBand("kill", null, "pursue")).toBe("pursue");
   });
 });
 

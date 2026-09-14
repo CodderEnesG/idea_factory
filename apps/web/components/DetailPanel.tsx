@@ -63,9 +63,8 @@ export function DetailPanel({
   const rootRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const band = BAND[item.band]; // ham AI kompozit bandı — yalnız "AI:" dökümünde kullanılır
-  // Kesinleşmiş > kişisel > AI Yorumcusu > AI bandı — bkz. card-view.ts resolveEffectiveBand.
-  // Üst rozet/FitRing artık "sistem şu an ne diyor"u gösterir, ham AI görüşünü değil.
-  const effective = BAND[item.effectiveBand];
+  // Sistemin kapılı bandı (AI + Yorumcu kapısı). İnsan kararı bunu değiştirmez, ayrı "Sen:" olarak görünür.
+  const effective = BAND[item.gatedBand];
   const hasDetail = !item.noData && item.lensViews.length > 0;
   const comments = useComments(item.id, item.comments);
   const debate = useDebate(item.id, item.debates);
@@ -221,7 +220,7 @@ export function DetailPanel({
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-mono text-xs text-ink-muted">
               <span className={`inline-flex items-center gap-1 ${effective.text}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${effective.dot}`} /> {effective.label}
+                <span className={`h-1.5 w-1.5 rounded-full ${effective.dot}`} /> Sistem: {effective.label}
               </span>
               <span>· güven: {CONFIDENCE_LABEL[item.confidence]}</span>
               <span className={`inline-flex items-center gap-1 ${band.text}`}>· AI: {band.label}</span>
@@ -266,7 +265,7 @@ export function DetailPanel({
                   · Rekabet: {item.competition.label}
                 </span>
               )}
-              {item.effectiveBand === "pursue" && item.competition?.label === "kalabalık" && (
+              {item.gatedBand === "pursue" && item.competition?.label === "kalabalık" && (
                 <span className="inline-flex items-center gap-1 text-watch opacity-80" title="Kovala ama rekabet ortamı doygun görünüyor — boşluk kapanmış olabilir">
                   · rekabet kalabalık
                 </span>

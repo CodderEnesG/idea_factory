@@ -90,9 +90,6 @@ export interface CardView {
   gatedBand: Band;
   /** Kapının durumu: pending (2 tartışma tamamlanmadı) · confirmed · caveat · vetoed · n/a. */
   gate: GateState;
-  /** Kesinleşmiş > kişisel > kapılı AI bandı — bkz. `resolveEffectiveBand`.
-   *  Görsel bant/rozet/sıralama artık HEP bunu kullanır. */
-  effectiveBand: Band;
   /** Rekabet ortamı (beyaz-alan merceği) — yoksa null. */
   competition: CompetitionView | null;
   bench: boolean;
@@ -201,21 +198,13 @@ export function resolveGatedBand(
     : { band: "pursue", gate: "caveat" };
 }
 
-/**
- * Tek hiyerarşi (2026-08-19 kullanıcı kararı, 2026-08-26'da kapıyla güncellendi) —
- * Kuyruk/Panom'da üç ayrı, birbirinden habersiz "kim kazanır" mantığı vardı. Artık TEK yer.
- *
- * Sıra: **Kesinleşmiş (kilitli ekip kararı) > Kişisel karar > kapılı AI bandı.**
- * Yorumcu katmanı artık ayrı bir tier değil — `resolveGatedBand` içinde AI bandına gömülü
- * (ve yalnız düşürebiliyor). İnsan kararı her zaman ikisinin de üstünde.
+/*
+ * Kuyruk bandı = `gatedBand` (sistem), insan kararı ASLA üstüne binmez (2026-09-14 kullanıcı
+ * kararı: "o sistemle diğer sistem farklı olmalı"). Eski `final ?? mine ?? gatedBand`
+ * hiyerarşisi Kuyruk'u 10 gün önceki, eski listeye verilmiş kararlarla dolduruyordu — AI
+ * yeniden değerlendirmesi kovala sütununa hiç yansımıyordu. İnsan kararı Kuyruk'ta yalnız
+ * "Sen:" etiketi olarak görünür; "ne karar verdik" sorusu Panom'un (`resolvePanomBand`).
  */
-export function resolveEffectiveBand(
-  gatedBand: Band,
-  mine: Decision | null,
-  finalDecision: Decision | null,
-): Band {
-  return finalDecision ?? mine ?? gatedBand;
-}
 
 /**
  * Panom'un KASITLI olarak farklı hiyerarşisi (PLAN.md §19 kararı korunuyor).

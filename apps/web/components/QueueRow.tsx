@@ -26,9 +26,8 @@ export function QueueRow({
   selectMode?: boolean;
   isNew?: boolean;
 }) {
-  // Kesinleşmiş/kişisel/AI Yorumcusu hiyerarşisinin sonucu — bkz. card-view.ts
-  // resolveEffectiveBand. Ham AI bandı değil, "sistem şu an ne diyor" burada.
-  const band = BAND[item.effectiveBand];
+  // Sistemin kapılı bandı (AI + Yorumcu kapısı). İnsan kararı rengi değiştirmez, sağda "Sen:" olarak durur.
+  const band = BAND[item.gatedBand];
   return (
     // `role="button"` (native <button> değil): satırın sonunda ayrı bir gerçek <button>
     // (OpportunityMenu) barındırıyor — buton içine buton HTML'de geçersiz/erişilebilirlik
@@ -44,7 +43,7 @@ export function QueueRow({
         }
       }}
       className={`flex w-full cursor-pointer items-center gap-2 border-l-[3px] px-3 py-2 text-left text-[13px] transition ${
-        selected ? `${BORDER_BY_BAND[item.effectiveBand]} bg-white/[0.05]` : "border-l-transparent hover:bg-white/[0.025]"
+        selected ? `${BORDER_BY_BAND[item.gatedBand]} bg-white/[0.05]` : "border-l-transparent hover:bg-white/[0.025]"
       }`}
     >
       {selectMode ? (
@@ -72,7 +71,11 @@ export function QueueRow({
         </div>
       </div>
       {item.finalDecision !== null && <IconLock className="h-3 w-3 shrink-0 text-brand" />}
-      {item.mine !== null && <span className="shrink-0 text-[10px] text-ink-muted">✓</span>}
+      {item.mine !== null && (
+        <span className={`shrink-0 text-[10px] ${BAND[item.mine].text}`} title="Senin kararın — sistemin bandını değiştirmez">
+          Sen: {BAND[item.mine].label}
+        </span>
+      )}
       {item.bench && <IconAward className="h-3 w-3 shrink-0 text-ink-muted" />}
       {!selectMode && <OpportunityMenu url={item.url} />}
     </div>

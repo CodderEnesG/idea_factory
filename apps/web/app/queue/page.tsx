@@ -27,10 +27,8 @@ export default async function Queue() {
     loadDebates(),
   ]);
   const debates = debateRes.map;
-  // Sunucu sıralaması AYNI bant çözümünü kullanır (FAZ6_PLAN.md §Faz 2.2). Eskiden burada
-  // hiyerarşinin elle yazılmış bir KOPYASI vardı (`final ?? mine ?? debateVerdict`); kapı
-  // eklendikten sonra o kopya bekleyen/veto edilmiş sinyalleri pursue bandında sıralamaya
-  // devam eder, kart ise İzle/Ele render edilirdi — renk ile sıra çelişirdi.
+  // Sunucu sıralaması kartla AYNI bandı kullanır: kapılı sistem bandı (`gatedBand`). İnsan
+  // kararı Kuyruk sırasını değiştirmez (2026-09-14) — bkz. card-view.ts Kuyruk bandı notu.
   const sortBand = new Map<string, Band>();
   for (const item of items) {
     const bands = resolveCardBands({
@@ -40,7 +38,7 @@ export default async function Queue() {
       debates: debates.get(item.signal.id) ?? [],
       gateEnabled: !demo,
     });
-    sortBand.set(item.signal.id, bands.effectiveBand);
+    sortBand.set(item.signal.id, bands.gatedBand);
   }
   const cards = rank(items, {
     bandOverride: (item) => sortBand.get(item.signal.id),
