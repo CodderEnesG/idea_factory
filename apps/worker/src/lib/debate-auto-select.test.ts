@@ -1,5 +1,40 @@
 import { describe, it, expect } from "vitest";
-import { selectGateCandidates, selectAutoDebateCandidates, type DecisionLogRow } from "./debate-auto-select.js";
+import {
+  planDebateRuns,
+  selectGateCandidates,
+  selectAutoDebateCandidates,
+  type DecisionLogRow,
+} from "./debate-auto-select.js";
+
+describe("planDebateRuns — eski turların run_no'su üstüne devam", () => {
+  it("hiç turu olmayan kapı adayı 1 ve 2. turu alır", () => {
+    expect(planDebateRuns(["a"], [], new Map(), new Map())).toEqual([
+      { signalId: "a", runNo: 1 },
+      { signalId: "a", runNo: 2 },
+    ]);
+  });
+
+  it("2 eski (güncel sayılmayan) turu olan kart 3 ve 4. turu alır — benzersiz indeksle çakışmaz", () => {
+    expect(planDebateRuns(["v"], [], new Map(), new Map([["v", 2]]))).toEqual([
+      { signalId: "v", runNo: 3 },
+      { signalId: "v", runNo: 4 },
+    ]);
+  });
+
+  it("1 güncel turu olan yalnız 1 tur daha alır", () => {
+    expect(planDebateRuns(["h"], [], new Map([["h", 1]]), new Map([["h", 3]]))).toEqual([
+      { signalId: "h", runNo: 4 },
+    ]);
+  });
+
+  it("insan-tetikli sinyal tek tur alır; kapı listesinde de varsa tekrar planlanmaz", () => {
+    expect(planDebateRuns(["a"], ["a", "b"], new Map(), new Map([["b", 1]]))).toEqual([
+      { signalId: "a", runNo: 1 },
+      { signalId: "a", runNo: 2 },
+      { signalId: "b", runNo: 2 },
+    ]);
+  });
+});
 
 // created_at desc (en yeni önce) — dedupe kuralı bu sıralamaya dayanır.
 function row(signalId: string, decision: string, decidedBy: string | null, createdAt: string): DecisionLogRow {

@@ -1,10 +1,10 @@
 import "./env.js"; // repo kökündeki .env'i yükle (runDebate provider'ı process.env'i doğrudan okur)
-import { composite, runDebate, type BaseAnalysis, type Signal } from "@idea-factory/core";
+import { composite, isGateDebateCurrent, runDebate, type BaseAnalysis, type Signal } from "@idea-factory/core";
 import { db } from "./db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
 import {
-  GATE_REQUIRED_DEBATES,
+  planDebateRuns,
   selectAutoDebateCandidates,
   selectGateCandidates,
   type DecisionLogRow,
@@ -81,8 +81,8 @@ function pickLocalCompetitor(
 
 async function main(): Promise<void> {
   // Kapı turları: sinyal başına kaç OTOMATİK tartışma var (manuel turlar kapıyı kapatmaz).
-  let debRes = (await db.from("debates").select("signal_id, kind")) as {
-    data: { signal_id: string; kind?: string }[] | null;
+  let debRes = (await db.from("debates").select("signal_id, kind, run_no, created_at")) as {
+    data: { signal_id: string; kind?: string; run_no?: number | null; created_at: string }[] | null;
     error: { code?: string; message: string } | null;
   };
   // 0014 uygulanmadıysa `kind` yok — kapı kapanamaz. Sessizce yanlış çalışmaktansa AÇIKÇA dur:
@@ -95,11 +95,16 @@ async function main(): Promise<void> {
   }
   const { data: debateRows, error: debErr } = debRes;
   if (debErr) throw new Error(`debates sorgu hatası: ${debErr.message}`);
+  // Kapı yalnız GÜNCEL otomatik turları sayar (bkz. core debate-gate.ts); run_no ise eskiler dahil
+  // en büyükten devam eder (benzersiz indeks). anyDebate insan-tetikli idempotensi için hepsini tutar.
   const autoCount = new Map<string, number>();
+  const maxRunNo = new Map<string, number>();
   const anyDebate = new Set<string>();
   for (const r of debateRows ?? []) {
     anyDebate.add(r.signal_id);
-    if (r.kind === "auto") autoCount.set(r.signal_id, (autoCount.get(r.signal_id) ?? 0) + 1);
+    if (r.kind !== "auto") continue;
+    if (isGateDebateCurrent(r.created_at)) autoCount.set(r.signal_id, (autoCount.get(r.signal_id) ?? 0) + 1);
+    maxRunNo.set(r.signal_id, Math.max(maxRunNo.get(r.signal_id) ?? 0, r.run_no ?? 0));
   }
 
   const { rows: gateRows, analysesBySignal } = await loadGateCandidates();
@@ -116,22 +121,8 @@ async function main(): Promise<void> {
     anyDebate,
   ).filter((id) => !gateIds.includes(id));
 
-  // Aday başına kaç tur eksik — kapı adaylarında 2'ye tamamla, insan-tetiklilerde 1 tur yeter.
-  const plan: { signalId: string; runNo: number }[] = [];
-  for (const id of gateIds) {
-    const have = autoCount.get(id) ?? 0;
-    for (let n = have + 1; n <= GATE_REQUIRED_DEBATES; n++) plan.push({ signalId: id, runNo: n });
-  }
-  for (const id of humanIds) plan.push({ signalId: id, runNo: (autoCount.get(id) ?? 0) + 1 });
-  // Kemer + askı: `humanIds` zaten `gateIds`ten arındırılmış (yukarıda) ama aynı (sinyal, tur)
-  // çiftini iki kez koşturmak boşa 7 LLM çağrısı demek — tek kaynak yerine burada da kes.
-  const seenPlan = new Set<string>();
-  const deduped = plan.filter((p) => {
-    const k = `${p.signalId}#${p.runNo}`;
-    if (seenPlan.has(k)) return false;
-    seenPlan.add(k);
-    return true;
-  });
+  // Aday başına kaç tur eksik — kapı adaylarında 2 güncel tura tamamla, insan-tetiklilerde 1 tur.
+  const deduped = planDebateRuns(gateIds, humanIds, autoCount, maxRunNo);
 
   const pendingSignals = gateIds.length;
   const todo = deduped.slice(0, BATCH_LIMIT);

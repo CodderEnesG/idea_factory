@@ -52,6 +52,36 @@ export function selectGateCandidates(
 }
 
 /**
+ * Koşturulacak (sinyal, tur) planı. `currentCount`: kapıya sayılan (güncel) otomatik tur
+ * sayısı; `maxRunNo`: eskiler DAHİL yazılmış en büyük otomatik `run_no`. Yeni turlar
+ * `maxRunNo`dan devam etmeli — `debates_auto_run` benzersiz indeksi (signal_id, run_no)
+ * eski turların numaralarını tutuyor; 1'den başlasa insert 23505 alır ve "eşzamanlı mükerrer"
+ * diye sessizce atlanırdı (eski tartışmalı kart hiç yeniden tartışılmazdı).
+ */
+export function planDebateRuns(
+  gateIds: string[],
+  humanIds: string[],
+  currentCount: ReadonlyMap<string, number>,
+  maxRunNo: ReadonlyMap<string, number>,
+): { signalId: string; runNo: number }[] {
+  const plan: { signalId: string; runNo: number }[] = [];
+  const seen = new Set<string>();
+  for (const id of gateIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const needed = GATE_REQUIRED_DEBATES - (currentCount.get(id) ?? 0);
+    const start = maxRunNo.get(id) ?? 0;
+    for (let i = 1; i <= needed; i++) plan.push({ signalId: id, runNo: start + i });
+  }
+  for (const id of humanIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    plan.push({ signalId: id, runNo: (maxRunNo.get(id) ?? 0) + 1 });
+  }
+  return plan;
+}
+
+/**
  * İkincil tetikleyici — kapının DIŞINDA kalan sinyaller için (fit<80 ama bir insan yine de
  * "Kovala" demiş). Kapı bunları hiç seçmez ama insanın beğendiği bir sinyalde ikinci görüş
  * hâlâ değerli, o yüzden eski seçici korunuyor.

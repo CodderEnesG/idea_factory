@@ -2,6 +2,7 @@ import {
   composite,
   isActionableKind,
   isBench,
+  isGateDebateCurrent,
   StoredEnrichmentSchema,
   WHITE_SPACE_GAP_MIN,
   type BaseAnalysis,
@@ -60,8 +61,11 @@ export function resolveCardBands(args: {
   gateEnabled?: boolean;
 }): { aiBand: Band; gatedBand: Band; gate: GateState } {
   const { comp, debates, gateEnabled = true } = args;
-  const autoVerdicts = debates.filter((d) => d.kind === "auto").map((d) => d.final_verdict);
-  const manualVerdicts = debates.filter((d) => d.kind !== "auto").map((d) => d.final_verdict);
+  // Kesimden önceki tartışmalar eski analize aitti — kapıya ve temkinli-kazanır kuralına
+  // katılmaz (kartta görünmeye devam eder). Worker seçimi aynı sabiti okur (core debate-gate.ts).
+  const current = debates.filter((d) => isGateDebateCurrent(d.created_at));
+  const autoVerdicts = current.filter((d) => d.kind === "auto").map((d) => d.final_verdict);
+  const manualVerdicts = current.filter((d) => d.kind !== "auto").map((d) => d.final_verdict);
   const gated = resolveGatedBand(comp.band, autoVerdicts, gateEnabled);
   // Elle tetiklenmiş tartışma kapıyı kapatmaz ama yükseltemez de — temkinli olan kazanır.
   const withManual = gateEnabled

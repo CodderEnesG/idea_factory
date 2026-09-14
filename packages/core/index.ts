@@ -16,5 +16,6 @@ export * from "./digest.js";
 export * from "./knowledge.js";
 export * from "./hash.js";
 export * from "./debate.js";
+export * from "./debate-gate.js";
 // Golden few-shot çapaları — üretim analistine prompt materyali (THESIS_AND_LENS §3a).
 export { golden } from "./eval/golden.js";

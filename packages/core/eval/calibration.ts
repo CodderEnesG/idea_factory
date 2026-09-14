@@ -30,6 +30,7 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { isGateDebateCurrent } from "../debate-gate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // .env.local öncelikli (dotenv array: ilk dosya kazanır), .env fallback — run.ts ile aynı kalıp.
@@ -133,7 +134,9 @@ async function main(): Promise<void> {
   const autoBySignal = new Map<string, Band[]>();
   const allBySignal = new Map<string, Band[]>();
   for (const d of debates) {
-    if (d.kind !== "manual") autoBySignal.set(d.signal_id, [...(autoBySignal.get(d.signal_id) ?? []), d.final_verdict]);
+    // Kapı yalnız güncel tartışmaları sayar (bkz. debate-gate.ts) — web kartı ve worker ile aynı kural.
+    if (d.kind !== "manual" && isGateDebateCurrent(d.created_at))
+      autoBySignal.set(d.signal_id, [...(autoBySignal.get(d.signal_id) ?? []), d.final_verdict]);
     allBySignal.set(d.signal_id, [...(allBySignal.get(d.signal_id) ?? []), d.final_verdict]);
   }
 
