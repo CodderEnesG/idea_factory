@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeSourceWeights } from "./source-weight.js";
+import { computeSourceWeights } from "./source-weight-calc.js";
 
 function rows(source: string, fits: number[]): { source: string; bestFit: number }[] {
   return fits.map((bestFit) => ({ source, bestFit }));

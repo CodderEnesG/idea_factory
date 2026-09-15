@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { computeSourceWeights } from "./source-weight-calc.js";
 
 /**
  * Kaynak-verim ağırlığı: LLM analiz bütçesi kıt (analyze.ts/backfill-lens.ts kaynak başı
@@ -6,45 +7,8 @@ import { db } from "../db.js";
  * producthunt'ın ~5 katı, ycombinator 134 analizde tek bir fit≥80 bile üretmedi. Sabit eşit
  * tavan bu farkı görmezden geliyor. Bu modül `triage_score`'u kaynağın tarihsel fit≥80
  * oranıyla ağırlıklandırır — kaynağı ELEMEZ (yeni eklenen kaynaklar hâlâ örneklem topluyor),
- * yalnız kıt bütçede sıra önceliğini kaydırır.
+ * yalnız kıt bütçede sıra önceliğini kaydırır. Saf hesap: `source-weight-calc.ts`.
  */
-
-const MIN_WEIGHT = 0.4;
-const MAX_WEIGHT = 2.5;
-// Bayes düzeltmesi: küçük örneklemli kaynak (örn. yeni eklenen 6 sektör kaynağı, n<20) tek bir
-// şanslı/şanssız sonuçla uç ağırlığa savrulmasın — global ortalamaya doğru çekilir.
-const PRIOR_STRENGTH = 15;
-
-export interface SourceStat {
-  source: string;
-  analyzed: number;
-  fit80: number;
-}
-
-/** Saf hesap — test edilebilir. `rows`: her analiz edilmiş sinyal için {source, bestFit}. */
-export function computeSourceWeights(rows: { source: string; bestFit: number }[]): Map<string, number> {
-  const bySource = new Map<string, SourceStat>();
-  let totalAnalyzed = 0;
-  let totalFit80 = 0;
-  for (const r of rows) {
-    const s = bySource.get(r.source) ?? { source: r.source, analyzed: 0, fit80: 0 };
-    s.analyzed++;
-    if (r.bestFit >= 80) s.fit80++;
-    bySource.set(r.source, s);
-    totalAnalyzed++;
-    if (r.bestFit >= 80) totalFit80++;
-  }
-  const globalRate = totalAnalyzed > 0 ? totalFit80 / totalAnalyzed : 0.05;
-
-  const weights = new Map<string, number>();
-  for (const s of bySource.values()) {
-    // Bayes-düzeltilmiş oran: (fit80 + prior*globalRate) / (n + prior).
-    const smoothedRate = (s.fit80 + PRIOR_STRENGTH * globalRate) / (s.analyzed + PRIOR_STRENGTH);
-    const ratio = globalRate > 0 ? smoothedRate / globalRate : 1;
-    weights.set(s.source, Math.min(MAX_WEIGHT, Math.max(MIN_WEIGHT, ratio)));
-  }
-  return weights;
-}
 
 /** DB'den son N sinyalin kaynak+en-iyi-fit'ini çekip ağırlık haritasını üretir.
  *  Hiç veri yoksa (ör. testte/boş DB'de) boş map döner — çağıran taraf weight=1 varsaymalı. */
