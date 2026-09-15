@@ -65,6 +65,10 @@ jobs:
           # Yorumcu kapısı (FAZ6_PLAN.md §Faz 2): her AI-kovala adayı 2 bağımsız tartışmadan
           # geçer. TUR tavanı (sinyal değil) — günde ~2.3 aday x 2 tur + birikmiş kuyruk payı.
           DEBATE_AUTO_LIMIT: ${{ vars.DEBATE_AUTO_LIMIT || '8' }}
+          # 2026-09-15: 8 tur sıralı ~16 dk sürüp tick'i 65 dk sınırına dayadı (09:05 koşusu iptal,
+          # digest oluşmadı). Tartışma planı (sinyal, tur) çiftleri benzersiz → paralel güvenli;
+          # toplu koşuda 4 paralel Vertex 429 üretmedi.
+          DEBATE_AUTO_CONCURRENCY: ${{ vars.DEBATE_AUTO_CONCURRENCY || '3' }}
           # Asılan LLM bağlantısı tick'i sonsuza kadar bekletmesin.
           LLM_TIMEOUT_MS: ${{ vars.LLM_TIMEOUT_MS || '90000' }}
           ANALYZE_DEADLINE_MS: ${{ vars.ANALYZE_DEADLINE_MS || '240000' }}
