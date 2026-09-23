@@ -41,7 +41,7 @@ export default function Login() {
         body: JSON.stringify({ username, password }),
       });
       if (res.ok) {
-        const next = new URLSearchParams(window.location.search).get("next") || "/queue";
+        const next = new URLSearchParams(window.location.search).get("next") || "/gelen";
         router.push(next);
         router.refresh();
       } else {

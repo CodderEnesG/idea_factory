@@ -28,6 +28,7 @@ function initialsOf(name: string): string {
 }
 
 export type NavKey =
+  | "gelen"
   | "queue"
   | "panom"
   | "harita"
@@ -199,8 +200,11 @@ export function AppSidebar({
       )}
 
       <nav className="mb-2 shrink-0 space-y-1">
-        <NavItem href="/queue" active={active("queue")} icon={<IconInbox className="h-4 w-4" />} collapsed={collapsed} label="Kuyruk">
-          Kuyruk
+        <NavItem href="/gelen" active={active("gelen")} icon={<IconInbox className="h-4 w-4" />} collapsed={collapsed} label="Gelen kutusu">
+          Gelen kutusu
+        </NavItem>
+        <NavItem href="/queue" active={active("queue")} icon={<IconSliders className="h-4 w-4" />} collapsed={collapsed} label="Tüm sinyaller">
+          Tüm sinyaller
         </NavItem>
         {me && (
           <NavItem

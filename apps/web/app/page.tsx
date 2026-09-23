@@ -10,11 +10,11 @@ function Nav() {
         <span className="font-display text-lg font-semibold tracking-tight">IdeaFact</span>
       </div>
       <div className="flex items-center gap-6 text-sm text-ink-secondary">
-        <Link href="/queue" className="hover:text-ink">
-          Kuyruk
+        <Link href="/gelen" className="hover:text-ink">
+          Gelen kutusu
         </Link>
-        <Link href="/queue" className="btn-primary">
-          Kuyruğu aç →
+        <Link href="/gelen" className="btn-primary">
+          Gelen kutusunu aç →
         </Link>
       </div>
     </nav>
@@ -52,8 +52,8 @@ export default function Landing() {
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-3">
-            <Link href="/queue" className="btn-primary">
-              Fırsat kuyruğunu aç →
+            <Link href="/gelen" className="btn-primary">
+              Gelen kutusunu aç →
             </Link>
             <a href="#nasil" className="btn-ghost">
               Nasıl çalışır

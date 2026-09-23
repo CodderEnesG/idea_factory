@@ -27,6 +27,8 @@ const SOURCE_LABELS: Record<string, string> = {
   contxto: "Contxto",
   crunchbase_news: "Crunchbase News",
   restofworld: "Rest of World",
+  github: "GitHub",
+  softwarerecs: "Software Recs",
 };
 
 /** Ham `signals.source` değerini ("tldr:founders") okunabilir bir etikete çevirir ("TLDR"). */
