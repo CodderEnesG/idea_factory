@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
-import { BAND, CONFIDENCE_LABEL } from "./card-visuals";
+import { BAND } from "./card-visuals";
+import { whyLine, trustNote, competitionNote } from "../lib/card-text";
 import { formatSource } from "../lib/source-labels";
 import { AppSidebar } from "./AppSidebar";
 import type { SessionUser } from "../lib/session";
@@ -21,35 +22,6 @@ const OPTS: { d: Decision; key: string; label: string; cls: string }[] = [
   { d: "watch", key: "2", label: "İzle", cls: "bg-watch/10 text-watch hover:bg-watch/25" },
   { d: "kill", key: "3", label: "Ele", cls: "bg-kill/10 text-kill hover:bg-kill/25" },
 ];
-
-/** Tek cümlelik "neden": en yüksek uyumlu merceğin gerekçesinin ilk cümlesi. */
-export function whyLine(item: CardView): string {
-  const best = [...item.lensViews].sort((a, b) => b.fit - a.fit)[0];
-  const text = (best?.rationale || item.summary || "").replace(/\s+/g, " ").trim();
-  if (!text) return "Henüz gerekçe yok.";
-  const firstSentence = text.match(/^.+?[.!?](\s|$)/)?.[0].trim() ?? text;
-  return firstSentence.length > 240 ? `${firstSentence.slice(0, 237)}…` : firstSentence;
-}
-
-/** Yargıç/veto katmanının kullanıcıya inen tek kelimelik özeti. */
-export function trustNote(item: CardView): string {
-  switch (item.gate) {
-    case "confirmed":
-      return "iki bağımsız tartışma onayladı";
-    case "caveat":
-      return "onaylandı, çekinceli";
-    case "pending":
-      return "henüz doğrulanmadı";
-    default:
-      return `güven: ${CONFIDENCE_LABEL[item.confidence]}`;
-  }
-}
-
-function competitionNote(item: CardView): string | null {
-  const c = item.competition;
-  if (!c || c.label === "belirsiz") return null;
-  return c.label === "boş" ? "rakip: yok" : `rakip: ${c.label}`;
-}
 
 export function InboxBoard({
   items,

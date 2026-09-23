@@ -1,478 +1,189 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { resolvePanomBand, type CardView } from "../lib/card-view";
+import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
 import { AppSidebar } from "./AppSidebar";
-import { PanomCard } from "./PanomCard";
-import { canonicalSourceName } from "../lib/source-health";
-import { normalizeTag, distinct, distinctSources } from "../lib/facet-filters";
-import { IconInbox, IconSearch } from "./icons";
+import { SignalDetail } from "./SignalDetail";
+import { formatSource } from "../lib/source-labels";
 
-interface Resolved extends CardView {
-  effective: Decision;
-  /** Gösterilen karar benim değil, kilitli de değilse kimin kararı olduğu (ör. "muhammed"). */
-  effectiveUser: string | null;
-  locked: boolean;
-  lockedBy: string | null;
+export interface KilledRow {
+  id: string;
+  title: string;
+  source: string;
 }
 
-interface FinalOverride {
-  decision: Decision;
-  decidedBy: string;
+/** Kararın kartta görünen etkin değeri: ekip kararı > benim > başkasının. */
+function decisionOf(c: CardView, override: Map<string, Decision>): Decision {
+  return override.get(c.id) ?? c.finalDecision ?? c.mine ?? c.others[0]?.decision ?? "watch";
 }
 
-const GROUPS: { d: Decision; label: string; dot: string; text: string }[] = [
-  { d: "pursue", label: "Kovala", dot: "bg-pursue", text: "text-pursue" },
-  { d: "watch", label: "İzle", dot: "bg-watch", text: "text-watch" },
-  { d: "kill", label: "Ele", dot: "bg-kill", text: "text-kill" },
-];
-
-const PAGE_SIZE = 30;
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+}
 
 /**
- * Panom (0013 yeniden tasarımı). Eski sürüm tek sayfada üç sonsuz dikey liste olarak
- * yaşıyordu (görsel/yapısal olarak Kuyruk'un kart diliyle uyumsuz, sürükle-bırak yok,
- * binlerce "ele" kartı aynı sayfada sonsuza kadar duruyordu — kullanıcı geri bildirimi
- * 2026-08-15). Bu sürüm gerçek 3-sütunlu kanban: kart sürüklenince KİŞİSEL karar yazılır
- * (`/api/decisions`), ayrı bir "Kilitle" düğmesi ekip kararını KESİNLEŞTİRİR
- * (`/api/decisions/final`, 0013) — sürüklemek bir kilidi asla bozmaz, önce açılmalı.
- * Ele varsayılan katlı (yalnız sayı); İzle "Bugün gözden geçir" (watchReviewAt geçmiş,
- * yalnız kilitli izlemeler için — final/route.ts +30g set eder) üstte, geri kalanı katlı.
+ * Panom — baştan yazıldı (2026-09-24). Karar verdiğin sinyallerin sade takibi: Kovala (yaptığın
+ * iş: görev ilerlemesi), İzle (ne zaman dönüp bakacağın), Ele (katlı). Sürükle-bırak, kilitleme,
+ * çoklu filtre ve üç ayrı kart dili kaldırıldı; karar değiştirmek satırı açıp düğmeye basmaktır.
+ * (Ekip kararı kilidi API'de duruyor, arayüzden çıkarıldı.)
  */
-export function PanomBoard({ cards, me, meName }: { cards: CardView[]; me: SessionUser | null; meName: string }) {
-  const [search, setSearch] = useState("");
-  const [sector, setSector] = useState("");
-  const [market, setMarket] = useState("");
-  const [source, setSource] = useState("");
-  const [mineOverride, setMineOverride] = useState<Map<string, Decision>>(new Map());
-  const [finalOverride, setFinalOverride] = useState<Map<string, FinalOverride | null>>(new Map());
+export function PanomBoard({
+  cards,
+  killed,
+  me,
+  meName,
+}: {
+  cards: CardView[];
+  killed: KilledRow[];
+  me: SessionUser | null;
+  meName: string;
+}) {
+  const [override, setOverride] = useState<Map<string, Decision>>(new Map());
+  const [openId, setOpenId] = useState<string | null>(null);
   const [killOpen, setKillOpen] = useState(false);
-  const [watchRestOpen, setWatchRestOpen] = useState(false);
-  const [visibleCount, setVisibleCount] = useState<Record<Decision, number>>({
-    pursue: PAGE_SIZE,
-    watch: PAGE_SIZE,
-    kill: PAGE_SIZE,
-  });
-  const [dragOverCol, setDragOverCol] = useState<Decision | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
-  const resolved = useMemo<Resolved[]>(() => {
-    const out: Resolved[] = [];
+  const { pursue, watch, moved } = useMemo(() => {
+    const pursue: CardView[] = [];
+    const watch: CardView[] = [];
+    let moved = 0;
     for (const c of cards) {
-      const mine = mineOverride.get(c.id) ?? c.mine;
-      const finalOv = finalOverride.has(c.id)
-        ? finalOverride.get(c.id)
-        : c.finalDecision
-          ? { decision: c.finalDecision, decidedBy: c.finalDecidedBy ?? "?" }
-          : null;
-      // Kimse (ne ben ne başka bir üye) karar vermemiş ve kilit de yoksa kart Panom'da
-      // durmasının anlamı kalmaz — Kuyruk'un kararsızlar listesine geri düşer.
-      // `others[0]` en son karar (loadDecisions created_at DESC sıralar, bkz. card-view.ts).
-      const latestOther = c.others[0] ?? null;
-      if (mine === null && !finalOv && !latestOther) continue;
-      // Final > kişisel > başka birinin en son kararı. Kuyruk'un hiyerarşisinden KASITLI
-      // farklı (bkz. card-view.ts::resolvePanomBand — ayrım orada belgeli): Panom = "ne karar
-      // verdik", Kuyruk = "sistem şu an ne düşünüyor". Panom AI bandına ya da Yorumcu kapısına
-      // HİÇ düşmez; buna karşılık 4. katmanı (başkasının kararı) Kuyruk'ta OLMAMALI.
-      const effective = resolvePanomBand(mine, finalOv?.decision ?? null, latestOther?.decision ?? null)!;
-      const effectiveUser = finalOv || mine !== null ? null : latestOther!.user;
-      out.push({ ...c, mine, effective, effectiveUser, locked: finalOv !== null, lockedBy: finalOv?.decidedBy ?? null });
+      const d = decisionOf(c, override);
+      if (d === "pursue") pursue.push(c);
+      else if (d === "watch") watch.push(c);
+      else moved++; // burada Ele'ye çevrilenler bir sonraki yenilemede Ele listesine düşer
     }
-    return out;
-  }, [cards, mineOverride, finalOverride]);
+    // İzle: gözden geçirme vakti gelenler üstte.
+    const now = Date.now();
+    const due = (c: CardView) => (c.watchReviewAt && Date.parse(c.watchReviewAt) <= now ? 0 : 1);
+    watch.sort((a, b) => due(a) - due(b) || (a.watchReviewAt ?? "").localeCompare(b.watchReviewAt ?? ""));
+    return { pursue, watch, moved };
+  }, [cards, override]);
 
-  const sectors = useMemo(() => distinct(resolved, (i) => i.sector), [resolved]);
-  const markets = useMemo(() => distinct(resolved, (i) => i.market), [resolved]);
-  const sources = useMemo(() => distinctSources(resolved), [resolved]);
+  const row = (c: CardView, right: React.ReactNode) => {
+    const open = openId === c.id;
+    return (
+      <li key={c.id} className="border-b border-white/[0.06] last:border-b-0">
+        <button
+          type="button"
+          onClick={() => setOpenId(open ? null : c.id)}
+          aria-expanded={open}
+          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${open ? "bg-white/[0.04]" : "hover:bg-white/[0.025]"}`}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] text-ink">{c.title}</span>
+            <span className="block truncate font-mono text-[10.5px] text-ink-muted">
+              {formatSource(c.source)}
+              {c.sector && ` · ${c.sector}`}
+            </span>
+          </span>
+          {right}
+          <span className="font-mono text-xs font-bold text-ink-muted">{c.fit}</span>
+        </button>
+        {open && (
+          <div className="border-t border-white/[0.06] bg-white/[0.015] px-5 py-5">
+            <SignalDetail card={c} meName={meName} onDecided={(d) => setOverride((m) => new Map(m).set(c.id, d))} />
+          </div>
+        )}
+      </li>
+    );
+  };
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return resolved.filter((i) => {
-      if (q && !i.title.toLowerCase().includes(q)) return false;
-      if (sector && (!i.sector || normalizeTag(i.sector).key !== sector)) return false;
-      if (market && (!i.market || normalizeTag(i.market).key !== market)) return false;
-      if (source && canonicalSourceName(i.source) !== source) return false;
-      return true;
-    });
-  }, [resolved, search, sector, market, source]);
+  const progress = (c: CardView) => {
+    const total = c.tasks.length;
+    if (total === 0) return <span className="text-[11px] text-ink-muted">görev yok</span>;
+    const done = c.tasks.filter((t) => t.done).length;
+    return (
+      <span className="flex shrink-0 items-center gap-2 text-[11px] text-ink-secondary">
+        <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.08]">
+          <span className="block h-full rounded-full bg-pursue" style={{ width: `${(100 * done) / total}%` }} />
+        </span>
+        {done}/{total}
+      </span>
+    );
+  };
 
-  const byBand = useMemo(() => {
-    const map = new Map<Decision, Resolved[]>();
-    for (const g of GROUPS) map.set(g.d, []);
-    for (const c of filtered) map.get(c.effective)?.push(c);
-    return map;
-  }, [filtered]);
+  const reviewNote = (c: CardView) => {
+    if (!c.watchReviewAt) return null;
+    const due = Date.parse(c.watchReviewAt) <= Date.now();
+    return (
+      <span className={`shrink-0 text-[11px] ${due ? "font-semibold text-watch" : "text-ink-muted"}`}>
+        {due ? "bugün bak" : `${fmtDate(c.watchReviewAt)}'de bak`}
+      </span>
+    );
+  };
 
-  const now = Date.now();
-  const watchAll = byBand.get("watch") ?? [];
-  const watchDue = watchAll.filter((c) => c.watchReviewAt && Date.parse(c.watchReviewAt) <= now);
-  const watchRest = watchAll.filter((c) => !(c.watchReviewAt && Date.parse(c.watchReviewAt) <= now));
-
-  const activeFilterCount = (sector ? 1 : 0) + (market ? 1 : 0) + (source ? 1 : 0);
-
-  function clearFilters() {
-    setSector("");
-    setMarket("");
-    setSource("");
-  }
-
-  async function decide(id: string, d: Decision) {
-    const prev = mineOverride.get(id);
-    setMineOverride((m) => new Map(m).set(id, d));
-    setActionError(null);
-    try {
-      const res = await fetch("/api/decisions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ signal_id: id, decision: d }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch {
-      setMineOverride((m) => {
-        const next = new Map(m);
-        if (prev) next.set(id, prev);
-        else next.delete(id);
-        return next;
-      });
-      setActionError("Karar kaydedilemedi, bağlantını kontrol edip tekrar dene.");
-    }
-  }
-
-  async function lock(id: string, d: Decision) {
-    setFinalOverride((m) => new Map(m).set(id, { decision: d, decidedBy: meName }));
-    setActionError(null);
-    try {
-      const res = await fetch("/api/decisions/final", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ signal_id: id, decision: d }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch {
-      setFinalOverride((m) => {
-        const next = new Map(m);
-        next.delete(id);
-        return next;
-      });
-      setActionError("Kilitlenemedi, bağlantını kontrol edip tekrar dene.");
-    }
-  }
-
-  async function unlock(id: string) {
-    setFinalOverride((m) => new Map(m).set(id, null));
-    setActionError(null);
-    try {
-      const res = await fetch("/api/decisions/final", {
-        method: "DELETE",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ signal_id: id }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch {
-      setFinalOverride((m) => {
-        const next = new Map(m);
-        next.delete(id);
-        return next;
-      });
-      setActionError("Kilit açılamadı, bağlantını kontrol edip tekrar dene.");
-    }
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLDivElement>, target: Decision) {
-    e.preventDefault();
-    setDragOverCol(null);
-    const id = e.dataTransfer.getData("text/plain");
-    if (!id) return;
-    const current = resolved.find((c) => c.id === id);
-    if (!current || current.locked || current.effective === target) return;
-    decide(id, target);
-  }
+  const empty = pursue.length === 0 && watch.length === 0 && killed.length === 0;
 
   return (
     <div className="flex h-screen overflow-hidden">
       <AppSidebar me={me} current="panom" />
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-white/[0.12] px-6 pt-16 pb-5 md:pt-5">
-          <h1 className="font-display text-2xl font-bold">Panom</h1>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {resolved.length} karar verilmiş sinyal · sürükle = kendi kararın, kilitle = ekip kararı
-          </p>
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-4xl px-6 pb-10 pt-16 md:pt-8">
+          <header className="mb-6">
+            <h1 className="font-display text-3xl font-bold">Panom</h1>
+            <p className="mt-1 text-sm text-ink-secondary">
+              {pursue.length} kovaladığın · {watch.length} izlediğin · {killed.length + moved} elediğin
+            </p>
+          </header>
 
-          {resolved.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-              <div className="flex items-center rounded-btn border border-hair bg-elevated">
-                <span className={`shrink-0 pl-2.5 ${search ? "text-ink" : "text-ink-muted"}`}>
-                  <IconSearch className="h-3.5 w-3.5" />
-                </span>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setSearch("");
-                  }}
-                  placeholder="Ara…"
-                  className="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-ink placeholder:text-ink-muted focus:outline-none"
-                />
-              </div>
-              <select value={sector} onChange={(e) => setSector(e.target.value)} className="chip bg-surface">
-                <option value="">Sektör: Tümü</option>
-                {sectors.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <select value={market} onChange={(e) => setMarket(e.target.value)} className="chip bg-surface">
-                <option value="">Pazar: Tümü</option>
-                {markets.map((m) => (
-                  <option key={m.key} value={m.key}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <select value={source} onChange={(e) => setSource(e.target.value)} className="chip bg-surface">
-                <option value="">Kaynak: Tümü</option>
-                {sources.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              {activeFilterCount > 0 && (
-                <button onClick={clearFilters} className="text-ink-muted underline-offset-2 hover:text-ink hover:underline">
-                  Temizle ({activeFilterCount})
+          {empty ? (
+            <div className="glass p-8 text-center text-sm text-ink-secondary">
+              Henüz karar vermedin. Gelen kutusundan başla.
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <section>
+                <h2 className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-pursue">
+                  <span className="h-2 w-2 rounded-full bg-pursue" /> Kovala · {pursue.length}
+                </h2>
+                {pursue.length === 0 ? (
+                  <p className="rounded-card border border-hair bg-surface px-4 py-4 text-sm text-ink-muted">Kovaladığın sinyal yok.</p>
+                ) : (
+                  <ul className="overflow-hidden rounded-card border border-hair bg-surface">{pursue.map((c) => row(c, progress(c)))}</ul>
+                )}
+              </section>
+
+              <section>
+                <h2 className="mb-2 flex items-center gap-2 font-display text-sm font-semibold text-watch">
+                  <span className="h-2 w-2 rounded-full bg-watch" /> İzle · {watch.length}
+                </h2>
+                {watch.length === 0 ? (
+                  <p className="rounded-card border border-hair bg-surface px-4 py-4 text-sm text-ink-muted">İzlediğin sinyal yok.</p>
+                ) : (
+                  <ul className="overflow-hidden rounded-card border border-hair bg-surface">{watch.map((c) => row(c, reviewNote(c)))}</ul>
+                )}
+              </section>
+
+              <section>
+                <button
+                  type="button"
+                  onClick={() => setKillOpen((v) => !v)}
+                  aria-expanded={killOpen}
+                  className="flex items-center gap-2 font-display text-sm font-semibold text-kill"
+                >
+                  <span className="h-2 w-2 rounded-full bg-kill" /> Ele · {killed.length + moved}
+                  <span className="text-xs font-normal text-ink-muted">{killOpen ? "gizle" : "göster"}</span>
                 </button>
-              )}
+                {killOpen && (
+                  <ul className="mt-2 divide-y divide-white/[0.06] overflow-hidden rounded-card border border-hair bg-surface">
+                    {killed.map((k) => (
+                      <li key={k.id}>
+                        <a href={`/queue?id=${encodeURIComponent(k.id)}`} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-secondary hover:bg-white/[0.025] hover:text-ink">
+                          <span className="min-w-0 flex-1 truncate">{k.title}</span>
+                          <span className="shrink-0 font-mono text-[10.5px] text-ink-muted">{formatSource(k.source)}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             </div>
           )}
-          {actionError && <p className="mt-2 text-xs text-kill">{actionError}</p>}
-        </header>
-
-        {resolved.length === 0 ? (
-          <p className="p-6 text-sm text-ink-muted">
-            Henüz bir karar vermediniz. Kuyruk&apos;ta bir sinyale Kovala, İzle ya da Ele deyin —
-            burada kendi klasörüne düşsün.
-          </p>
-        ) : filtered.length === 0 ? (
-          <p className="p-6 text-sm text-ink-muted">Bu filtrelerle eşleşen karar yok.</p>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col divide-y divide-white/[0.1] overflow-y-auto md:grid md:grid-cols-3 md:divide-x md:divide-y-0 md:overflow-hidden">
-            {/* Kovala */}
-            <KanbanColumn
-              group={GROUPS[0]!}
-              count={(byBand.get("pursue") ?? []).length}
-              dragOver={dragOverCol === "pursue"}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                setDragOverCol("pursue");
-              }}
-              onDragLeave={() => setDragOverCol(null)}
-              onDrop={(e) => handleDrop(e, "pursue")}
-            >
-              <CardList
-                items={byBand.get("pursue") ?? []}
-                visible={visibleCount.pursue}
-                onLoadMore={() => setVisibleCount((v) => ({ ...v, pursue: v.pursue + PAGE_SIZE }))}
-                onLock={(id) => lock(id, "pursue")}
-                onUnlock={unlock}
-                meName={meName}
-              />
-            </KanbanColumn>
-
-            {/* İzle */}
-            <KanbanColumn
-              group={GROUPS[1]!}
-              count={watchAll.length}
-              dragOver={dragOverCol === "watch"}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                setDragOverCol("watch");
-              }}
-              onDragLeave={() => setDragOverCol(null)}
-              onDrop={(e) => handleDrop(e, "watch")}
-            >
-              {watchDue.length > 0 && (
-                <div className="mb-3">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-watch">
-                    Bugün gözden geçir ({watchDue.length})
-                  </div>
-                  <div className="space-y-2.5">
-                    {watchDue.map((item) => (
-                      <PanomCard
-                        key={item.id}
-                        item={item}
-                        effective={item.effective}
-                        effectiveUser={item.effectiveUser}
-                        locked={item.locked}
-                        lockedBy={item.lockedBy}
-                        onLock={() => lock(item.id, "watch")}
-                        onUnlock={() => unlock(item.id)}
-                        meName={meName}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {watchRest.length > 0 && (
-                <div>
-                  {watchDue.length > 0 ? (
-                    <button
-                      onClick={() => setWatchRestOpen((v) => !v)}
-                      className="mb-2 text-[11px] font-medium text-ink-muted hover:text-ink"
-                    >
-                      {watchRestOpen ? "Diğerlerini gizle ▴" : `Diğerleri (${watchRest.length}) ▾`}
-                    </button>
-                  ) : null}
-                  {(watchDue.length === 0 || watchRestOpen) && (
-                    <CardList
-                      items={watchRest}
-                      visible={visibleCount.watch}
-                      onLoadMore={() => setVisibleCount((v) => ({ ...v, watch: v.watch + PAGE_SIZE }))}
-                      onLock={(id) => lock(id, "watch")}
-                      onUnlock={unlock}
-                      meName={meName}
-                    />
-                  )}
-                </div>
-              )}
-            </KanbanColumn>
-
-            {/* Ele */}
-            <KanbanColumn
-              group={GROUPS[2]!}
-              count={(byBand.get("kill") ?? []).length}
-              dragOver={dragOverCol === "kill"}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                setDragOverCol("kill");
-              }}
-              onDragLeave={() => setDragOverCol(null)}
-              onDrop={(e) => handleDrop(e, "kill")}
-            >
-              {!killOpen ? (
-                // Katlı durum bilinçli (kullanıcı kararı: binlerce "ele" kartı sonsuza kadar
-                // ekranda durmasın) — ama eski hali (ince bir buton + altında koca boş alan)
-                // sayfa yüklenmemiş gibi görünüyordu. Bu, katlanmanın kendisinin kasıtlı bir
-                // durum olduğunu gösteren bir yer tutucu.
-                <button
-                  onClick={() => setKillOpen(true)}
-                  className="flex w-full flex-col items-center gap-2 rounded-lg border border-dashed border-white/[0.14] py-10 text-ink-muted transition hover:border-white/25 hover:text-ink"
-                >
-                  <IconInbox className="h-5 w-5" />
-                  <span className="text-xs">
-                    {(byBand.get("kill") ?? []).length} sinyal ele alındı — varsayılan katlı
-                  </span>
-                  <span className="chip mt-1">Göster ({(byBand.get("kill") ?? []).length})</span>
-                </button>
-              ) : (
-                <>
-                  <button onClick={() => setKillOpen(false)} className="mb-2 text-[11px] font-medium text-ink-muted hover:text-ink">
-                    Gizle ▴
-                  </button>
-                  <CardList
-                    items={byBand.get("kill") ?? []}
-                    visible={visibleCount.kill}
-                    onLoadMore={() => setVisibleCount((v) => ({ ...v, kill: v.kill + PAGE_SIZE }))}
-                    onLock={(id) => lock(id, "kill")}
-                    onUnlock={unlock}
-                    meName={meName}
-                  />
-                </>
-              )}
-            </KanbanColumn>
-          </div>
-        )}
+        </div>
       </main>
-    </div>
-  );
-}
-
-function KanbanColumn({
-  group,
-  count,
-  dragOver,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  children,
-}: {
-  group: { d: Decision; label: string; dot: string; text: string };
-  count: number;
-  dragOver: boolean;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      onDragOver={onDragOver}
-      onDragLeave={(e) => {
-        // Alt bir karta/elemana girince de dragleave tetiklenir (DOM olay modeli) — gerçekten
-        // sütunun dışına çıkılmadıysa yok say, aksi halde sürükleme sırasında vurgu titrer.
-        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-        onDragLeave();
-      }}
-      onDrop={onDrop}
-      className={`flex min-h-0 shrink-0 flex-col overflow-visible transition md:min-h-0 md:shrink md:overflow-hidden ${dragOver ? "bg-white/[0.04]" : ""}`}
-    >
-      <div className="flex shrink-0 items-center gap-2 px-4 pb-3 pt-4">
-        <span className={`h-2 w-2 rounded-full ${group.dot}`} />
-        <h2 className={`font-display text-sm font-semibold ${group.text}`}>{group.label}</h2>
-        <span className="font-mono text-xs text-ink-muted">({count})</span>
-      </div>
-      <div className="scroll-emphasis min-h-0 flex-1 space-y-2.5 overflow-visible px-4 pb-4 md:overflow-y-auto">{children}</div>
-    </div>
-  );
-}
-
-function CardList({
-  items,
-  visible,
-  onLoadMore,
-  onLock,
-  onUnlock,
-  meName,
-}: {
-  items: Resolved[];
-  visible: number;
-  onLoadMore: () => void;
-  onLock: (id: string) => void;
-  onUnlock: (id: string) => void;
-  meName: string;
-}) {
-  if (items.length === 0) {
-    return <p className="text-xs text-ink-muted">Boş — buraya bir kart sürükle.</p>;
-  }
-  const shown = items.slice(0, visible);
-  return (
-    <div className="space-y-2.5">
-      {shown.map((item) => (
-        <PanomCard
-          key={item.id}
-          item={item}
-          effective={item.effective}
-          effectiveUser={item.effectiveUser}
-          locked={item.locked}
-          lockedBy={item.lockedBy}
-          onLock={() => onLock(item.id)}
-          onUnlock={() => onUnlock(item.id)}
-          meName={meName}
-        />
-      ))}
-      {items.length > shown.length && (
-        <button
-          onClick={onLoadMore}
-          className="w-full rounded-btn border border-hair py-2 text-xs text-ink-muted transition hover:border-strong hover:text-ink"
-        >
-          Daha fazla yükle ({items.length - shown.length} tane daha)
-        </button>
-      )}
     </div>
   );
 }
