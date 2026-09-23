@@ -12,7 +12,7 @@ export default async function Gelen() {
   // Filtre değil sıralama: zaten `rank` bandı+uyumu sıraladı. Burada yalnız "bana ait olmayan"
   // (karar verilmemiş) ve sistemin elediği ayrılır; elenenler sayaçta kalır, silinmez.
   const undecided = cards.filter((c) => c.mine === null && c.finalDecision === null);
-  const open = undecided.filter((c) => c.effectiveBand !== "kill");
+  const open = undecided.filter((c) => c.gatedBand !== "kill");
 
   return (
     <InboxBoard

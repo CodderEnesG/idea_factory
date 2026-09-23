@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CardView, Band } from "../lib/card-view";
+import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import { BAND, CONFIDENCE_LABEL } from "./card-visuals";
 import { formatSource } from "../lib/source-labels";
@@ -168,7 +168,7 @@ export function InboxBoard({
             <div className="flex flex-col gap-4 lg:flex-row">
               <ol className="min-w-0 flex-1 divide-y divide-white/[0.06] overflow-hidden rounded-card border border-hair bg-surface lg:max-w-[46%]">
                 {queue.map((it, i) => {
-                  const b = BAND[it.effectiveBand as Band];
+                  const b = BAND[it.gatedBand];
                   const active = i === cursor;
                   return (
                     <li key={it.id}>
@@ -203,7 +203,7 @@ export function InboxBoard({
                   <div>
                     <h2 className="font-display text-xl font-semibold leading-snug">{current.title}</h2>
                     <p className="mt-1 font-mono text-[11px] text-ink-muted">
-                      {formatSource(current.source)} · {BAND[current.effectiveBand].label.toLowerCase()} · uyum {current.fit} ·{" "}
+                      {formatSource(current.source)} · {BAND[current.gatedBand].label.toLowerCase()} · uyum {current.fit} ·{" "}
                       {trustNote(current)}
                       {competitionNote(current) && ` · ${competitionNote(current)}`}
                     </p>
