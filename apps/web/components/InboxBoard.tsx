@@ -239,14 +239,19 @@ export function InboxBoard({
                     ))}
                   </div>
 
-                  <a
-                    href={current.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-sm text-brand hover:underline"
-                  >
-                    Kaynağı aç →
-                  </a>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                    <a
+                      href={current.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand hover:underline"
+                    >
+                      Kaynağı aç →
+                    </a>
+                    <a href={`/queue?id=${encodeURIComponent(current.id)}`} className="text-ink-secondary hover:text-ink hover:underline">
+                      Tam analiz, tartışma ve notlar →
+                    </a>
+                  </div>
                 </section>
               )}
             </div>

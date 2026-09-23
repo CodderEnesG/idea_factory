@@ -97,6 +97,15 @@ export function QueueBoard({
   const [bandFilter, setBandFilter] = useState<Set<CardView["band"]>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Gelen kutusu'ndan `/queue?id=…` ile gelinen sinyal: kayıtlı filtrelerin dışında kalsa da açılır.
+  const [deepId, setDeepId] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("id");
+    if (id) {
+      setDeepId(id);
+      setSelectedId(id);
+    }
+  }, []);
   const [localMine, setLocalMine] = useState<Map<string, Decision>>(new Map());
   const [localFinal, setLocalFinal] = useState<Map<string, { decision: Decision; decidedBy: string } | null>>(new Map());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
@@ -255,7 +264,11 @@ export function QueueBoard({
 
   // Seçili öğe filtrelerin dışına düşerse (ör. "yalnız kararsızlar"da karar verilince)
   // listedeki ilk öğeye düş — bu aynı zamanda oto-ilerlemenin tamamı: ekstra state gerekmez.
-  const selected = filtered.find((i) => i.id === selectedId) ?? filtered[0] ?? null;
+  const selected =
+    filtered.find((i) => i.id === selectedId) ??
+    (deepId !== null && selectedId === deepId ? resolved.find((i) => i.id === deepId) : undefined) ??
+    filtered[0] ??
+    null;
 
   // Kenar çubuğu artık "Daha fazla" menüsüyle kalıcı yer kapladığı için liste alanı küçüldü
   // — 900'e yakın satırı tek seferde DOM'a basmak yerine ilk PAGE_SIZE gösterilir, geri kalanı

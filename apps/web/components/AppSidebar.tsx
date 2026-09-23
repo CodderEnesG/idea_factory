@@ -39,7 +39,7 @@ export type NavKey =
   | "toplama"
   | "metrikler";
 
-const REPORT_KEYS: NavKey[] = ["harita", "trend", "digest"];
+const REPORT_KEYS: NavKey[] = ["queue", "harita", "trend", "digest"];
 const ADMIN_KEYS: NavKey[] = ["tez", "mercekler", "toplama", "metrikler"];
 
 const ITEM_ACTIVE = "bg-white/[0.06] text-ink";
@@ -203,9 +203,6 @@ export function AppSidebar({
         <NavItem href="/gelen" active={active("gelen")} icon={<IconInbox className="h-4 w-4" />} collapsed={collapsed} label="Gelen kutusu">
           Gelen kutusu
         </NavItem>
-        <NavItem href="/queue" active={active("queue")} icon={<IconSliders className="h-4 w-4" />} collapsed={collapsed} label="Tüm sinyaller">
-          Tüm sinyaller
-        </NavItem>
         {me && (
           <NavItem
             href="/panom"
@@ -238,9 +235,9 @@ export function AppSidebar({
             doğrudan (her zaman) gösteriliyor; yalnız genişken açılır/kapanır. */}
         {(collapsed || moreOpen) && (
           <div className={collapsed ? "space-y-1" : "ml-1 space-y-1 border-l border-white/[0.08] pl-2"}>
-            {!collapsed && (
-              <div className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Raporlar</div>
-            )}
+            <NavItem href="/queue" active={active("queue")} icon={<IconSliders className="h-4 w-4" />} collapsed={collapsed} label="Tüm sinyaller">
+              Tüm sinyaller
+            </NavItem>
             <NavItem href="/harita" active={active("harita")} icon={<IconGlobe className="h-4 w-4" />} collapsed={collapsed} label="Harita">
               Harita
             </NavItem>
