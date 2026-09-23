@@ -1,3 +1,4 @@
+import { bustContextCache } from "../../../../lib/context-cache";
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../../lib/supabase";
 import { getSession } from "../../../../lib/auth";
@@ -57,6 +58,7 @@ export async function PATCH(req: Request, { params }: { params: { taskId: string
   if (!data || data.length === 0) {
     return NextResponse.json({ ok: false, error: "görev bulunamadı" }, { status: 404 });
   }
+  bustContextCache();
   return NextResponse.json({ ok: true });
 }
 
@@ -80,5 +82,6 @@ export async function DELETE(_req: Request, { params }: { params: { taskId: stri
   if (!data || data.length === 0) {
     return NextResponse.json({ ok: false, error: "görev bulunamadı" }, { status: 404 });
   }
+  bustContextCache();
   return NextResponse.json({ ok: true });
 }

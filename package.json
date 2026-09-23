@@ -17,7 +17,8 @@
     "digest": "pnpm --filter @idea-factory/worker digest",
     "tick": "pnpm --filter @idea-factory/worker tick",
     "eval": "pnpm --filter @idea-factory/core eval",
-    "web": "pnpm --filter @idea-factory/web dev"
+    "web": "pnpm --filter @idea-factory/web dev",
+    "web:prod": "pnpm --filter @idea-factory/web build && pnpm --filter @idea-factory/web start"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

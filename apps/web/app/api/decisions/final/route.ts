@@ -1,3 +1,4 @@
+import { bustContextCache } from "../../../../lib/context-cache";
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../../lib/supabase";
 import { getSession } from "../../../../lib/auth";
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     await seedStarterTasks(db, body.signal_id, decidedBy);
   }
 
+  bustContextCache();
   return NextResponse.json({ ok: true });
 }
 
@@ -72,5 +74,6 @@ export async function DELETE(req: Request) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   await db.from("signals").update({ watch_review_at: null }).eq("id", body.signal_id);
 
+  bustContextCache();
   return NextResponse.json({ ok: true });
 }

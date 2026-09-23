@@ -1,3 +1,4 @@
+import { bustContextCache } from "../../../lib/context-cache";
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../lib/supabase";
 import { getSession } from "../../../lib/auth";
@@ -35,5 +36,6 @@ export async function POST(req: Request) {
     .select("id, author, body, created_at")
     .single();
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  bustContextCache();
   return NextResponse.json({ ok: true, comment: data });
 }

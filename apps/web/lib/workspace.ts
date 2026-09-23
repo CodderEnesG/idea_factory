@@ -1,4 +1,5 @@
 import { composite, rank } from "@idea-factory/core";
+import { sharedCtx } from "./context-cache";
 import { getSession } from "./auth";
 import { loadIndexItems, loadItemsByIds } from "./load-items";
 import { loadLensRegistry } from "./load-lens-registry";
@@ -30,27 +31,27 @@ export interface Entry {
 
 type Ctx = Awaited<ReturnType<typeof loadContext>>;
 
+// Yardımcı tablolar (mercek, karar, görev, yorum, tartışma) 30 sn önbellekli; kullanıcı yazma
+// rotaları `bustContextCache()` çağırır ki kendi kararın/görevin sayfa geçişinde hemen görünsün.
+
 async function loadContext() {
   const me = await getSession();
-  const [lensRegistry, decisions, finals, comments, tasks, debateRes] = await Promise.all([
-    loadLensRegistry(),
-    loadDecisions(),
-    loadFinalDecisions(),
-    loadComments(),
-    loadTasks(),
-    loadDebates(),
-  ]);
+  const shared = await sharedCtx.get(async () => {
+    const [lensRegistry, decisions, finals, comments, tasks, debateRes] = await Promise.all([
+      loadLensRegistry(),
+      loadDecisions(),
+      loadFinalDecisions(),
+      loadComments(),
+      loadTasks(),
+      loadDebates(),
+    ]);
+    return { lensRegistry, decisions, finals, comments, tasks, debates: debateRes.map, debatesDegraded: debateRes.degraded };
+  });
   return {
     me,
     meName: me?.username ?? "web",
     isAdmin: me?.is_admin ?? false,
-    lensRegistry,
-    decisions,
-    finals,
-    comments,
-    tasks,
-    debates: debateRes.map,
-    debatesDegraded: debateRes.degraded,
+    ...shared,
   };
 }
 

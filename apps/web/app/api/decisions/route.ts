@@ -1,3 +1,4 @@
+import { bustContextCache } from "../../../lib/context-cache";
 import { NextResponse } from "next/server";
 import { serverDb } from "../../../lib/supabase";
 import { getSession } from "../../../lib/auth";
@@ -38,5 +39,6 @@ export async function POST(req: Request) {
     await seedStarterTasks(db, body.signal_id, decidedBy);
   }
 
+  bustContextCache();
   return NextResponse.json({ ok: true });
 }

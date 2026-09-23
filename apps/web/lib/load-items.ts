@@ -1,6 +1,7 @@
 import type { BaseAnalysis, RankedItem, Signal } from "@idea-factory/core";
 import { serverDb } from "./supabase";
 import { DEMO_ITEMS } from "./demo";
+import { ttlCache, globalMap } from "./ttl-cache";
 
 // PostgREST/Supabase yanıtı limit'siz .select()'te bile 1000 satırda SESSİZCE kesiyor
 // (2026-08-21'de keşfedildi: 1247 analiz satırından 247'si hiçbir sayfada görünmüyordu, hata
@@ -97,7 +98,7 @@ export async function loadItems(): Promise<LoadItemsResult> {
 
 const INDEX_TTL_MS = 45_000;
 const HYDRATE_CHUNK = 40;
-let indexCache: { at: number; value: Promise<LoadItemsResult> } | null = null;
+const indexCache = ttlCache("index", INDEX_TTL_MS);
 
 async function pagedOrdered(
   table: "analyses" | "signals",
@@ -153,25 +154,30 @@ async function buildIndexItems(): Promise<LoadItemsResult> {
   return { items: [...bySignal.values()], demo: false, error: null };
 }
 
-/** Sıralama için hafif kalemler (tam gerekçe metni YOK). Başarısız sonuç önbelleğe alınmaz. */
-export function loadIndexItems(): Promise<LoadItemsResult> {
-  if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) return indexCache.value;
-  const value = buildIndexItems();
-  const entry = { at: Date.now(), value };
-  indexCache = entry;
-  void value.then((r) => {
-    if (r.error && indexCache === entry) indexCache = null;
-  });
-  return value;
+/** Sıralama için hafif kalemler (tam gerekçe metni YOK). Başarısız sonuç önbelleğe alınmaz
+ *  (bkz. ttl-cache.ts) — ama `error` alanıyla dönen "başarılı çözülmüş hata" alınır, o yüzden ayrıca düşürülür. */
+export async function loadIndexItems(): Promise<LoadItemsResult> {
+  const r = await indexCache.get(buildIndexItems);
+  if (r.error) indexCache.bust();
+  return r;
 }
 
-/** Yalnız verilen sinyallerin TAM analizi (gerekçe, risk, enrichment). Sıra, `ids` sırasıdır. */
+const ITEM_TTL_MS = 45_000;
+const itemCache = globalMap<{ at: number; item: RankedItem }>("items");
+
+/** Yalnız verilen sinyallerin TAM analizi (gerekçe, risk, enrichment). Sıra, `ids` sırasıdır.
+ *  Son 45 sn içinde çekilenler önbellekten gelir (analizi yalnız worker yazar). */
 export async function loadItemsByIds(ids: string[]): Promise<RankedItem[]> {
   const db = serverDb();
   if (!db) return DEMO_ITEMS.filter((i) => ids.includes(i.signal.id));
-  const bySignal = new Map<string, RankedItem>();
-  for (let i = 0; i < ids.length; i += HYDRATE_CHUNK) {
-    const chunk = ids.slice(i, i + HYDRATE_CHUNK);
+  const now = Date.now();
+  const missing = ids.filter((id) => {
+    const c = itemCache.get(id);
+    return !c || now - c.at >= ITEM_TTL_MS;
+  });
+  const fetched = new Map<string, RankedItem>();
+  for (let i = 0; i < missing.length; i += HYDRATE_CHUNK) {
+    const chunk = missing.slice(i, i + HYDRATE_CHUNK);
     const { data, error } = await db
       .from("analyses")
       .select(`*, signals(${SIGNAL_COLUMNS})`)
@@ -181,10 +187,14 @@ export async function loadItemsByIds(ids: string[]): Promise<RankedItem[]> {
       const { signals, ...rest } = r as Record<string, unknown> & { signals?: Signal };
       if (!signals) continue;
       const analysis = rest as unknown as BaseAnalysis;
-      const item = bySignal.get(signals.id);
+      const item = fetched.get(signals.id);
       if (item) item.analyses[analysis.lens] = analysis;
-      else bySignal.set(signals.id, { signal: signals, analyses: { [analysis.lens]: analysis } });
+      else fetched.set(signals.id, { signal: signals, analyses: { [analysis.lens]: analysis } });
     }
   }
-  return ids.map((id) => bySignal.get(id)).filter((x): x is RankedItem => x !== undefined);
+  for (const [id, item] of fetched) itemCache.set(id, { at: now, item });
+  if (itemCache.size > 600) {
+    for (const [id, c] of itemCache) if (now - c.at >= ITEM_TTL_MS) itemCache.delete(id);
+  }
+  return ids.map((id) => itemCache.get(id)?.item).filter((x): x is RankedItem => x !== undefined);
 }
