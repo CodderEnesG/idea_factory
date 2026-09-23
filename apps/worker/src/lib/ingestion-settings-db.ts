@@ -30,6 +30,14 @@ const KNOWN_SOURCES = [
   "gcc_startup_news",
   "github",
   "softwarerecs",
+  "techcabal",
+  "disrupt_africa",
+  "e27",
+  "startupi",
+  "neofeed",
+  "propakistani",
+  "perakende",
+  "digitalage",
 ];
 
 export interface IngestionSettings {

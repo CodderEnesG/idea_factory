@@ -30,6 +30,14 @@ export const KNOWN_SOURCES = [
   "gcc_startup_news",
   "github",
   "softwarerecs",
+  "techcabal",
+  "disrupt_africa",
+  "e27",
+  "startupi",
+  "neofeed",
+  "propakistani",
+  "perakende",
+  "digitalage",
 ] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;

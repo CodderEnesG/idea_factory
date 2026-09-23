@@ -29,6 +29,14 @@ const SOURCE_LABELS: Record<string, string> = {
   restofworld: "Rest of World",
   github: "GitHub",
   softwarerecs: "Software Recs",
+  techcabal: "TechCabal",
+  disrupt_africa: "Disrupt Africa",
+  e27: "e27",
+  startupi: "Startupi",
+  neofeed: "NeoFeed",
+  propakistani: "ProPakistani",
+  perakende: "Perakende.org",
+  digitalage: "Digital Age",
 };
 
 /** Ham `signals.source` değerini ("tldr:founders") okunabilir bir etikete çevirir ("TLDR"). */

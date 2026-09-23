@@ -11,6 +11,8 @@ export function wpFeed(opts: {
   name: string; // Source.name ve Signal.source
   url: string;
   market?: string | null;
+  /** Feed çok büyükse (ör. 1000 kayıtlı arşiv feed'i) analiz bütçesini boğmasın diye en yeni N kayıt. */
+  limit?: number;
   inferType: (title: string, categories: string[]) => SignalType;
 }): Source {
   return {
@@ -21,7 +23,7 @@ export function wpFeed(opts: {
       const now = new Date().toISOString();
       const out: Signal[] = [];
 
-      for (const item of feed.items) {
+      for (const item of opts.limit ? feed.items.slice(0, opts.limit) : feed.items) {
         const url = item.link?.trim();
         const title = item.title?.trim();
         if (!url || !title) continue;

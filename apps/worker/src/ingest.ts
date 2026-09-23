@@ -28,6 +28,7 @@ import { techcrunchApps } from "./sources/techcrunch-apps.js";
 import { gccStartupNews } from "./sources/gcc-startup-news.js";
 import { github } from "./sources/github.js";
 import { softwarerecs } from "./sources/softwarerecs.js";
+import { techcabal, disruptAfrica, e27, startupi, neofeed, proPakistani, perakende, digitalAge } from "./sources/regional-feeds.js";
 import type { Source } from "./sources/types.js";
 import { dedupeBatch, quote } from "./lib/dedupe.js";
 import { fetchAllSources } from "./lib/fetch-sources.js";
@@ -62,6 +63,15 @@ const ALL_SOURCES: Source[] = [
   gccStartupNews,
   github,
   softwarerecs,
+  techcabal,
+  disruptAfrica,
+  e27,
+ 
+  startupi,
+  neofeed,
+  proPakistani,
+  perakende,
+  digitalAge,
 ];
 
 // PostgREST sorgusu URL query string'e gömülür; 100+ sinyalin url+hash'i tek sorguda
