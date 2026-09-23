@@ -3,10 +3,10 @@ import { parse } from "node-html-parser";
 import { SignalSchema, shortHash, type Signal, type SignalType } from "@idea-factory/core";
 import type { Source } from "./types.js";
 
-// Tez için en değerli TLDR feed'leri.
-const CATEGORIES = (process.env["TLDR_CATEGORIES"] ?? "founders,ai,tech,product").split(",");
-// Kategori başı haber tavanı (2026-09-14): tldr:ai sinyallerinin %51'i developer segmenti
-// (guard k — hiç kovala olamıyor). Kategoriyi kapatmıyoruz, sayı başına hacmini kısıyoruz.
+// Tez için en değerli TLDR feed'leri. Ölçüm (2026-09-23, fit≥80 / analiz): founders 7/105,
+// tech 2/75, ai 2/254, product 0/3 (128 sinyal, analiz bütçesi bile harcanmıyor) → yalnız founders.
+const CATEGORIES = (process.env["TLDR_CATEGORIES"] ?? "founders").split(",");
+// Kategori başı haber tavanı (2026-09-14): TLDR_CATEGORIES ile ai yeniden açılırsa hacmi kısılı kalsın.
 const CATEGORY_CAP: Record<string, number> = { ai: 5 };
 const UA = "Mozilla/5.0 (compatible; IdeaFactory/1.0)";
 

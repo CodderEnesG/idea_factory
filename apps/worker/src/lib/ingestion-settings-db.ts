@@ -28,6 +28,8 @@ const KNOWN_SOURCES = [
   "restofworld",
   "techcrunch_apps",
   "gcc_startup_news",
+  "github",
+  "softwarerecs",
 ];
 
 export interface IngestionSettings {

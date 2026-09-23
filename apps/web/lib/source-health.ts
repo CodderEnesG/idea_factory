@@ -28,6 +28,8 @@ export const KNOWN_SOURCES = [
   "restofworld",
   "techcrunch_apps",
   "gcc_startup_news",
+  "github",
+  "softwarerecs",
 ] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
