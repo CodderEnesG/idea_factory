@@ -2,6 +2,7 @@ import type { BaseAnalysis, RankedItem, Signal } from "@idea-factory/core";
 import { serverDb } from "./supabase";
 import { DEMO_ITEMS } from "./demo";
 import { ttlCache, globalMap } from "./ttl-cache";
+import { isRevenueSource } from "./revenue-view";
 
 // PostgREST/Supabase yanıtı limit'siz .select()'te bile 1000 satırda SESSİZCE kesiyor
 // (2026-08-21'de keşfedildi: 1247 analiz satırından 247'si hiçbir sayfada görünmüyordu, hata
@@ -75,7 +76,8 @@ export async function loadItems(): Promise<LoadItemsResult> {
   const bySignal = new Map<string, RankedItem>();
   for (const r of rows) {
     const { signals, ...rest } = r as Record<string, unknown> & { signals?: Signal };
-    if (!signals) continue;
+    // Kanıtlı gelir kaynakları raporlara (harita/trend/metrik) karışmaz — yalnız /kanitli.
+    if (!signals || isRevenueSource(signals.source)) continue;
     const analysis = rest as unknown as BaseAnalysis;
     const item = bySignal.get(signals.id);
     if (item) item.analyses[analysis.lens] = analysis;

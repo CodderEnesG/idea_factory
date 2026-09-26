@@ -46,7 +46,8 @@ export default async function Queue({ searchParams }: { searchParams: Params }) 
 
   // `?id=` (Gelen kutusu'ndan derin bağlantı): sayfada yoksa da açılsın.
   const wantedId = searchParams.id ?? null;
-  const wanted = wantedId ? ws.entries.find((e) => e.id === wantedId) : undefined;
+  // Kanıtlı gelir satırları listede yok ama "Tam analiz" derin bağlantısı onları da açar.
+  const wanted = wantedId ? [...ws.entries, ...ws.revenueEntries].find((e) => e.id === wantedId) : undefined;
   const rowEntries = wanted && !pageEntries.some((e) => e.id === wanted.id) ? [wanted, ...pageEntries] : pageEntries;
 
   const cardList = await hydrate(

@@ -10,6 +10,10 @@ import {
 } from "@idea-factory/core";
 import { db } from "./db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
+import { MANUAL_REVENUE_SOURCE } from "./lib/revenue-signal.js";
+import { APPSTORE_SOURCE } from "./sources/appstore.js";
+
+const REVENUE_SOURCES = new Set([MANUAL_REVENUE_SOURCE, APPSTORE_SOURCE]);
 
 const TOP_N = Number(process.env["DIGEST_TOP_N"] ?? "10");
 
@@ -24,7 +28,8 @@ async function main(): Promise<void> {
   const bySignal = new Map<string, RankedItem>();
   for (const row of data ?? []) {
     const { signals, ...rest } = row as Record<string, unknown> & { signals?: Signal };
-    if (!signals) continue;
+    // Kanıtlı gelir kaynakları (manual_revenue, appstore_grossing) digest'e karışmaz — web'de ayrı sekme.
+    if (!signals || REVENUE_SOURCES.has(signals.source)) continue;
     const analysis = rest as unknown as BaseAnalysis;
     const item = bySignal.get(signals.id);
     if (item) item.analyses[analysis.lens] = analysis;

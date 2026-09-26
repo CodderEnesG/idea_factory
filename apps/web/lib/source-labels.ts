@@ -37,6 +37,8 @@ const SOURCE_LABELS: Record<string, string> = {
   propakistani: "ProPakistani",
   perakende: "Perakende.org",
   digitalage: "Digital Age",
+  manual_revenue: "Kanıtlı gelir",
+  appstore_grossing: "App Store hasılat",
 };
 
 /** Ham `signals.source` değerini ("tldr:founders") okunabilir bir etikete çevirir ("TLDR"). */

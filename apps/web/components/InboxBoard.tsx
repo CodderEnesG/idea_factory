@@ -6,7 +6,7 @@ import type { Decision } from "./DecisionButtons";
 import { BAND } from "./card-visuals";
 import { whyLine, trustNote, competitionNote } from "../lib/card-text";
 import { formatSource } from "../lib/source-labels";
-import { AppSidebar } from "./AppSidebar";
+import { AppSidebar, type NavKey } from "./AppSidebar";
 import type { SessionUser } from "../lib/session";
 
 /**
@@ -30,6 +30,10 @@ export function InboxBoard({
   me,
   demo,
   loadError,
+  current: navKey = "gelen",
+  title = "Gelen kutusu",
+  metricById,
+  note,
 }: {
   items: CardView[];
   hiddenKilled: number;
@@ -37,6 +41,13 @@ export function InboxBoard({
   me: SessionUser | null;
   demo: boolean;
   loadError: string | null;
+  /** Aynı triage başka listede (Kanıtlı gelir) kullanılınca menü anahtarı ve başlık. */
+  current?: NavKey;
+  title?: string;
+  /** Satır başına kısa kaynak metriği ("30g $85.9K ↑12%"); verilirse uyum puanının yanında görünür. */
+  metricById?: Record<string, string>;
+  /** Başlığın altında tek satır bilgi notu. */
+  note?: string | null;
 }) {
   const [queue, setQueue] = useState(items);
   const [cursor, setCursor] = useState(0);
@@ -97,22 +108,23 @@ export function InboxBoard({
 
   const remaining = queue.length;
   const heading = useMemo(
-    () => (remaining > 0 ? `${remaining} fırsat karar bekliyor` : "Gelen kutusu boş"),
-    [remaining],
+    () => (remaining > 0 ? `${remaining} fırsat karar bekliyor` : `${title} boş`),
+    [remaining, title],
   );
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar me={me} current="gelen" />
+      <AppSidebar me={me} current={navKey} />
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-6 pb-8 pt-16 md:pt-8">
           <header className="mb-5 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h1 className="font-display text-3xl font-bold">Gelen kutusu</h1>
+              <h1 className="font-display text-3xl font-bold">{title}</h1>
               <p className="mt-1 text-sm text-ink-secondary">
                 {heading}
                 {done > 0 && ` · bu oturumda ${done} karar`}
               </p>
+              {note && <p className="mt-1 text-xs text-ink-muted">{note}</p>}
             </div>
             <p className="hidden font-mono text-[11px] text-ink-muted md:block">
               <kbd>j</kbd>/<kbd>k</kbd> gez · <kbd>1</kbd> kovala · <kbd>2</kbd> izle · <kbd>3</kbd> ele · <kbd>o</kbd> kaynağı aç
@@ -160,6 +172,9 @@ export function InboxBoard({
                             {it.sector && ` · ${it.sector}`}
                           </span>
                         </span>
+                        {metricById?.[it.id] && (
+                          <span className="shrink-0 font-mono text-[11px] text-pursue">{metricById[it.id]}</span>
+                        )}
                         <span className="font-mono text-xs font-bold text-ink-muted">{it.fit}</span>
                       </button>
                     </li>
@@ -175,7 +190,8 @@ export function InboxBoard({
                   <div>
                     <h2 className="font-display text-xl font-semibold leading-snug">{current.title}</h2>
                     <p className="mt-1 font-mono text-[11px] text-ink-muted">
-                      {formatSource(current.source)} · {BAND[current.gatedBand].label.toLowerCase()} · uyum {current.fit} ·{" "}
+                      {formatSource(current.source)}
+                      {metricById?.[current.id] && ` · ${metricById[current.id]}`} · {BAND[current.gatedBand].label.toLowerCase()} · uyum {current.fit} ·{" "}
                       {trustNote(current)}
                       {competitionNote(current) && ` · ${competitionNote(current)}`}
                     </p>

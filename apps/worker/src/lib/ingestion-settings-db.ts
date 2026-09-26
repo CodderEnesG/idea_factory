@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { MANUAL_REVENUE_SOURCE } from "./revenue-signal.js";
 
 // web/lib/source-health.ts'teki KNOWN_SOURCES ile senkron tutulmalı.
 const KNOWN_SOURCES = [
@@ -38,6 +39,7 @@ const KNOWN_SOURCES = [
   "propakistani",
   "perakende",
   "digitalage",
+  "appstore_grossing",
 ];
 
 export interface IngestionSettings {
@@ -76,12 +78,14 @@ export async function loadActiveIngestionSettings(): Promise<IngestionSettings> 
 }
 
 /** İki çekim arası asgari saat ayarını uygular — son sinyalin `fetched_at`'i yeterince
- *  eski değilse bu tick'i atlamak için true döner. */
+ *  eski değilse bu tick'i atlamak için true döner. Elle eklenen sinyaller (`manual_revenue`)
+ *  sayılmaz: yoksa her elle ekleme bir sonraki otomatik çekimi erteler. */
 export async function shouldSkipForInterval(minIntervalHours: number): Promise<boolean> {
   if (minIntervalHours <= 0) return false;
   const { data, error } = await db
     .from("signals")
     .select("fetched_at")
+    .neq("source", MANUAL_REVENUE_SOURCE)
     .order("fetched_at", { ascending: false })
     .limit(1)
     .maybeSingle();

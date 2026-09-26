@@ -10,6 +10,7 @@ import { loadTasks } from "./load-tasks";
 import { loadDebates } from "./load-debates";
 import { buildCardView, resolveCardBands } from "./build-card-view";
 import { resolvePanomBand, type Band, type CardView, type GateState } from "./card-view";
+import { isRevenueSource } from "./revenue-view";
 import type { Decision, UserDecision } from "../components/DecisionButtons";
 
 /** Bir sinyalin liste satırı için gereken HER ŞEY — tam gerekçe metni yok, o `hydrate` ile gelir. */
@@ -56,7 +57,10 @@ async function loadContext() {
 }
 
 export interface Workspace extends Ctx {
+  /** Eski (haber/lansman) sinyaller — Gelen kutusu, Tüm sinyaller, Panom bunu görür. */
   entries: Entry[];
+  /** Gelir kanıtlı kaynaklar (Kanıtlı gelir, 2026-09-27) — yalnız /kanitli; eski listelere karışmaz. */
+  revenueEntries: Entry[];
   demo: boolean;
   loadError: string | null;
 }
@@ -85,7 +89,7 @@ export async function loadWorkspace(): Promise<Workspace> {
   }
 
   const ranked = rank(items, { bandOverride: (i) => bandOf.get(i.signal.id)?.band, lensRegistry });
-  const entries: Entry[] = ranked.map((item) => {
+  const all: Entry[] = ranked.map((item) => {
     const id = item.signal.id;
     const dec = decisions.get(id) ?? [];
     const mine = dec.find((d) => d.user === meName)?.decision ?? null;
@@ -108,7 +112,9 @@ export async function loadWorkspace(): Promise<Workspace> {
     };
   });
 
-  return { ...ctx, entries, demo, loadError: error };
+  const entries = all.filter((e) => !isRevenueSource(e.source));
+  const revenueEntries = all.filter((e) => isRevenueSource(e.source));
+  return { ...ctx, entries, revenueEntries, demo, loadError: error };
 }
 
 /** Verilen sinyallerin tam kart görünümü (yalnız bunlar DB'den çekilir); sıra `ids` sırasıdır. */

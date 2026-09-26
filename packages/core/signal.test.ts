@@ -29,6 +29,13 @@ describe("SignalSchema", () => {
     expect(SignalSchema.safeParse({ ...valid, type: "blog" }).success).toBe(false);
   });
 
+  it("source_meta korunur, null ve yokluk kabul edilir", () => {
+    const meta = { kind: "manual_revenue", revenue_30d_usd: 85881 };
+    expect(SignalSchema.parse({ ...valid, source_meta: meta }).source_meta).toEqual(meta);
+    expect(SignalSchema.safeParse({ ...valid, source_meta: null }).success).toBe(true);
+    expect(SignalSchema.parse(valid).source_meta).toBeUndefined();
+  });
+
   it("shortHash deterministik", () => {
     expect(shortHash("aynı")).toBe(shortHash("aynı"));
     expect(shortHash("a")).not.toBe(shortHash("b"));

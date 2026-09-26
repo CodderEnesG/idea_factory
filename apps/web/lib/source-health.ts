@@ -38,6 +38,7 @@ export const KNOWN_SOURCES = [
   "propakistani",
   "perakende",
   "digitalage",
+  "appstore_grossing",
 ] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;

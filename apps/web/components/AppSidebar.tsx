@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
 import {
   IconInbox,
+  IconBanknote,
   IconBookmark,
   IconChevronLeft,
   IconChevronDown,
@@ -29,6 +30,7 @@ function initialsOf(name: string): string {
 
 export type NavKey =
   | "gelen"
+  | "kanitli"
   | "queue"
   | "panom"
   | "harita"
@@ -205,6 +207,9 @@ export function AppSidebar({
         </NavItem>
         <NavItem href="/queue" active={active("queue")} icon={<IconSliders className="h-4 w-4" />} collapsed={collapsed} label="Tüm sinyaller">
           Tüm sinyaller
+        </NavItem>
+        <NavItem href="/kanitli" active={active("kanitli")} icon={<IconBanknote className="h-4 w-4" />} collapsed={collapsed} label="Kanıtlı gelir">
+          Kanıtlı gelir
         </NavItem>
         {me && (
           <NavItem

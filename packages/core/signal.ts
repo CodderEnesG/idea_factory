@@ -23,5 +23,8 @@ export const SignalSchema = z.object({
   // 0013 — bkz. supabase/migrations/0013_final_decisions.sql. Yalnız `final_decisions`'ta
   // "watch" kesinleştiğinde set edilir; ingest/enrich bu kolonu hiç yazmaz.
   watch_review_at: z.string().nullable().optional(),
+  // 0016 — kaynağa özgü metrik (gelir, sıralama); yalnız gelir kanıtlı kaynaklar yazar, diğerlerinde null.
+  // enrich/reassess `SignalSchema.parse` ile okuyor — alan burada olmasa parse onu düşürürdü.
+  source_meta: z.record(z.unknown()).nullable().optional(),
 });
 export type Signal = z.infer<typeof SignalSchema>;

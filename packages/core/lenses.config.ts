@@ -245,7 +245,12 @@ export const ARBITRAGE_SEED_LENS: CustomLensDef = {
       "Sermaye-yoğunluk anti-pattern'ı BİZİM Türkiye'de kovalayacağımız versiyonun sermaye " +
       "ihtiyacıyla ölçülür: uyarlama düşük sermayeyle kurulabiliyorsa, kaynak şirketin büyük " +
       "fonlaması fit'i DÜŞÜRMEZ, yükseltir.",
-    "Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon.",
+    // 2026-09-27: gelir kanıtlı kaynaklar (elle girilen doğrulanmış gelir, App Store hasılatı) —
+    // bootstrap şirket fon almaz, basına düşmez; fon yokluğu burada eksi okunmasın.
+    // Canlı DB'ye scripts/migrate-2026-09-revenue-evidence.ts taşır.
+    "Kanıt: başka pazarda gerçekten işe yaramış mı? (traksiyon/fonlama/büyüme) Yoksa spekülasyon. " +
+      "Ödeme sağlayıcısıyla doğrulanmış gelir (MRR, son 30 gün geliri) ve App Store hasılat " +
+      "sıralaması fon haberinden GÜÇLÜ kanıttır; gelir kanıtlıysa fonlama yokluğu eksi değildir.",
     // 2026-09-13: eski metin "hangi dar segment" diyerek darlığı ödüllendiriyordu (fit≥80'in
     // çoğu tek-rol niş B2B). Canlı DB'ye scripts/migrate-2026-09-thesis-b2c.ts taşır.
     "Yerel wedge + kitle: Türkiye'de somut giriş noktası ve acı ne, bu ürünü kaç kişi/işletme " +
