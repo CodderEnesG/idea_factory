@@ -29,6 +29,10 @@ const PER_SOURCE_CAP = Number(process.env["ANALYZE_PER_SOURCE_CAP"] ?? "4");
 // Tüm kovalanabilir sinyalleri golden kalibrasyonuyla baştan analiz için (done-atlamasını
 // devre dışı bırakır, upsert eski satırın üstüne yazar). enrich.ts FORCE_ENRICH deseni.
 const FORCE = process.env["ANALYZE_FORCE"] === "true";
+// Mercek içi paralel çağrı. Varsayılan 1 = cron'un bugünkü sıralı davranışı; toplu backlog
+// (ör. Kanıtlı gelir ilk yüklemesi) için yükseltilir. enrich.ts'teki 300 ms kademe ile aynı 429 önlemi.
+const CONCURRENCY = Math.max(1, Number(process.env["ANALYZE_CONCURRENCY"] ?? "1"));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Henüz triage edilmemiş (triage.ts çalışmadı/başarısız oldu) sinyal kaybolmasın — nötr say.
 const NEUTRAL_TRIAGE_SCORE = 50;
 
@@ -116,9 +120,16 @@ async function main(): Promise<void> {
 
     totalTodo += todo.length;
     let ok = 0;
-    for (const signal of todo) {
-      if (await analyzeOne(signal, lens, { fewShot, knowledge, thesis })) ok++;
+    let next = 0;
+    async function workerLoop(): Promise<void> {
+      for (;;) {
+        const n = next++;
+        if (n >= todo.length) return;
+        if (n >= CONCURRENCY) await sleep(300);
+        if (await analyzeOne(todo[n]!, lens, { fewShot, knowledge, thesis })) ok++;
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, todo.length) }, workerLoop));
     console.log(`[${lens.id}] bitti: ${ok}/${todo.length} analiz yazıldı`);
     totalOk += ok;
   }

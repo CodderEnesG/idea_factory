@@ -38,6 +38,12 @@ const DRY = process.env["BACKFILL_DRY"] === "true";
 // görüldü (2026-08-10 pilotu), o yüzden varsayılan 3. 1 = tamamen sıralı.
 const CONCURRENCY = Math.max(1, Number(process.env["BACKFILL_CONCURRENCY"] ?? "3"));
 const PAGE = 1000; // PostgREST satır tavanı
+// Yalnız bu kaynaklar (virgüllü, `tldr:founders` gibi alt-kaynaklar kökünden eşleşir). Boş = hepsi
+// (cron davranışı). Toplu yüklemede (ör. Kanıtlı gelir) eski backlog'a bütçe gitmesin diye.
+const SOURCES = (process.env["BACKFILL_SOURCES"] ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const FEW_SHOT_BY_LENS: Record<string, FewShotExample[]> = { [ARBITRAGE_SEED_LENS.id]: golden };
 
@@ -81,7 +87,7 @@ async function findCandidates(
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`signals sorgu hatası: ${error.message}`);
     const rows = (data ?? []) as Signal[];
-    all.push(...rows);
+    all.push(...(SOURCES.length ? rows.filter((r) => SOURCES.includes(r.source.split(":")[0]!)) : rows));
     if (rows.length < PAGE) break;
   }
 
