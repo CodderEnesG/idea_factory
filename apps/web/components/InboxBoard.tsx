@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import { BAND } from "./card-visuals";
@@ -16,6 +16,27 @@ import type { SessionUser } from "../lib/session";
  * "neden bu?" cümlesini ve tek kelimelik güven notunu görür. Hiçbir sinyal gizlice
  * elenmez — sistemin "ele" dediği sinyaller listede değil, sayaçta ve Kuyruk'ta durur.
  */
+
+const DECISION_TEXT: Record<Decision, { label: string; cls: string }> = {
+  pursue: { label: "kovala", cls: "text-pursue" },
+  watch: { label: "izle", cls: "text-watch" },
+  kill: { label: "ele", cls: "text-kill" },
+};
+
+/** Diğer üyelerin kararı — ortak liste: biri karar verse de satır başkasında kalır, kararı görünür. */
+function OthersLine({ card }: { card: CardView }) {
+  if (card.others.length === 0) return null;
+  return (
+    <>
+      {card.others.map((o) => (
+        <span key={o.user}>
+          {" · "}
+          {o.user}: <span className={DECISION_TEXT[o.decision].cls}>{DECISION_TEXT[o.decision].label}</span>
+        </span>
+      ))}
+    </>
+  );
+}
 
 const OPTS: { d: Decision; key: string; label: string; cls: string }[] = [
   { d: "pursue", key: "1", label: "Kovala", cls: "bg-pursue/10 text-pursue hover:bg-pursue/25" },
@@ -34,6 +55,8 @@ export function InboxBoard({
   title = "Gelen kutusu",
   metricById,
   note,
+  total,
+  toolbar,
 }: {
   items: CardView[];
   hiddenKilled: number;
@@ -48,6 +71,10 @@ export function InboxBoard({
   metricById?: Record<string, string>;
   /** Başlığın altında tek satır bilgi notu. */
   note?: string | null;
+  /** Sayfalı listede karar bekleyenlerin TOPLAMI (yalnız bu sayfa değil); başlık bunu gösterir. */
+  total?: number;
+  /** Başlığın altında sunucudan gelen süzgeç/sayfa çubuğu. */
+  toolbar?: ReactNode;
 }) {
   const [queue, setQueue] = useState(items);
   const [cursor, setCursor] = useState(0);
@@ -108,8 +135,11 @@ export function InboxBoard({
 
   const remaining = queue.length;
   const heading = useMemo(
-    () => (remaining > 0 ? `${remaining} fırsat karar bekliyor` : `${title} boş`),
-    [remaining, title],
+    () => {
+      const waiting = total != null ? Math.max(0, total - done) : remaining;
+      return waiting > 0 ? `${waiting} fırsat karar bekliyor` : `${title} boş`;
+    },
+    [remaining, title, total, done],
   );
 
   return (
@@ -125,6 +155,7 @@ export function InboxBoard({
                 {done > 0 && ` · bu oturumda ${done} karar`}
               </p>
               {note && <p className="mt-1 text-xs text-ink-muted">{note}</p>}
+              {toolbar}
             </div>
             <p className="hidden font-mono text-[11px] text-ink-muted md:block">
               <kbd>j</kbd>/<kbd>k</kbd> gez · <kbd>1</kbd> kovala · <kbd>2</kbd> izle · <kbd>3</kbd> ele · <kbd>o</kbd> kaynağı aç
@@ -170,6 +201,7 @@ export function InboxBoard({
                           <span className="block truncate font-mono text-[10.5px] text-ink-muted">
                             {formatSource(it.source)}
                             {it.sector && ` · ${it.sector}`}
+                            <OthersLine card={it} />
                           </span>
                         </span>
                         {metricById?.[it.id] && (
@@ -195,6 +227,11 @@ export function InboxBoard({
                       {trustNote(current)}
                       {competitionNote(current) && ` · ${competitionNote(current)}`}
                     </p>
+                    {current.others.length > 0 && (
+                      <p className="mt-1 font-mono text-[11px] text-ink-secondary">
+                        Diğer kararlar<OthersLine card={current} />
+                      </p>
+                    )}
                   </div>
 
                   <p className="text-[15px] leading-relaxed text-ink">{whyLine(current)}</p>

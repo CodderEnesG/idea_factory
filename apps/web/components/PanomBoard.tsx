@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { CardView } from "../lib/card-view";
 import type { Decision } from "./DecisionButtons";
 import type { SessionUser } from "../lib/session";
-import { AppSidebar } from "./AppSidebar";
+import { AppSidebar, type NavKey } from "./AppSidebar";
 import { SignalDetail } from "./SignalDetail";
 import { formatSource } from "../lib/source-labels";
 
@@ -17,6 +17,16 @@ export interface KilledRow {
 /** Kararın kartta görünen etkin değeri: ekip kararı > benim > başkasının. */
 function decisionOf(c: CardView, override: Map<string, Decision>): Decision {
   return override.get(c.id) ?? c.finalDecision ?? c.mine ?? c.others[0]?.decision ?? "watch";
+}
+
+const DECISION_WORD: Record<Decision, string> = { pursue: "kovala", watch: "izle", kill: "ele" };
+
+/** Ortak görünümde satırın kimden geldiği: ekip kararı varsa o, yoksa her üyenin kararı. */
+function whoDecided(c: CardView, meName: string): string {
+  if (c.finalDecision) return `ekip: ${DECISION_WORD[c.finalDecision]}${c.finalDecidedBy ? ` (${c.finalDecidedBy})` : ""}`;
+  const parts = c.others.map((o) => `${o.user}: ${DECISION_WORD[o.decision]}`);
+  if (c.mine) parts.unshift(`${meName}: ${DECISION_WORD[c.mine]}`);
+  return parts.join(" · ");
 }
 
 function fmtDate(iso: string): string {
@@ -35,11 +45,21 @@ export function PanomBoard({
   killed,
   me,
   meName,
+  current = "panom",
+  title = "Panom",
+  shared = false,
+  toolbar,
 }: {
   cards: CardView[];
   killed: KilledRow[];
   me: SessionUser | null;
   meName: string;
+  /** Aynı pano başka listede (Kanıtlı gelir kararları) kullanılınca menü anahtarı ve başlık. */
+  current?: NavKey;
+  title?: string;
+  /** Ortak görünüm: sayaç "senin" değil ekibin kararlarını anlatır, satırda kimin karar verdiği yazar. */
+  shared?: boolean;
+  toolbar?: React.ReactNode;
 }) {
   const [override, setOverride] = useState<Map<string, Decision>>(new Map());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -77,6 +97,7 @@ export function PanomBoard({
             <span className="block truncate font-mono text-[10.5px] text-ink-muted">
               {formatSource(c.source)}
               {c.sector && ` · ${c.sector}`}
+              {shared && ` · ${whoDecided(c, meName)}`}
             </span>
           </span>
           {right}
@@ -119,14 +140,17 @@ export function PanomBoard({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar me={me} current="panom" />
+      <AppSidebar me={me} current={current} />
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-6 pb-10 pt-16 md:pt-8">
           <header className="mb-6">
-            <h1 className="font-display text-3xl font-bold">Panom</h1>
+            <h1 className="font-display text-3xl font-bold">{title}</h1>
             <p className="mt-1 text-sm text-ink-secondary">
-              {pursue.length} kovaladığın · {watch.length} izlediğin · {killed.length + moved} elediğin
+              {shared
+                ? `${pursue.length} kovalanan · ${watch.length} izlenen · ${killed.length + moved} elenen`
+                : `${pursue.length} kovaladığın · ${watch.length} izlediğin · ${killed.length + moved} elediğin`}
             </p>
+            {toolbar}
           </header>
 
           {empty ? (
