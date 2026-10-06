@@ -26,9 +26,6 @@ export function SignalDetail({
 }) {
   const band = BAND[card.gatedBand];
   const decided = card.finalDecision ?? card.mine;
-  const risks = card.lensViews.flatMap((l) => l.risks).slice(0, 4);
-  const verify = card.lensViews.flatMap((l) => l.validation_needed).slice(0, 4);
-  const yorumcu = card.debates[0];
   const comp = competitionNote(card);
 
   return (
@@ -68,56 +65,7 @@ export function SignalDetail({
         </p>
       )}
 
-      <details className="rounded-card border border-hair bg-surface px-4 py-3 text-sm">
-        <summary className="cursor-pointer select-none text-ink-secondary">Tam analiz</summary>
-        <div className="mt-3 space-y-4">
-          {card.lensViews.map((l) => (
-            <section key={l.id}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                {l.name} · {l.fit} · güven {CONFIDENCE_LABEL[l.confidence]}
-              </h3>
-              <p className="mt-1 whitespace-pre-line leading-relaxed text-ink-secondary">
-                {l.rationale.replace(/^\[[^\]]*\]\s*/, "")}
-              </p>
-              {l.note && (
-                <p className="mt-1 text-xs text-ink-muted">
-                  {l.extraNoteLabel}: {l.note}
-                </p>
-              )}
-            </section>
-          ))}
-          {risks.length > 0 && (
-            <section>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Riskler</h3>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-secondary">
-                {risks.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {verify.length > 0 && (
-            <section>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Doğrulanacaklar</h3>
-              <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-secondary">
-                {verify.map((v, i) => (
-                  <li key={i}>
-                    {v.data} <span className="text-ink-muted">— {v.how_to_verify}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {yorumcu && (
-            <section>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                Yorumcu · {VERDICT_TR[yorumcu.final_verdict]}
-              </h3>
-              <p className="mt-1 leading-relaxed text-ink-secondary">{yorumcu.final_commentary}</p>
-            </section>
-          )}
-        </div>
-      </details>
+      <FullAnalysis card={card} />
 
       {decided === "pursue" && (
         <section>
@@ -130,5 +78,65 @@ export function SignalDetail({
         Kaynağı aç →
       </a>
     </article>
+  );
+}
+
+/** Mercek gerekçeleri, riskler, doğrulanacaklar, Yorumcu özeti — katlanır. SignalDetail ve
+ *  Gelen kutusu / Kanıtlı gelir triage paneli paylaşır (orada varsayılan açık). */
+export function FullAnalysis({ card, open = false }: { card: CardView; open?: boolean }) {
+  const risks = card.lensViews.flatMap((l) => l.risks).slice(0, 4);
+  const verify = card.lensViews.flatMap((l) => l.validation_needed).slice(0, 4);
+  const yorumcu = card.debates[0];
+  return (
+    <details open={open} className="rounded-card border border-hair bg-surface px-4 py-3 text-sm">
+      <summary className="cursor-pointer select-none text-ink-secondary">Tam analiz</summary>
+      <div className="mt-3 space-y-4">
+        {card.lensViews.map((l) => (
+          <section key={l.id}>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+              {l.name} · {l.fit} · güven {CONFIDENCE_LABEL[l.confidence]}
+            </h3>
+            <p className="mt-1 whitespace-pre-line leading-relaxed text-ink-secondary">
+              {l.rationale.replace(/^\[[^\]]*\]\s*/, "")}
+            </p>
+            {l.note && (
+              <p className="mt-1 text-xs text-ink-muted">
+                {l.extraNoteLabel}: {l.note}
+              </p>
+            )}
+          </section>
+        ))}
+        {risks.length > 0 && (
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Riskler</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-secondary">
+              {risks.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {verify.length > 0 && (
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Doğrulanacaklar</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-ink-secondary">
+              {verify.map((v, i) => (
+                <li key={i}>
+                  {v.data} <span className="text-ink-muted">— {v.how_to_verify}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {yorumcu && (
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+              Yorumcu · {VERDICT_TR[yorumcu.final_verdict]}
+            </h3>
+            <p className="mt-1 leading-relaxed text-ink-secondary">{yorumcu.final_commentary}</p>
+          </section>
+        )}
+      </div>
+    </details>
   );
 }

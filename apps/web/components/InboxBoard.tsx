@@ -7,6 +7,7 @@ import { BAND } from "./card-visuals";
 import { whyLine, trustNote, competitionNote } from "../lib/card-text";
 import { formatSource } from "../lib/source-labels";
 import { AppSidebar, type NavKey } from "./AppSidebar";
+import { FullAnalysis } from "./SignalDetail";
 import type { SessionUser } from "../lib/session";
 
 /**
@@ -217,7 +218,7 @@ export function InboxBoard({
               {current && (
                 <section
                   key={current.id}
-                  className="glass min-w-0 flex-1 space-y-4 p-5 lg:sticky lg:top-8 lg:self-start"
+                  className="glass min-w-0 flex-1 space-y-4 p-5 lg:sticky lg:top-8 lg:max-h-[calc(100vh-4rem)] lg:self-start lg:overflow-y-auto"
                 >
                   <div>
                     <h2 className="font-display text-xl font-semibold leading-snug">{current.title}</h2>
@@ -236,18 +237,18 @@ export function InboxBoard({
 
                   <p className="text-[15px] leading-relaxed text-ink">{whyLine(current)}</p>
 
-                  {current.lensViews.some((l) => l.risks.length > 0) && (
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Dikkat</div>
-                      <ul className="mt-1 list-disc space-y-1 pl-4 text-sm text-ink-secondary">
-                        {current.lensViews
-                          .flatMap((l) => l.risks)
-                          .slice(0, 3)
-                          .map((r, i) => (
-                            <li key={i}>{r}</li>
-                          ))}
-                      </ul>
-                    </div>
+                  {(current.pitch ?? current.summary) && (
+                    <p className="text-sm leading-relaxed text-ink-secondary">{current.pitch ?? current.summary}</p>
+                  )}
+
+                  {current.facts.length > 0 && (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {current.facts.map((f, i) => (
+                        <li key={i} className="rounded-btn border border-hair bg-surface px-2 py-0.5 text-[11px] text-ink-secondary">
+                          {f.text}
+                        </li>
+                      ))}
+                    </ul>
                   )}
 
                   <div className="flex gap-2 pt-1">
@@ -263,6 +264,8 @@ export function InboxBoard({
                       </button>
                     ))}
                   </div>
+
+                  <FullAnalysis card={current} open />
 
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
                     <a
