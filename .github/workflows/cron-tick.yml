@@ -55,6 +55,9 @@ jobs:
           TRIAGE_LIMIT: ${{ vars.TRIAGE_LIMIT || '100' }}
           ANALYZE_LIMIT: ${{ vars.ANALYZE_LIMIT || '40' }}
           ANALYZE_PER_SOURCE_CAP: ${{ vars.ANALYZE_PER_SOURCE_CAP || '12' }}
+          # 2026-10-06: analyze sıralı koşuyordu (varsayılan 1) — 17+17 sinyal ~23 dk sürüp tick'i
+          # 53 dk'ya, 65 dk sınırının dibine itti. backfill/debate ile aynı 3 paralel (429 görülmedi).
+          ANALYZE_CONCURRENCY: ${{ vars.ANALYZE_CONCURRENCY || '3' }}
           # 2026-09-04: `analyze.ts` yalnız en-yeni pencereyi tarar (fetchShortlist), eski
           # backlog (1177 sinyal) o pencereye bir daha hiç girmiyordu. `backfill-lens.ts` artık
           # `tick`'in kendi parçası (iki mercek de, her koşuda kademeli) — tavan gözetimsiz
