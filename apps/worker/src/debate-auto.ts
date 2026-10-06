@@ -3,6 +3,7 @@ import { composite, isGateDebateCurrent, runDebate, type BaseAnalysis, type Sign
 import { db } from "./db.js";
 import { loadActiveThesis } from "./lib/thesis-db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
+import { fetchAll } from "./lib/fetch-all.js";
 import {
   planDebateRuns,
   selectAutoDebateCandidates,
@@ -37,14 +38,20 @@ async function loadGateCandidates(): Promise<{
   analysesBySignal: Map<string, Record<string, BaseAnalysis>>;
 }> {
   const lensRegistry = await loadActiveCustomLenses();
-  const { data, error } = await db
-    .from("analyses")
-    .select("signal_id, lens, fit, confidence, recommended_action, tags, rationale, created_at")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(`analyses sorgu hatası: ${error.message}`);
+  // id ikincil sıra: toplu upsert'lerde created_at eşitlenir, sayfalar arası kayma olmasın.
+  const data = await fetchAll(
+    (from, to) =>
+      db
+        .from("analyses")
+        .select("signal_id, lens, fit, confidence, recommended_action, tags, rationale, created_at")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    "analyses sorgu hatası",
+  );
 
   const bySignal = new Map<string, { analyses: Record<string, BaseAnalysis>; ts: string }>();
-  for (const row of (data ?? []) as Record<string, unknown>[]) {
+  for (const row of data as Record<string, unknown>[]) {
     const signalId = row["signal_id"] as string;
     const lens = row["lens"] as string;
     const entry = bySignal.get(signalId) ?? { analyses: {}, ts: row["created_at"] as string };

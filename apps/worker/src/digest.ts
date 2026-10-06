@@ -10,6 +10,7 @@ import {
 } from "@idea-factory/core";
 import { db } from "./db.js";
 import { loadActiveCustomLenses } from "./lib/lenses-db.js";
+import { fetchAll } from "./lib/fetch-all.js";
 import { MANUAL_REVENUE_SOURCE } from "./lib/revenue-signal.js";
 import { APPSTORE_SOURCE } from "./sources/appstore.js";
 
@@ -21,12 +22,14 @@ async function main(): Promise<void> {
   const customLenses = await loadActiveCustomLenses(); // /admin/mercekler'de eklenmiş aktif admin-mercekleri
   const lensRegistry = [...lenses, ...customLenses];
 
-  const { data, error } = await db.from("analyses").select("*, signals(*)");
-  if (error) throw new Error(`analyses join hatası: ${error.message}`);
+  const data = await fetchAll(
+    (from, to) => db.from("analyses").select("*, signals(*)").order("id").range(from, to),
+    "analyses join hatası",
+  );
 
   // Tüm mercek satırlarını sinyal başına `analyses` haritasında topla (queue/page.tsx ile aynı desen).
   const bySignal = new Map<string, RankedItem>();
-  for (const row of data ?? []) {
+  for (const row of data) {
     const { signals, ...rest } = row as Record<string, unknown> & { signals?: Signal };
     // Kanıtlı gelir kaynakları (manual_revenue, appstore_grossing) digest'e karışmaz — web'de ayrı sekme.
     if (!signals || REVENUE_SOURCES.has(signals.source)) continue;
@@ -53,7 +56,7 @@ async function main(): Promise<void> {
     console.error(`digest DB'ye yazılamadı (lokal dosya yine de yazıldı): ${insertError.message}`);
   }
 
-  console.log(`✓ digest yazıldı: ${out} (${items.length} sinyal, ${data?.length ?? 0} analiz)`);
+  console.log(`✓ digest yazıldı: ${out} (${items.length} sinyal, ${data.length} analiz)`);
 }
 
 main()

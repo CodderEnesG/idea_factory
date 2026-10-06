@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { computeSourceWeights } from "./source-weight-calc.js";
+import { fetchAll } from "./fetch-all.js";
 
 /**
  * Kaynak-verim ağırlığı: LLM analiz bütçesi kıt (analyze.ts/backfill-lens.ts kaynak başı
@@ -20,11 +21,13 @@ export async function loadSourceWeights(limit = 3000): Promise<Map<string, numbe
     .limit(limit);
   if (sigErr) throw new Error(`signals sorgu hatası (source-weight): ${sigErr.message}`);
 
-  const { data: analyses, error: anErr } = await db.from("analyses").select("signal_id,fit");
-  if (anErr) throw new Error(`analyses sorgu hatası (source-weight): ${anErr.message}`);
+  const analyses = await fetchAll(
+    (from, to) => db.from("analyses").select("signal_id,fit").order("id").range(from, to),
+    "analyses sorgu hatası (source-weight)",
+  );
 
   const bestFit = new Map<string, number>();
-  for (const a of analyses ?? []) {
+  for (const a of analyses) {
     const sid = a["signal_id"] as string;
     const fit = a["fit"] as number;
     const cur = bestFit.get(sid);
